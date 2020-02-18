@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>vlaaad</groupId>
+  <artifactId>reveal</artifactId>
+  <version>0.1.1-ea</version>
+  <name>reveal</name>
+  <dependencies>
+    <dependency>
+      <groupId>org.clojure</groupId>
+      <artifactId>clojure</artifactId>
+      <version>1.10.1</version>
+    </dependency>
+    <dependency>
+      <groupId>cljfx</groupId>
+      <artifactId>cljfx</artifactId>
+      <version>1.6.2</version>
+    </dependency>
+    <dependency>
+      <groupId>cljfx</groupId>
+      <artifactId>css</artifactId>
+      <version>1.1.0</version>
+    </dependency>
+  </dependencies>
+  <build>
+    <sourceDirectory>src</sourceDirectory>
+  </build>
+  <repositories/>
+  <scm>
+    <url>https://github.com/vlaaad/reveal</url>
+    <tag>0.1.1-ea</tag>
+  </scm>
+</project>
