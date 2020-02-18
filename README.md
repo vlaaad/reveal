@@ -32,6 +32,23 @@ started, it will open a window where evaluation results will appear. The window 
 both mouse and keyboard navigation. Context menu on selected value is opened either by 
 pressing space or by right mouse button click.
 
+## Installation and requirements
+
+Add a dev dependency on the latest version:
+
+[![Reveal on Clojars](https://clojars.org/vlaaad/reveal/latest-version.svg)](https://clojars.org/vlaaad/reveal)
+
+Minimum required clojure version is `1.10`.
+
+If you are using nrepl, just add `vlaaad.reveal.nrepl/middleware` to the middleware list. 
+Minimum nrepl version is `0.6.0`.
+
+If you are using socket repl, just run main in `vlaaad.reveal.prepl` namespace.
+
+If you don't want to use it as a repl, just call `(vlaaad.reveal.ui/make)` and it will 
+open a window and return a function: call it with 1 argument to submit a value, call it 
+with 0 arguments to close the window and dispose it.
+
 ## Try it out
 
 ### As a repl in a shell
@@ -66,3 +83,4 @@ clj \
 - structural navigation
 - remember window position and size
 - popup might appear in weird locations
+- logo and window icons
