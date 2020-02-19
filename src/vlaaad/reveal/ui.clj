@@ -6,14 +6,17 @@
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.event :as event]
             [vlaaad.reveal.view :as view]
-            [cljfx.lifecycle :as fx.lifecycle])
+            [cljfx.lifecycle :as fx.lifecycle]
+            [cljfx.composite :as fx.composite]
+            [cljfx.fx.scroll-pane :as fx.scroll-pane])
   (:import [javafx.scene.input KeyEvent KeyCode MouseEvent]
            [javafx.scene Node]
            [javafx.beans.value ChangeListener]
            [javafx.event Event]
            [java.util.concurrent ArrayBlockingQueue]
            [java.util UUID List]
-           [clojure.lang MultiFn]))
+           [clojure.lang MultiFn]
+           [javafx.scene.control ScrollPane]))
 
 (defn- on-header-width-changed [{:keys [state id fx/event]}]
   {:state (assoc-in state [:views id :header-width] event)})
@@ -46,6 +49,13 @@
 
 (defn- request-focus! [^MouseEvent e]
   (.requestFocus ^Node (.getTarget e)))
+
+(def ^:private scroll-pane
+  (fx.composite/lifecycle
+    {:ctor #(proxy [ScrollPane] []
+              (requestFocus []))
+     :args []
+     :props fx.scroll-pane/props}))
 
 (defn- view [{:keys [showing output view-order views focused-view] :as state}]
   (let [has-views (pos? (count view-order))]
@@ -80,24 +90,32 @@
                                :grid-pane/row 1
                                :grid-pane/column 0
                                :on-key-pressed {::event/handler on-view-key-pressed :id focused-view}
-                               :children [{:fx/type :h-box
-                                           :style-class "reveal-view-header"
-                                           :children (->> view-order
-                                                          (map (fn [id]
-                                                                 {:fx/type fx/ext-on-instance-lifecycle
-                                                                  :fx/key id
-                                                                  :on-created #(.put (.getProperties ^Node %) ::id id)
-                                                                  :desc {:fx/type :group
-                                                                         :children [{:fx/type segment/view
-                                                                                     :width (get-in views [id :header-width])
-                                                                                     :on-width-changed {::event/handler on-header-width-changed :id id}
-                                                                                     :height (get-in views [id :header-height])
-                                                                                     :on-height-changed {::event/handler on-header-height-changed :id id}
-                                                                                     :segments (get-in views [id :action :segments])}]}}))
-                                                          (interpose {:fx/type :label
-                                                                      :style-class "reveal-view-header-separator"
-                                                                      :min-width :use-pref-size
-                                                                      :text "→"}))}
+                               :children [{:fx/type scroll-pane
+                                           :style-class "reveal-view-scroll-pane"
+                                           :fit-to-width true
+                                           :vbar-policy :never
+                                           :hbar-policy :never
+                                           :content {:fx/type :h-box
+                                                     :style-class "reveal-view-header"
+                                                     :children (->> view-order
+                                                                    (map (fn [id]
+                                                                           {:fx/type fx/ext-on-instance-lifecycle
+                                                                            :fx/key id
+                                                                            :on-created #(.put (.getProperties ^Node %) ::id id)
+                                                                            :desc {:fx/type :pane
+                                                                                   :style-class (str "reveal-view-header-" (if (= id focused-view) "focused" "blurred"))
+                                                                                   :min-width :use-pref-size
+                                                                                   :min-height :use-pref-size
+                                                                                   :children [{:fx/type segment/view
+                                                                                               :width (get-in views [id :header-width])
+                                                                                               :on-width-changed {::event/handler on-header-width-changed :id id}
+                                                                                               :height (get-in views [id :header-height])
+                                                                                               :on-height-changed {::event/handler on-header-height-changed :id id}
+                                                                                               :segments (get-in views [id :action :segments])}]}}))
+                                                                    (interpose {:fx/type :label
+                                                                                :style-class "reveal-view-header-separator"
+                                                                                :min-width :use-pref-size
+                                                                                :text "→"}))}}
                                           {:fx/type ext-focused-by-default
                                            :fx/key focused-view
                                            :v-box/vgrow :always

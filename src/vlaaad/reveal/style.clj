@@ -33,9 +33,13 @@
                                   :-fx-padding scroll-bar-size}
                   "-view" {"-header" {:-fx-background-color popup-color
                                       :-fx-padding 5
+                                      "-focused" {:-fx-border-color util-color
+                                                  :-fx-border-width "0 0 1 0"
+                                                  :-fx-border-insets "0 0 -5 0"}
                                       "-separator" {:-fx-text-fill util-color
-                                                    :-fx-padding [0 3]
-                                                    :-fx-font-family (str \" (.getFamily font/font) \")}}}}
+                                                    :-fx-padding [0 5]
+                                                    :-fx-font-family (str \" (.getFamily font/font) \")}}
+                           "-scroll-pane" {:-fx-min-height 27}}}
        ".cell" {:-fx-text-fill symbol-color
                 :-fx-background-color :transparent
                 ":focused" {:-fx-background-color selection-color}}
