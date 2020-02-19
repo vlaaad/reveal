@@ -57,19 +57,21 @@ with 0 arguments to close the window and dispose it.
 ### As a repl in a shell
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea1"}}}' -m vlaaad.reveal.prepl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea2"}}}' -m vlaaad.reveal.prepl
 ```
 
 ### As an nrepl middleware in a shell
 
 ```sh
 clj \
--Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea1"} nrepl {:mvn/version "0.6.0"}}}' \
+-Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea2"} nrepl {:mvn/version "0.6.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
 
 ## To do
 
+- accordion navigation: auto-scroll to new tab, ctrl+arrows to go to next/prev 
+- multiple accordions
 - text search (triggered either just by typing, or with a shortcut)
 - context menu should allow text input that is then evaluated on selection
 - more representations of objects:
@@ -81,7 +83,6 @@ clj \
   - coll of maps, coll of same-length vectors: as table
   - documentable things (fns, vars, keywords): as formatted documentation
   - sourceable things: as source code
-- multiple accordions, better focus (tab/shift+tab) management
 - improve datafy/nav support (on sets, for example)
 - structural navigation
 - remember window position and size
