@@ -29,8 +29,11 @@ it's already a superior experience compared to repl.
 
 It does not depend on any particular IDE or text editor, it works in-process instead: when 
 started, it will open a window where evaluation results will appear. The window supports 
-both mouse and keyboard navigation. Context menu on selected value is opened either by 
-pressing space or by right mouse button click.
+both mouse and keyboard navigation. 
+
+Context menu on selected value is opened either by pressing <kbd>space</kbd> or by right 
+mouse button click. Selecting action to run is done either with arrow keys and 
+<kbd>enter</kbd>, or with left mouse button click.
 
 ## Installation and requirements
 
