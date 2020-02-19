@@ -6,7 +6,8 @@ Read Eval Visualize Loop for Clojure
 
 ## Rationale
 
-I want to be able hold a value in my hand. I want to understand it better, faster, easier.
+I want to be able hold a value in my hand. I want to understand it better and with less 
+effort.
 
 Repl is a great window into a running program, but text representation is too limited for 
 inspection. Reveal recognizes the value of a text as universal interface, that's why its 
@@ -17,8 +18,16 @@ menu.
 
 If I want to be able to understand the values I'm looking at, the tool to do it needs to
 treat these values as sacred. Where datafy-and-nav based tools like REBL pretend that 
-atoms are single-element vectors, Reveal never touches evaluation results, even the 
+atoms are single-element vectors, Reveal never obscures evaluation results, even the 
 metadata.
+
+Not being limited to just text, Reveal uses judicious syntax highlighting and sometimes 
+simplified string representations for data to make it more approachable yet distinctive. 
+For example, `java.lang.Integer` has different formatting depending on whether it 
+was produced from symbol or class, and function `+` is displayed as `clojure.core/+`, 
+not an `#object[clojure.core$_PLUS_ 0x1e295f7f "clojure.core$_PLUS_@1e295f7f"]`, while 
+still looking different from the symbol `'clojure.core/+`
+
 
 ## Project status
 
