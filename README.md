@@ -2,6 +2,8 @@
 
 Read Eval Visualize Loop for Clojure
 
+![demo](doc/demo.gif)
+
 [![Clojars Project](https://img.shields.io/clojars/v/vlaaad/reveal.svg?logo=clojure&logoColor=white)](https://clojars.org/vlaaad/reveal)
 
 ## Rationale
