@@ -33,12 +33,12 @@
                                   :-fx-padding scroll-bar-size}
                   "-view" {"-header" {:-fx-background-color popup-color
                                       :-fx-padding 5
-                                      "-focused" {:-fx-border-color util-color
-                                                  :-fx-border-width "0 0 1 0"
-                                                  :-fx-border-insets "0 0 -5 0"}
-                                      "-separator" {:-fx-text-fill util-color
-                                                    :-fx-padding [0 5]
-                                                    :-fx-font-family (str \" (.getFamily font/font) \")}}
+                                      :-fx-spacing 5
+                                      "-focused" {:-fx-background-color background-color
+                                                  :-fx-background-insets -5}
+                                      "-separator" {:-fx-min-width 1
+                                                    :-fx-background-color background-color
+                                                    :-fx-background-insets [-5 0]}}
                            "-scroll-pane" {:-fx-min-height 27}}}
        ".cell" {:-fx-text-fill symbol-color
                 :-fx-background-color :transparent

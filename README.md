@@ -6,8 +6,8 @@ Read Eval Visualize Loop for Clojure
 
 ## Rationale
 
-I want to be able hold a value in my hand. I want to understand it better and with less 
-effort.
+I want to be able hold a value in my hand. I want to understand it better and with fewer 
+keystrokes.
 
 Repl is a great window into a running program, but text representation is too limited for 
 inspection. Reveal recognizes the value of a text as universal interface, that's why its 
@@ -22,11 +22,11 @@ atoms are single-element vectors, Reveal never obscures evaluation results, even
 metadata.
 
 Not being limited to just text, Reveal uses judicious syntax highlighting and sometimes 
-simplified string representations for data to make it more approachable yet distinctive. 
-For example, `java.lang.Integer` has different formatting depending on whether it 
-was produced from symbol or class, and function `+` is displayed as `clojure.core/+`, 
-not an `#object[clojure.core$_PLUS_ 0x1e295f7f "clojure.core$_PLUS_@1e295f7f"]`, while 
-still looking different from the symbol `'clojure.core/+`
+simplified string representations for data to make it more approachable yet keep it 
+distinctive. For example, `java.lang.Integer` has different formatting depending on 
+whether it was produced from symbol or class, and function `+` is displayed as 
+`clojure.core/+`, not an `#object[clojure.core$_PLUS_ 0x1e295f7f "clojure.core$_PLUS_@1e295f7f"]`, 
+while still looking different from the symbol `'clojure.core/+`.
 
 
 ## Project status
@@ -40,9 +40,13 @@ It does not depend on any particular IDE or text editor, it works in-process ins
 started, it will open a window where evaluation results will appear. The window supports 
 both mouse and keyboard navigation. 
 
-Context menu on selected value is opened either by pressing <kbd>space</kbd> or by right 
+Context menu on selected value is opened either by pressing <kbd>Space</kbd> or by right 
 mouse button click. Selecting action to run is done either with arrow keys and 
-<kbd>enter</kbd>, or with left mouse button click.
+<kbd>Enter</kbd>, or with left mouse button click.
+
+Multiple action results are shown as separate tabs in popup panel, and switching between 
+those tabs is done either using mouse or using <kbd>Ctrl ←</kbd> / <kbd>Ctrl →</kbd> when 
+focus is on a results panel.
 
 ## Installation and requirements
 
@@ -79,8 +83,7 @@ clj \
 
 ## To do
 
-- accordion navigation: auto-scroll to new tab, ctrl+arrows to go to next/prev 
-- multiple accordions
+- accordion navigation: auto-scroll to new tab 
 - text search (triggered either just by typing, or with a shortcut)
 - context menu should allow text input that is then evaluated on selection
 - more representations of objects:
@@ -92,8 +95,9 @@ clj \
   - coll of maps, coll of same-length vectors: as table
   - documentable things (fns, vars, keywords): as formatted documentation
   - sourceable things: as source code
-- improve datafy/nav support (on sets, for example)
+- multiple accordions
 - structural navigation
+- improve datafy/nav support (on sets, for example)
 - remember window position and size
 - popup might appear in weird locations
 - logo and window icons

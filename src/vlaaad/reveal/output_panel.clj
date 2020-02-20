@@ -90,7 +90,7 @@
         (assoc this
           :layout
           (cond
-            shortcut (layout/arrow-scroll-up layout)
+            shortcut layout
             (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
             (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
             :else (layout/move-cursor-vertically layout with-anchor dec))))
@@ -101,7 +101,7 @@
         (assoc this
           :layout
           (cond
-            shortcut (layout/arrow-scroll-down layout)
+            shortcut layout
             (not cursor) (layout/introduce-cursor-at-top-of-screen layout)
             (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
             :else (layout/move-cursor-vertically layout with-anchor inc))))
@@ -110,7 +110,7 @@
       (assoc this
         :layout
         (cond
-          shortcut (layout/arrow-scroll-left layout)
+          shortcut layout
           (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
           (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
           :else (layout/move-cursor-horizontally layout with-anchor dec)))
@@ -119,7 +119,7 @@
       (assoc this
         :layout
         (cond
-          shortcut (layout/arrow-scroll-right layout)
+          shortcut layout
           (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
           (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
           :else (layout/move-cursor-horizontally layout with-anchor inc)))

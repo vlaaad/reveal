@@ -8,13 +8,15 @@
             [vlaaad.reveal.view :as view]
             [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.composite :as fx.composite]
-            [cljfx.fx.scroll-pane :as fx.scroll-pane])
-  (:import [javafx.scene.input KeyEvent KeyCode MouseEvent]
-           [javafx.scene Node]
+            [cljfx.fx.scroll-pane :as fx.scroll-pane]
+            [cljfx.mutator :as fx.mutator]
+            [cljfx.prop :as fx.prop])
+  (:import [javafx.scene.input KeyEvent KeyCode]
+           [javafx.scene Node Parent]
            [javafx.beans.value ChangeListener]
            [javafx.event Event]
            [java.util.concurrent ArrayBlockingQueue]
-           [java.util UUID List]
+           [java.util UUID]
            [clojure.lang MultiFn]
            [javafx.scene.control ScrollPane]))
 
@@ -24,9 +26,17 @@
 (defn- on-header-height-changed [{:keys [state id fx/event]}]
   {:state (assoc-in state [:views id :header-height] event)})
 
-(defn- on-view-key-pressed [{:keys [id ^KeyEvent fx/event]}]
-  (when (= KeyCode/ESCAPE (.getCode event))
-    {:close-view id}))
+(defn- on-view-key-pressed [{:keys [index ^KeyEvent fx/event state]}]
+  (let [code (.getCode event)]
+    (cond
+      (and (= KeyCode/LEFT code) (.isShortcutDown event))
+      {:state (update state :focused-view-index #(max 0 (dec %)))}
+
+      (and (= KeyCode/RIGHT code) (.isShortcutDown event))
+      {:state (update state :focused-view-index #(min (inc %) (dec (count (:view-order state)))))}
+
+      (= KeyCode/ESCAPE code)
+      {:close-view index})))
 
 (defn focus-when-on-scene! [^Node node]
   (if (some? (.getScene node))
@@ -47,79 +57,99 @@
 (defn- on-window-focused-changed [{:keys [state fx/event]}]
   {:state (assoc state :window-focused event)})
 
-(defn- request-focus! [^MouseEvent e]
-  (.requestFocus ^Node (.getTarget e)))
+(defn- focus-on-tab [{:keys [state index]}]
+  {:state (assoc state :focused-view-index index)})
 
 (def ^:private scroll-pane
   (fx.composite/lifecycle
     {:ctor #(proxy [ScrollPane] []
               (requestFocus []))
      :args []
-     :props fx.scroll-pane/props}))
+     :prop-order {:focused-view 1}
+     :props (assoc fx.scroll-pane/props
+              :focused-view
+              (fx.prop/make
+                (fx.mutator/setter
+                  (fn [^ScrollPane scroll-pane id]
+                    (when-let [view (->> ^Parent (.getContent scroll-pane)
+                                         (.getChildrenUnmodifiable)
+                                         (some #(when (= id (::id (.getProperties ^Node %))) %)))]
+                      (let [width (.getWidth (.getBoundsInLocal (.getContent scroll-pane)))
+                            height (.getHeight (.getBoundsInLocal (.getContent scroll-pane)))
+                            x (.getMaxX (.getBoundsInParent view))
+                            y (.getMaxY (.getBoundsInParent view))]
+                        (doto scroll-pane
+                          (.setVvalue (/ y height))
+                          (.setHvalue (/ x width)))))))
+                fx.lifecycle/scalar))}))
 
-(defn- view [{:keys [showing output view-order views focused-view] :as state}]
-  (let [has-views (pos? (count view-order))]
-    {:fx/type :stage
-     ;; todo ask if user wants to quit repl (default) or exit jvm
-     :on-close-request #(.consume ^Event %)
-     :showing showing
-     :width 400
-     :height 500
-     :on-focused-changed {::event/handler on-window-focused-changed}
-     :scene {:fx/type :scene
-             :stylesheets [(:cljfx.css/url style/style)]
-             :root {:fx/type :grid-pane
-                    :style-class "reveal-ui"
-                    :column-constraints [{:fx/type :column-constraints
-                                          :hgrow :always}]
-                    :row-constraints (if has-views
-                                       [{:fx/type :row-constraints
-                                         :percent-height 50}
-                                        {:fx/type :row-constraints
-                                         :percent-height 50}]
-                                       [{:fx/type :row-constraints
-                                         :percent-height 100}])
-                    :children
-                    (cond-> [(assoc output :fx/type output-panel/view
-                                           :grid-pane/row 0
-                                           :grid-pane/column 0
-                                           :id :output)]
-                            has-views
-                            (conj
+(defn- view [{:keys [showing output view-order views focused-view-index] :as state}]
+  {:fx/type :stage
+   ;; todo ask if user wants to quit repl (default) or exit jvm
+   :on-close-request #(.consume ^Event %)
+   :showing showing
+   :width 400
+   :height 500
+   :on-focused-changed {::event/handler on-window-focused-changed}
+   :scene {:fx/type :scene
+           :stylesheets [(:cljfx.css/url style/style)]
+           :root {:fx/type :grid-pane
+                  :style-class "reveal-ui"
+                  :column-constraints [{:fx/type :column-constraints
+                                        :hgrow :always}]
+                  :row-constraints (if focused-view-index
+                                     [{:fx/type :row-constraints
+                                       :percent-height 50}
+                                      {:fx/type :row-constraints
+                                       :percent-height 50}]
+                                     [{:fx/type :row-constraints
+                                       :percent-height 100}])
+                  :children
+                  (cond-> [(assoc output :fx/type output-panel/view
+                                         :grid-pane/row 0
+                                         :grid-pane/column 0
+                                         :id :output)]
+                          focused-view-index
+                          (conj
+                            (let [focused-view-id (view-order focused-view-index)]
                               {:fx/type :v-box
                                :grid-pane/row 1
                                :grid-pane/column 0
-                               :on-key-pressed {::event/handler on-view-key-pressed :id focused-view}
+                               :on-key-pressed {::event/handler on-view-key-pressed :index focused-view-index}
                                :children [{:fx/type scroll-pane
                                            :style-class "reveal-view-scroll-pane"
                                            :fit-to-width true
                                            :vbar-policy :never
                                            :hbar-policy :never
-                                           :content {:fx/type :h-box
-                                                     :style-class "reveal-view-header"
-                                                     :children (->> view-order
-                                                                    (map (fn [id]
-                                                                           {:fx/type fx/ext-on-instance-lifecycle
-                                                                            :fx/key id
-                                                                            :on-created #(.put (.getProperties ^Node %) ::id id)
-                                                                            :desc {:fx/type :pane
-                                                                                   :style-class (str "reveal-view-header-" (if (= id focused-view) "focused" "blurred"))
-                                                                                   :min-width :use-pref-size
-                                                                                   :min-height :use-pref-size
-                                                                                   :children [{:fx/type segment/view
-                                                                                               :width (get-in views [id :header-width])
-                                                                                               :on-width-changed {::event/handler on-header-width-changed :id id}
-                                                                                               :height (get-in views [id :header-height])
-                                                                                               :on-height-changed {::event/handler on-header-height-changed :id id}
-                                                                                               :segments (get-in views [id :action :segments])}]}}))
-                                                                    (interpose {:fx/type :label
-                                                                                :style-class "reveal-view-header-separator"
-                                                                                :min-width :use-pref-size
-                                                                                :text "→"}))}}
+                                           ;:focused-view focused-view
+                                           :content
+                                           {:fx/type :h-box
+                                            :style-class "reveal-view-header"
+                                            :children
+                                            (->> view-order
+                                              (map-indexed
+                                                (fn [index id]
+                                                  {:fx/type fx/ext-on-instance-lifecycle
+                                                   :fx/key id
+                                                   :on-created #(.put (.getProperties ^Node %) ::id id)
+                                                   :desc {:fx/type :pane
+                                                          :style-class (str "reveal-view-header-" (if (= id focused-view-id) "focused" "blurred"))
+                                                          :min-width :use-pref-size
+                                                          :min-height :use-pref-size
+                                                          :on-mouse-clicked {::event/handler focus-on-tab :index index}
+                                                          :children [{:fx/type segment/view
+                                                                      :width (get-in views [id :header-width])
+                                                                      :on-width-changed {::event/handler on-header-width-changed :id id}
+                                                                      :height (get-in views [id :header-height])
+                                                                      :on-height-changed {::event/handler on-header-height-changed :id id}
+                                                                      :segments (get-in views [id :action :segments])}]}}))
+                                              (interpose
+                                                {:fx/type :region
+                                                 :style-class "reveal-view-header-separator"}))}}
                                           {:fx/type ext-focused-by-default
-                                           :fx/key focused-view
+                                           :fx/key focused-view-id
                                            :v-box/vgrow :always
-                                           :desc (get state focused-view)}]}))}}}))
+                                           :desc (get state focused-view-id)}]})))}}})
 
 (defn oneduce
   ([xf x]
@@ -132,14 +162,16 @@
   (cond-> coll (ifn? x) (conj x)))
 
 (defn on-open-view [{:keys [state id desc action value *view-state]}]
-  {:state (-> state
-              (assoc id desc :focused-view id)
-              (update :view-order conj id)
-              (assoc-in [:views id] {:action action
-                                     :header-width 0
-                                     :header-height 0
-                                     :value value
-                                     :*view-state *view-state}))})
+  (let [view-order (:view-order state)]
+    {:state (-> state
+                (assoc id desc
+                       :focused-view-index (count view-order)
+                       :view-order (conj view-order id))
+                (assoc-in [:views id] {:action action
+                                       :header-width 0
+                                       :header-height 0
+                                       :value value
+                                       :*view-state *view-state}))}))
 
 (defn- execute-action-effect [action dispatch!]
   (future
@@ -175,18 +207,23 @@
                                 (update :on-delete into on-delete)))))))
 
 (defn- make-close-view-effect [*state]
-  (fn [id _]
-    (let [{:keys [*view-state]} (get-in @*state [:views id])]
+  (fn [index _]
+    (let [state @*state
+          id (get-in state [:view-order index])
+          {:keys [*view-state]} (get-in state [:views id])]
       (doseq [f (:on-delete @*view-state)]
         (f))
       (swap! *state (fn [state]
-                      (let [^List view-order (:view-order state)
-                            i (.indexOf view-order id)
-                            new-view-order (into (subvec view-order 0 i) (subvec view-order (inc i)))]
+                      (let [view-order (:view-order state)
+                            new-view-order (into (subvec view-order 0 index)
+                                                 (subvec view-order (inc index)))]
                         (-> state
                             (dissoc id)
                             (assoc :view-order new-view-order)
-                            (assoc :focused-view (get new-view-order (max 0 (dec i))))
+                            (as-> $ (if (empty? new-view-order)
+                                      (dissoc $ :focused-view-index)
+                                      (assoc $ :focused-view-index
+                                               (min index (dec (count new-view-order))))))
                             (update :views dissoc id)))))
       (swap! *view-state assoc :state :stopped))))
 
