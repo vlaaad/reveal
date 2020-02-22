@@ -42,14 +42,13 @@
   ([{:keys [canvas-width canvas-height lines scroll-x scroll-y focused scrolling-enabled]
      :or {scroll-x 0
           scroll-y 0
-          canvas-width 0
-          canvas-height 0
           lines []
           focused false
           scrolling-enabled true}
      :as layout}]
    (let [line-count (count lines)
          document-height (+ (* font/line-height line-count) (if scrolling-enabled scroll-bar-breadth 0))
+         canvas-height (or canvas-height document-height)
          scroll-y (clamp scroll-y (- canvas-height document-height) 0.0)
          scroll-y-remainder (rem (- scroll-y) font/line-height)
          dropped-line-count (- (long (/ scroll-y font/line-height)))
@@ -61,6 +60,7 @@
                              max
                              0
                              (range dropped-line-count (+ dropped-line-count drawn-line-count))))
+         canvas-width (or canvas-width document-width)
          scroll-x (clamp scroll-x (- canvas-width document-width) 0.0)]
      (-> layout
          (assoc :scroll-x scroll-x

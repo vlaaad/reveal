@@ -71,20 +71,31 @@
               (fx.prop/make
                 (fx.mutator/setter
                   (fn [^ScrollPane scroll-pane id]
+                    (.layout scroll-pane)
                     (when-let [view (->> ^Parent (.getContent scroll-pane)
                                          (.getChildrenUnmodifiable)
                                          (some #(when (= id (::id (.getProperties ^Node %))) %)))]
-                      (let [width (.getWidth (.getBoundsInLocal (.getContent scroll-pane)))
-                            height (.getHeight (.getBoundsInLocal (.getContent scroll-pane)))
-                            x (.getMaxX (.getBoundsInParent view))
-                            y (.getMaxY (.getBoundsInParent view))]
-                        (doto scroll-pane
-                          (.setVvalue (/ y height))
-                          (.setHvalue (/ x width)))))))
+                      (let [content (.getBoundsInLocal (.getContent scroll-pane))
+                            region (.getBoundsInParent view)
+                            viewport (.getViewportBounds scroll-pane)
+                            viewport-x (.getMinX viewport)
+                            viewport-width (.getWidth viewport)
+                            region-x (- (.getMinX region) 5)
+                            region-width (+ (.getWidth region) 10)
+                            canvas-start (- viewport-x)
+                            region-end (+ region-x region-width)
+                            canvas-end (+ canvas-start viewport-width)
+                            start (if (> region-end canvas-end)
+                                    (- region-x (- region-end canvas-end))
+                                    region-x)
+                            start (max start canvas-start)]
+                        (.setHvalue scroll-pane (/ (- region-x start viewport-x)
+                                                   (- (.getWidth content) viewport-width)))))))
                 fx.lifecycle/scalar))}))
 
 (defn- view [{:keys [showing output view-order views focused-view-index] :as state}]
   {:fx/type :stage
+   :title "Reveal"
    ;; todo ask if user wants to quit repl (default) or exit jvm
    :on-close-request #(.consume ^Event %)
    :showing showing
@@ -121,10 +132,11 @@
                                            :fit-to-width true
                                            :vbar-policy :never
                                            :hbar-policy :never
-                                           ;:focused-view focused-view
+                                           :focused-view focused-view-id
                                            :content
                                            {:fx/type :h-box
                                             :style-class "reveal-view-header"
+                                            :min-width :use-pref-size
                                             :children
                                             (->> view-order
                                               (map-indexed
@@ -168,8 +180,6 @@
                        :focused-view-index (count view-order)
                        :view-order (conj view-order id))
                 (assoc-in [:views id] {:action action
-                                       :header-width 0
-                                       :header-height 0
                                        :value value
                                        :*view-state *view-state}))}))
 

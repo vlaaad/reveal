@@ -13,8 +13,8 @@
     (isResizable [] true)
     (minWidth [_] 0)
     (minHeight [_] 0)
-    (maxWidth [_] Double/MAX_VALUE)
-    (maxHeight [_] Double/MAX_VALUE)
+    (maxWidth [_] 4096)
+    (maxHeight [_] 4096)
     (prefWidth [_]
       (let [^Canvas this this]
         (:pref-width (.getProperties this) (.getWidth this))))
@@ -39,6 +39,7 @@
   (fx.composite/lifecycle
     {:ctor make-resizable-canvas
      :args []
+     :prop-order {:draw 1}
      :props (merge fx.canvas/props
                    (fx.composite/props Canvas
                      :draw [(fx.mutator/setter

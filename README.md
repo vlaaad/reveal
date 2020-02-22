@@ -85,7 +85,7 @@ clj \
 
 ## To do
 
-- accordion navigation: auto-scroll to new tab 
+- accordion navigation: click to request focus 
 - text search (triggered either just by typing, or with a shortcut)
 - context menu should allow text input that is then evaluated on selection
 - more representations of objects:
