@@ -32,13 +32,9 @@
                   "-placeholder" {:-fx-text-fill util-color
                                   :-fx-padding scroll-bar-size}
                   "-view" {"-header" {:-fx-background-color popup-color
-                                      :-fx-padding 5
-                                      :-fx-spacing 5
-                                      "-focused" {:-fx-background-color background-color
-                                                  :-fx-background-insets -5}
+                                      "-tab" {"-focused" {:-fx-background-color background-color}}
                                       "-separator" {:-fx-min-width 1
-                                                    :-fx-background-color background-color
-                                                    :-fx-background-insets [-5 0]}}
+                                                    :-fx-background-color background-color}}
                            "-scroll-pane" {:-fx-min-height 27}}}
        ".cell" {:-fx-text-fill symbol-color
                 :-fx-background-color :transparent

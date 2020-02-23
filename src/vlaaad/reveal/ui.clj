@@ -80,8 +80,8 @@
                             viewport (.getViewportBounds scroll-pane)
                             viewport-x (.getMinX viewport)
                             viewport-width (.getWidth viewport)
-                            region-x (- (.getMinX region) 5)
-                            region-width (+ (.getWidth region) 10)
+                            region-x (.getMinX region)
+                            region-width (.getWidth region)
                             canvas-start (- viewport-x)
                             region-end (+ region-x region-width)
                             canvas-end (+ canvas-start viewport-width)
@@ -144,12 +144,16 @@
                                                   {:fx/type fx/ext-on-instance-lifecycle
                                                    :fx/key id
                                                    :on-created #(.put (.getProperties ^Node %) ::id id)
-                                                   :desc {:fx/type :pane
-                                                          :style-class (str "reveal-view-header-" (if (= id focused-view-id) "focused" "blurred"))
+                                                   :desc {:fx/type :anchor-pane
+                                                          :style-class ["reveal-view-header-tab" (str "reveal-view-header-tab-" (if (= id focused-view-id) "focused" "blurred"))]
                                                           :min-width :use-pref-size
                                                           :min-height :use-pref-size
                                                           :on-mouse-clicked {::event/handler focus-on-tab :index index}
                                                           :children [{:fx/type segment/view
+                                                                      :anchor-pane/left 5
+                                                                      :anchor-pane/right 5
+                                                                      :anchor-pane/top 5
+                                                                      :anchor-pane/bottom 5
                                                                       :width (get-in views [id :header-width])
                                                                       :on-width-changed {::event/handler on-header-width-changed :id id}
                                                                       :height (get-in views [id :header-height])
