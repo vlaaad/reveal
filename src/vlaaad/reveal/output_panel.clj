@@ -186,6 +186,10 @@
              :focus-traversable true
              :on-focused-changed {::event/handler on-focus-changed :id id :fx/sync true}
              :on-key-pressed {::event/handler on-key-pressed :id id :fx/sync true}
+             #_#_:on-key-typed #(when-not (or (.isShortcutDown %)
+                                              (.isAltDown %))
+                                  (tap> {:char (.getCharacter %)
+                                         :control? (Character/isISOControl (.charAt (.getCharacter %) 0))}))
              :on-mouse-dragged {::event/handler on-mouse-dragged :id id}
              :on-mouse-pressed {::event/handler on-mouse-pressed :id id :fx/sync true}
              :on-mouse-released {::event/handler on-mouse-released :id id}

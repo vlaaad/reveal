@@ -86,6 +86,12 @@ clj \
 ## To do
  
 - text search (triggered either just by typing, or with a shortcut)
+  - do I need to scroll back if I want to cancel search? accidental searches should be 
+    reversible
+  - direction of search? from the cursor (or top of the screen if no cursor) in both 
+    directions
+  - enter/down/right to next occurrence, shift+enter/up/left to prev occurrence, esc to 
+    abort search
 - context menu should allow text input that is then evaluated on selection
 - more representations of objects:
   - as arbitrary JavaFx/cljfx nodes
@@ -102,3 +108,5 @@ clj \
 - remember window position and size
 - popup might appear in weird locations
 - logo and window icons
+- adjust scroll on opening results window
+- sometimes popup does not disappear

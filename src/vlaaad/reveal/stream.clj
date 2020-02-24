@@ -71,6 +71,9 @@
   ([x ann sf]
    (with-meta (with-value x (assoc ann ::hidden true) sf) {::type ::hidden})))
 
+(defn just [sf]
+  (with-meta sf {::type ::hidden}))
+
 (defn- flush-builder [^StringBuilder builder style]
   (fn [rf acc]
     (let [len (.length builder)]
