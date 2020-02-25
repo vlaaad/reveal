@@ -45,49 +45,47 @@
             (stream/raw-string " " {:fill ::style/util-color})
             (stream/stream x))))))
 
-(defn make-print [ui out fill]
+(defn- make-print [ui out fill]
   (PrintWriter-on
     #(do
        (ui (stream/as %
              (stream/raw-string (str/trim-newline %)
                                 {:fill fill})))
        (binding [*out* out]
-         (print %)))
+         (print %)
+         (flush)))
     nil))
 
-(defn -main [& args]
+(defn wrap-eval [ui eval]
+  (let [out (make-print ui *out* ::style/string-color)
+        err (make-print ui *err* ::style/error-color)]
+    (fn [form]
+      (binding [*out* out
+                *err* err]
+        (let [ret (eval form)]
+          (flush)
+          ret)))))
+
+(defn init []
+  (apply require m/repl-requires))
+
+(defn repl [& {:as args}]
   (let [ui (ui/make)
         tap (make-tap ui)
-        out *out*
-        err *err*
-        ui-out (PrintWriter-on
-                 #(do
-                    (ui (stream/as %
-                          (stream/raw-string (str/trim-newline %) {:fill ::style/string-color})))
-                    (binding [*out* out]
-                      (print %)))
-                 nil)
-        ui-err (PrintWriter-on
-                 #(do
-                    (ui (stream/as %
-                          (stream/raw-string (str/trim-newline %) {:fill ::style/error-color})))
-                    (binding [*out* err]
-                      (print %)
-                      (flush)))
-                 nil)
-        version (str "Clojure " (clojure-version))]
+        version (str "Clojure " (clojure-version))
+        repl-args (-> args
+                      (update :init #(or % init))
+                      (update :read #(wrap-read ui (or % m/repl-read)))
+                      (update :eval #(wrap-eval ui (or % eval)))
+                      (update :print #(wrap-print ui (or % prn)))
+                      (update :caught #(wrap-caught ui (or % m/repl-caught))))]
     (ui (stream/as *clojure-version*
           (stream/raw-string version {:fill ::style/util-color})))
-    (add-tap tap)
     (println version)
-    (m/repl :init #(apply require m/repl-requires)
-            :read (wrap-read ui m/repl-read)
-            :eval #(binding [*out* ui-out
-                             *err* ui-err]
-                     (let [ret (eval %)]
-                       (flush)
-                       ret))
-            :print (wrap-print ui prn)
-            :caught (wrap-caught ui m/repl-caught))
+    (add-tap tap)
+    (apply m/repl (mapcat identity repl-args))
     (remove-tap tap)
     (ui)))
+
+(defn -main [& args]
+  (repl))
