@@ -62,7 +62,7 @@ Minimum required clojure version is `1.10`.
 If you are using nrepl, just add `vlaaad.reveal.nrepl/middleware` to the middleware list. 
 Minimum nrepl version is `0.6.0`.
 
-If you are using socket repl, just run main in `vlaaad.reveal.prepl` namespace.
+If you are using socket repl, just run main in `vlaaad.reveal.repl` namespace.
 
 If you don't want to use it as a repl, just call `(vlaaad.reveal.ui/make)` and it will 
 open a window and return a function: call it with 1 argument to submit a value, call it 
@@ -70,25 +70,36 @@ with 0 arguments to close the window and dispose it.
 
 ## Try it out
 
-As a repl in a shell
+#### As a repl in a shell
 
 ```sh
 clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea5"}}}' -m vlaaad.reveal.repl
 ```
 
-As a repl in a shell with prepl backend
+#### As a repl in a shell with prepl backend
 
 ```sh
 clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea5"}}}' -m vlaaad.reveal.prepl
 ```
 
-As an nrepl middleware in a shell
+#### As an nrepl middleware in a shell
 
 ```sh
 clj \
 -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea5"} nrepl {:mvn/version "0.6.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
+
+#### As a `tap>` target
+
+If you don't want to use Reveal as a repl, but only want to send to it values for 
+inspection, you can add a dependency on Reveal and then evaluate this:
+```clj
+(add-tap ((requiring-resolve 'vlaaad.reveal.ui/make)))
+```
+
+It will open a window that will receive all `tap>`-ed values while the JVM process is 
+alive.
 
 ## To do
  
@@ -116,4 +127,9 @@ clj \
 - popup might appear in weird locations
 - logo and window icons
 - adjust scroll on opening results window
+- very long lines have poor performance
+- `vlaaad.reveal/-main`
 - sometimes popup does not disappear
+- actions and stacks of values+annotations:
+  - probably instead of stack for a given selection there should be single value
+  - should annotations be merged together?
