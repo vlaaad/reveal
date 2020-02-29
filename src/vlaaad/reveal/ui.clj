@@ -101,6 +101,7 @@
    :showing showing
    :width 400
    :height 500
+   :icons ["logo-16.png" "logo-32.png" "logo-64.png" "logo-256.png" "logo-512.png"]
    :on-focused-changed {::event/handler on-window-focused-changed}
    :scene {:fx/type :scene
            :stylesheets [(:cljfx.css/url style/style)]

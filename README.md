@@ -1,6 +1,6 @@
-# Reveal
+![logo](src/logo-64.png)
 
-Read Eval Visualize Loop for Clojure
+Reveal: Read Eval Visualize Loop for Clojure
 
 ![demo](doc/demo.gif)
 
@@ -104,12 +104,18 @@ alive.
 ## To do
  
 - text search (triggered either just by typing, or with a shortcut)
-  - do I need to scroll back if I want to cancel search? accidental searches should be 
-    reversible
+  - do I need to scroll back if I want to cancel search? yes, accidental searches should 
+    be reversible!
+  - jumps to first match when it's found
   - direction of search? from the cursor (or top of the screen if no cursor) in both 
     directions
   - enter/down/right to next occurrence, shift+enter/up/left to prev occurrence, esc to 
     abort search
+  - starts a process that scans lines in both direction
+  - what about changes to output view? new lines can be added: they need to be searched 
+    too. output might be cleared for watcher views
+  - an alternative can be searching one item at a time synchronously. might have bad 
+    performance.
 - context menu should allow text input that is then evaluated on selection
 - more representations of objects:
   - as arbitrary JavaFx/cljfx nodes
