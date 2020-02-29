@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>vlaaad</groupId>
   <artifactId>reveal</artifactId>
-  <version>0.1.0-ea5</version>
+  <version>0.1.0-ea6</version>
   <name>reveal</name>
   <dependencies>
     <dependency>
@@ -28,6 +28,6 @@
   <repositories/>
   <scm>
     <url>https://github.com/vlaaad/reveal</url>
-    <tag>0.1.0-ea5</tag>
+    <tag>0.1.0-ea6</tag>
   </scm>
 </project>
