@@ -1,6 +1,4 @@
-![logo](src/logo-64.png)
-
-Reveal: Read Eval Visualize Loop for Clojure
+# ![logo](src/logo-32.png) Reveal: Read Eval Visualize Loop for Clojure
 
 ![demo](doc/demo.gif)
 
