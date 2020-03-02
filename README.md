@@ -125,6 +125,7 @@ alive.
   - documentable things (fns, vars, keywords): as formatted documentation
   - sourceable things: as source code
 - multiple accordions
+- shift+click to extend selection
 - structural navigation
 - improve datafy/nav support (on sets, for example)
 - remember window position and size
