@@ -117,11 +117,20 @@ alive.
 - context menu should allow text input that is then evaluated on selection
 - more representations of objects:
   - as arbitrary JavaFx/cljfx nodes
-  - atoms: watch (always show latest), log (as a seq of successors)
+  - atoms: log (as a seq of successors)
   - url: as content, maybe even as a web page
   - directory: as file tree
   - file: as content
   - coll of maps, coll of same-length vectors: as table
+  - graph-like data: as plots. see:
+    - https://github.com/metasoarous/oz
+    - https://github.com/jsa-aerial/hanami
+    - https://vega.github.io/vega-lite/docs/selection.html#filtering-data
+    - https://chart-studio.plot.ly/create/?fid=JStevens%3A2
+    - > For example, I might say: "Look at that cluster of points. I wonder what they have
+      in common". Then I'd drag my mouse around them, get access to the 
+      datatable/vector/map/whatever datastructure of them in my REPL, and call some 
+      functions on it to see if they all have some attribute or statistical property.
   - documentable things (fns, vars, keywords): as formatted documentation
   - sourceable things: as source code
 - multiple accordions

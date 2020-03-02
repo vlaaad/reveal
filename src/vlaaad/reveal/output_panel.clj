@@ -24,6 +24,9 @@
 (defn add-lines [this lines]
   (update this :layout layout/add-lines lines))
 
+(defn clear-lines [this]
+  (update this :layout layout/clear-lines))
+
 (defn- on-mouse-released [{:keys [state id]}]
   (state-fx state id update :layout layout/stop-gesture))
 
@@ -208,3 +211,7 @@
 (defn on-add-lines [{:keys [state id fx/event]}]
   (when (contains? state id)
     (state-fx state id add-lines event)))
+
+(defn on-clear-lines [{:keys [state id]}]
+  (when (contains? state id)
+    (state-fx state id clear-lines)))

@@ -267,6 +267,12 @@
       (scroll-to-bottom layout)
       (make layout))))
 
+(defn clear-lines [layout]
+  (-> layout
+      (assoc :lines [])
+      remove-cursor
+      make))
+
 (defn empty-region? [region]
   (every? #(-> % :text str/blank?) (:segments region)))
 

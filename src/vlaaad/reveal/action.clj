@@ -158,7 +158,7 @@
   {:id ::browser
    :label "Browse"
    :check (fn [vals+anns]
-            (when-let [[v] (peek vals+anns)]
+            (when-let [v (first (peek vals+anns))]
               (cond
                 (instance? URI v)
                 #(deref (future (.browse (Desktop/getDesktop) v)))
@@ -173,6 +173,6 @@
   {:id ::vector
    :label "To vector"
    :check (fn [vals+anns]
-            (when-let [[v] (peek vals+anns)]
+            (when-let [v (first (peek vals+anns))]
               (when (.isArray (class v))
                 #(vec v))))})
