@@ -357,7 +357,7 @@
     (if-let [cursor (canvas->cursor layout (.getX event) (.getY event))]
       (-> layout
           (assoc :gesture {:type :selection})
-          (set-cursor cursor))
+          (set-cursor cursor :anchor (not (.isShiftDown event))))
       layout)))
 
 (defn stop-gesture [layout]
