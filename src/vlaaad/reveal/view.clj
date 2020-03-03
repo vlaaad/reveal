@@ -3,7 +3,8 @@
             [vlaaad.reveal.event :as event]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.layout :as layout]
-            [vlaaad.reveal.action :as action])
+            [vlaaad.reveal.action :as action]
+            [vlaaad.reveal.style :as style])
   (:import [clojure.lang IRef]
            [java.util.concurrent ArrayBlockingQueue TimeUnit]))
 
@@ -39,7 +40,7 @@
    :id (:id env)
    :layout (layout/make)})
 
-(defn watcher [*ref]
+(defn ref-watcher [*ref]
   (reify Viewable
     (get-value [_] *ref)
     (make-view [_ env]
@@ -86,7 +87,55 @@
    :check (fn [vals+anns]
             (when-let [v (first (peek vals+anns))]
               (when (instance? IRef v)
-                #(watcher v))))})
+                #(ref-watcher v))))})
+
+(defn ref-logger [*ref]
+  (reify Viewable
+    (get-value [_] *ref)
+    (make-view [_ env]
+      ((:on-create env)
+       (fn [dispatch!]
+         (let [*running (volatile! true)
+               out-queue (ArrayBlockingQueue. 1024)
+               submit! #(.put out-queue (if (nil? %) ::stream-nil %))
+               watch-key (gensym "vlaaad.reveal.view/watcher")
+               *counter (volatile! -1)
+               t (Thread.
+                   ^Runnable
+                   (fn []
+                     (while @*running
+                       (when-some [x (.poll out-queue 1 TimeUnit/SECONDS)]
+                         (runduce! (comp stream/stream-xf
+                                         (partition-all 128)
+                                         (take-while
+                                           (fn [_] @*running)))
+                                   #(dispatch! {::event/handler output-panel/on-add-lines
+                                                :fx/event %
+                                                :id (:id env)})
+                                   (stream/just
+                                     (stream/horizontal
+                                       (stream/raw-string (format "%4d: " (vswap! *counter inc))
+                                                          {:fill ::style/util-color})
+                                       (stream/stream
+                                         (if (= ::stream-nil x) nil x))))))))
+                   "reveal-view-logger-thread")]
+           (.start t)
+           (submit! @*ref)
+           (add-watch *ref watch-key #(submit! %4))
+           #(do
+              (remove-watch *ref watch-key)
+              (vreset! *running false)))))
+      {:fx/type output-panel/view
+       :id (:id env)
+       :layout (layout/make)})))
+
+(action/register!
+  {:id ::log
+   :label "Log"
+   :check (fn [vals+anns]
+            (when-let [v (first (peek vals+anns))]
+              (when (instance? IRef v)
+                #(ref-logger v))))})
 
 (extend-protocol Viewable
   nil
