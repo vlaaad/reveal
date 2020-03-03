@@ -7,12 +7,12 @@
 
 ## Rationale
 
-I want to be able hold a value in my hand. I want to understand it better and with fewer 
+I want to be able to hold a value in my hand. I want to understand it better and with fewer 
 keystrokes.
 
 Repl is a great window into a running program, but text representation is too limited for 
-inspection. Reveal recognizes the value of a text as universal interface, that's why its 
-output looks as a text by default: you can select it, copy it, save it into a file. It's 
+inspection. Reveal recognizes the value of a text as a universal interface, that's why its 
+output looks like text by default: you can select it, copy it, save it into a file. It's 
 not just an array of characters though: printed string representations of objects hold 
 references to objects themselves, making value inspection as easy as bringing up a context 
 menu.
@@ -43,7 +43,7 @@ both mouse and keyboard navigation.
 
 Context menu on selected value is opened either by pressing <kbd>Space</kbd> or by right 
 mouse button click. Selecting action to run is done either with arrow keys and 
-<kbd>Enter</kbd>, or with left mouse button click.
+<kbd>Enter</kbd> or with a left mouse button click.
 
 Multiple action results are shown as separate tabs in popup panel, and switching between 
 those tabs is done either using mouse or using <kbd>Ctrl ←</kbd> / <kbd>Ctrl →</kbd> when 
@@ -55,10 +55,10 @@ Add a dev dependency on the latest version:
 
 [![Reveal on Clojars](https://clojars.org/vlaaad/reveal/latest-version.svg)](https://clojars.org/vlaaad/reveal)
 
-Minimum required clojure version is `1.10`.
+The minimum required Clojure version is `1.10`.
 
 If you are using nrepl, just add `vlaaad.reveal.nrepl/middleware` to the middleware list. 
-Minimum nrepl version is `0.6.0`.
+The minimum nrepl version is `0.6.0`.
 
 If you are using socket repl, just run main in `vlaaad.reveal.repl` namespace.
 
@@ -80,7 +80,7 @@ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea7"}}}' -m vlaaad.reveal
 clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea7"}}}' -m vlaaad.reveal.prepl
 ```
 
-#### As an nrepl middleware in a shell
+#### As a nrepl middleware in a shell
 
 ```sh
 clj \
@@ -101,8 +101,8 @@ alive.
 
 ## To do
  
-- text search (triggered either just by typing, or with a shortcut)
-  - do I need to scroll back if I want to cancel search? yes, accidental searches should 
+- text search (triggered either just by typing or with a shortcut)
+  - do I need to scroll back if I want to cancel the search? yes, accidental searches should 
     be reversible!
   - jumps to first match when it's found
   - direction of search? from the cursor (or top of the screen if no cursor) in both 
