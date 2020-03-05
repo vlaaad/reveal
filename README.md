@@ -142,6 +142,7 @@ alive.
       functions on it to see if they all have some attribute or statistical property.
   - documentable things (fns, vars, keywords): as formatted documentation
   - sourceable things: as source code
+- handle exceptions during streaming phase
 - multiple accordions
 - structural navigation
 - improve datafy/nav support (on sets, for example)
