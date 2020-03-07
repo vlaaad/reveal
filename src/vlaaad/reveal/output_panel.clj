@@ -47,8 +47,8 @@
         screen-bounds (.localToScreen target bounds)]
     (-> this
         (assoc :layout layout)
-        (cond-> (pos? (count actions))
-                (assoc :popup {:actions actions :bounds screen-bounds :segments (:segments region)})))))
+        (cond-> actions
+                (assoc :popup (assoc actions :bounds screen-bounds :segments (:segments region)))))))
 
 (defn- handle-mouse-pressed [this ^MouseEvent event]
   (cond

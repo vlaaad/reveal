@@ -49,11 +49,12 @@
 
 (defn collect [values]
   (when-let [[val ann] (peek values)]
-    (when (some? val)
-      (let [registry @*registry]
-        (into []
-              (keep #(check % val ann))
-              (vals (:actions registry)))))))
+    (let [registry @*registry]
+      {:actions (into []
+                      (keep #(check % val ann))
+                      (vals (:actions registry)))
+       :val val
+       :ann ann})))
 
 (register!
   {:id ::nav
@@ -85,50 +86,56 @@
   {:id ::inspect
    :label "Inspect"
    :check (fn [x _]
-            (fn []
-              (let [props (->> x
-                               class
-                               (Introspector/getBeanInfo)
-                               (.getPropertyDescriptors)
-                               (keep
-                                 (fn [^PropertyDescriptor descriptor]
-                                   (when-let [read-meth (.getReadMethod descriptor)]
-                                     [(.getName descriptor)
-                                      (.invoke read-meth x (object-array 0))
-                                      descriptor]))))
-                    fields (->> x
-                                (class)
-                                (iterate #(.getSuperclass ^Class %))
-                                (take-while some?)
-                                (mapcat #(.getDeclaredFields ^Class %))
-                                (remove #(Modifier/isStatic (.getModifiers ^Field %)))
-                                (keep
-                                  (fn [^Field field]
-                                    (try
-                                      (.setAccessible field true)
-                                      [(.getName field)
-                                       (.get field x)
-                                       field]
-                                      (catch Throwable _
-                                        nil)))))
-                    sorted (->> (concat fields props)
-                                (group-by (juxt first second))
-                                (sort-by ffirst)
-                                (map (fn [[[name value] xs]]
-                                       (let [kinds (mapv last xs)
-                                             row [(stream/as (if (= 1 (count kinds)) (first kinds) kinds)
-                                                    (stream/raw-string name {:fill ::style/object-color}))
-                                                  value
-                                                  (stream/as kinds
-                                                    (stream/raw-string
-                                                      (str "("
-                                                           (str/join ", " (map #(-> % class .getSimpleName) kinds))
-                                                           ")")
-                                                      {:fill ::style/util-color}))]]
-                                         (stream/as row
-                                           (stream/items row))))))]
-                (stream/as sorted
-                  (stream/sequential sorted)))))})
+            (when (some? x)
+              (fn []
+                (let [props (->> x
+                                 class
+                                 (Introspector/getBeanInfo)
+                                 (.getPropertyDescriptors)
+                                 (keep
+                                   (fn [^PropertyDescriptor descriptor]
+                                     (when-let [read-meth (.getReadMethod descriptor)]
+                                       [(.getName descriptor)
+                                        (.invoke read-meth x (object-array 0))
+                                        descriptor]))))
+                      fields (->> x
+                                  (class)
+                                  (iterate #(.getSuperclass ^Class %))
+                                  (take-while some?)
+                                  (mapcat #(.getDeclaredFields ^Class %))
+                                  (remove #(Modifier/isStatic (.getModifiers ^Field %)))
+                                  (keep
+                                    (fn [^Field field]
+                                      (try
+                                        (.setAccessible field true)
+                                        [(.getName field)
+                                         (.get field x)
+                                         field]
+                                        (catch Throwable _
+                                          nil)))))
+                      sorted (->> (concat fields props)
+                                  (group-by (juxt first second))
+                                  (sort-by ffirst)
+                                  (map (fn [[[name value] xs]]
+                                         (let [kinds (mapv last xs)]
+                                           (stream/just
+                                             (stream/vertical
+                                               (apply
+                                                 stream/horizontal
+                                                 (stream/as name
+                                                   (stream/raw-string name {:fill ::style/object-color}))
+                                                 (stream/raw-string " ")
+                                                 (->> kinds
+                                                      (map (fn [kind]
+                                                             (stream/as kind
+                                                               (stream/raw-string (.getSimpleName (class kind))
+                                                                                  {:fill ::style/util-color}))))
+                                                      (interpose (stream/raw-string " "))))
+                                               (stream/horizontal
+                                                 (stream/raw-string "  ")
+                                                 (stream/stream value))))))))]
+                  (stream/just
+                    (stream/sequential sorted))))))})
 
 (register!
   {:id ::reflect
@@ -169,5 +176,5 @@
   {:id ::vector
    :label "To vector"
    :check (fn [v _]
-            (when (.isArray (class v))
+            (when (and v (.isArray (class v)))
               #(vec v)))})
