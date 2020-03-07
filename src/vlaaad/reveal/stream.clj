@@ -17,8 +17,11 @@
   ([f g]
    (fn [rf acc]
      (g rf (f rf acc))))
-  ([f g & fs]
-   (reduce => (cons f (cons g fs)))))
+  ([f g h]
+   (fn [rf acc]
+     (h rf (g rf (f rf acc)))))
+  ([f g h & fs]
+   (reduce => (cons f (cons g (cons h fs))))))
 
 (defn- op [op]
   (fn [rf acc]
@@ -167,9 +170,10 @@
   (fn [rf acc]
     (reduce-kv
       (fn [acc k v]
-        ((horizontal (stream k {:vlaaad.reveal.nav/val v})
+        ((horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
                      (raw-string " ")
-                     (stream v {:vlaaad.reveal.nav/key k})) rf acc))
+                     (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m}))
+         rf acc))
       acc
       m)))
 
@@ -178,7 +182,8 @@
     (let [*i (volatile! -1)]
       (reduce (fn [acc x]
                 ;; todo sets are also here, shouldn't really use indices in that case
-                ((stream x {:vlaaad.reveal.nav/index (vswap! *i inc)}) rf acc))
+                ((stream x {:vlaaad.reveal.nav/key (vswap! *i inc)
+                            :vlaaad.reveal.nav/coll coll}) rf acc))
               acc
               coll))))
 
@@ -191,7 +196,8 @@
                      (if (= x ::space)
                        ((raw-string " ") rf acc)
                        ;; todo sets are also here, shouldn't really use indices in that case
-                       ((stream x {:vlaaad.reveal.nav/index (vswap! *i inc)}) rf acc))))
+                       ((stream x {:vlaaad.reveal.nav/key (vswap! *i inc)
+                                   :vlaaad.reveal.nav/coll coll}) rf acc))))
                  acc
                  coll))))
 

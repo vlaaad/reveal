@@ -2,6 +2,7 @@
         cljfx {:mvn/version "1.6.2"}
         cljfx/css {:mvn/version "1.1.0"}}
  :aliases {:prepl {:main-opts ["-m" "vlaaad.reveal.prepl"]}
+           :repl {:main-opts ["-m" "vlaaad.reveal.repl"]}
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "0.6.0"}}
                    :main-opts ["-m" "nrepl.cmdline" "--middleware" "[vlaaad.reveal.nrepl/middleware]"]}
            :specs {:extra-paths ["specs"]}

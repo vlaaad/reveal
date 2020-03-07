@@ -84,10 +84,9 @@
 (action/register!
   {:id ::watch
    :label "Watch"
-   :check (fn [vals+anns]
-            (when-let [v (first (peek vals+anns))]
-              (when (instance? IRef v)
-                #(ref-watcher v))))})
+   :check (fn [v _]
+            (when (instance? IRef v)
+              #(ref-watcher v)))})
 
 (defn ref-logger [*ref]
   (reify Viewable
@@ -132,10 +131,9 @@
 (action/register!
   {:id ::log
    :label "Log"
-   :check (fn [vals+anns]
-            (when-let [v (first (peek vals+anns))]
-              (when (instance? IRef v)
-                #(ref-logger v))))})
+   :check (fn [v _]
+            (when (instance? IRef v)
+              #(ref-logger v)))})
 
 (extend-protocol Viewable
   nil
