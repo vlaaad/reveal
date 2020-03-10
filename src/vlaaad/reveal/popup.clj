@@ -54,6 +54,9 @@
 
 (defn- on-action-key-pressed [{:keys [state id ^KeyEvent fx/event action on-cancel segments]}]
   (condp = (.getCode event)
+    KeyCode/ESCAPE
+    {:dispatch on-cancel}
+
     KeyCode/ENTER
     [[:dispatch on-cancel]
      [:execute (assoc action :segments segments)]]
