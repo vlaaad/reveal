@@ -77,14 +77,14 @@
 
 (register!
   {:id ::show
-   :label "Show"
+   :label "Show actual value"
    :check (fn [val ann]
             (when (::stream/hidden ann)
               (constantly val)))})
 
 (register!
   {:id ::inspect
-   :label "Inspect"
+   :label "Inspect java fields"
    :check (fn [x _]
             (when (some? x)
               (fn []
@@ -123,7 +123,7 @@
                                                (apply
                                                  stream/horizontal
                                                  (stream/as name
-                                                   (stream/raw-string name {:fill ::style/object-color}))
+                                                   (stream/raw-string name {:fill ::style/symbol-color}))
                                                  (stream/raw-string " ")
                                                  (->> kinds
                                                       (map (fn [kind]
@@ -174,7 +174,7 @@
 
 (register!
   {:id ::vector
-   :label "To vector"
+   :label "Vec"
    :check (fn [v _]
             (when (and v (.isArray (class v)))
               #(vec v)))})

@@ -28,9 +28,28 @@
        ::cell-height cell-height
        ".reveal" {"-ui" {:-fx-background-color background-color}
                   "-popup" {:-fx-background-color popup-color
-                            "-list-view" {:-fx-fixed-cell-size cell-height}}
-                  "-placeholder" {:-fx-text-fill util-color
-                                  :-fx-padding scroll-bar-size}
+                            :-fx-spacing 5
+                            :-fx-padding 5
+                            "-scroll-pane" {:-fx-hbar-policy :never
+                                            :-fx-min-height 0}
+                            "-item" {:-fx-font-family (str \" (.getFamily font/font) \")
+                                     :-fx-text-fill util-color
+                                     :-fx-max-width "Infinity"
+                                     :-fx-padding [3.5 7]
+                                     :-fx-font-size (.getSize font/font)
+                                     ":hover" {:-fx-text-fill symbol-color}
+                                     "-selected" {:-fx-background-color selection-color
+                                                  :-fx-text-fill symbol-color}}
+                            "-text-field" {:-fx-font-family (str \" (.getFamily font/font) \")
+                                           :-fx-text-fill symbol-color
+                                           :-fx-font-size (.getSize font/font)
+                                           :-fx-background-color background-color
+                                           :-fx-highlight-fill selection-color
+                                           :-fx-highlight-text-fill symbol-color
+                                           :-fx-padding [7 7]
+                                           ":focused" {:-fx-border-color selection-color
+                                                       :-fx-border-width [0 0 2 0]
+                                                       :-fx-padding [7 7 5 7]}}}
                   "-view" {"-header" {:-fx-background-color popup-color
                                       "-tab" {"-focused" {:-fx-background-color background-color}}
                                       "-separator" {:-fx-min-width 1
@@ -54,8 +73,4 @@
                                                                    :-fx-padding 0}}
                       "> .increment-button" {:-fx-padding 0
                                              "> .increment-arrow" {:-fx-shape nil
-                                                                   :-fx-padding 0}}}
-       ".search-label" {:-fx-text-fill popup-color
-                        :-fx-padding 2
-                        :-fx-background-radius 2
-                        :-fx-background-color object-color}})))
+                                                                   :-fx-padding 0}}}})))

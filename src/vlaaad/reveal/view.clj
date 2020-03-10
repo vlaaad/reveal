@@ -83,7 +83,7 @@
 
 (action/register!
   {:id ::watch
-   :label "Watch"
+   :label "Watch changes"
    :check (fn [v _]
             (when (instance? IRef v)
               #(ref-watcher v)))})
@@ -130,7 +130,7 @@
 
 (action/register!
   {:id ::log
-   :label "Log"
+   :label "Log changes"
    :check (fn [v _]
             (when (instance? IRef v)
               #(ref-logger v)))})

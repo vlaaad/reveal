@@ -114,17 +114,10 @@ alive.
     too. output might be cleared for watcher views
   - an alternative can be searching one item at a time synchronously. might have bad 
     performance.
-- context menu should allow text input that is then evaluated on selection:
-  - `$val` is evaluated as selected value
-  - `$ann` is evaluated as selected value's annotation
-  - any single `sym` is expanded to `(sym $val)`
-  - lists need to specify `$val` or `$ann`
-  - actions are defined with same DSL: `(when (::stream/hidden $ann) (constantly $val))`
-  - if user has `$val` or `$ann` defined, he can use it fully-qualified
-  - can action results be somehow composed? probably not, they are mostly for different
-    data representations: use simple functions for composing actions. They are not really 
-    "actions", more like explorers. Text input acts both as a filter for available actions
-    and as a eval prompt. 
+- contextual eval:
+  - alt+up/down for history
+  - auto-insert closing brackets
+  - peek some useful ns to eval in
 - more representations of objects:
   - as arbitrary JavaFx/cljfx nodes
   - url: as content, maybe even as a web page

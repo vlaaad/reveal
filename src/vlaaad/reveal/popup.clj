@@ -7,71 +7,105 @@
             [cljfx.mutator :as fx.mutator]
             [vlaaad.reveal.style :as style]
             [cljfx.api :as fx]
-            [cljfx.ext.list-view :as fx.ext.list-view])
+            [clojure.string :as str]
+            [cljfx.prop :as fx.prop])
   (:import [javafx.geometry Bounds Rectangle2D]
            [javafx.stage Screen Popup]
            [com.sun.javafx.event RedirectedEvent]
            [javafx.event Event]
            [javafx.scene.input KeyCode KeyEvent]
-           [java.util Collection]
-           [javafx.scene.control ListView]))
+           [java.util Collection List]
+           [javafx.beans.value ChangeListener]
+           [javafx.scene Node]))
 
 (defn- consume-popup-event [^Event e]
   (if (instance? RedirectedEvent e)
     (.consume (.getOriginalEvent ^RedirectedEvent e))
     (.consume e)))
 
-(defn- on-key-pressed [{:keys [state id ^KeyEvent fx/event on-cancel segments]}]
+(def displayed-actions
+  (some-fn :selected-actions :actions))
+
+(defn- move-selected-index [this direction]
+  (let [actions (displayed-actions this)]
+    (update this :selected-index
+            (fn [i]
+              (let [min 0 max (dec (count actions))]
+                (if i
+                  (let [i (direction i)]
+                    (when (<= min i max) i))
+                  (if (= direction inc) min max)))))))
+
+(defn- select-action [this action]
+  (let [^List actions (displayed-actions this)
+        index (.indexOf actions action)]
+    (assoc this :selected-index (when-not (neg? index) index))))
+
+(defn- set-text [{:keys [actions] :as this} text]
+  (-> this
+      (assoc :text text
+             :selected-actions (cond-> actions
+                                       (not= "" text)
+                                       (search/select text :label)))
+      (dissoc :selected-index)))
+
+(defn- state-fx [state id f & args]
+  {:state (apply update-in state [id :popup] f args)})
+
+(defn- on-action-key-pressed [{:keys [state id ^KeyEvent fx/event action on-cancel segments]}]
+  (condp = (.getCode event)
+    KeyCode/ENTER
+    [[:dispatch on-cancel]
+     [:execute (assoc action :segments segments)]]
+
+    KeyCode/UP
+    (state-fx state id move-selected-index dec)
+
+    KeyCode/DOWN
+    (state-fx state id move-selected-index inc)
+
+    nil))
+
+(defn- on-action-pressed [{:keys [state id action]}]
+  (state-fx state id select-action action))
+
+(defn- on-action-clicked [{:keys [action segments on-cancel]}]
+  [[:dispatch on-cancel]
+   [:execute (assoc action :segments segments)]])
+
+(defn- on-text-key-pressed [{:keys [state id ^KeyEvent fx/event on-cancel segments val ann]}]
   (let [this (get-in state [id :popup])]
     (condp = (.getCode event)
       KeyCode/ESCAPE
-      (if (empty? (:filter-text this))
+      (if (empty? (:text this))
         {:dispatch on-cancel}
-        {:state (update-in state [id :popup] dissoc :filter-text)})
+        (state-fx state id set-text ""))
 
       KeyCode/ENTER
-      (when-let [action (.getFocusedItem (.getFocusModel ^ListView (.getTarget event)))]
-        {:execute (assoc action :segments segments)
+      (when-not (str/blank? (:text this))
+        {:execute {:invoke (fn []
+                             (let [form (read-string (:text this))
+                                   form `(fn [~'*v ~'*a] ~(cond
+                                                            ('#{*a *v} form) form
+                                                            (symbol? form) (list form '*v)
+                                                            :else form))]
+                               ((eval form) val ann)))
+                   :segments segments}
          :dispatch on-cancel})
+
+      KeyCode/UP
+      (state-fx state id move-selected-index dec)
+
+      KeyCode/DOWN
+      (state-fx state id move-selected-index inc)
+
       nil)))
 
-(defn- on-item-clicked [{:keys [action segments on-cancel]}]
-  {:execute (assoc action :segments segments)
-   :dispatch on-cancel})
+(defn- on-text-changed [{:keys [state id fx/event]}]
+  (state-fx state id set-text event))
 
-(defn- on-result-key-pressed [{:keys [^KeyEvent fx/event on-cancel]}]
-  (when (= KeyCode/ESCAPE (.getCode event))
-    {:dispatch on-cancel}))
-
-(defn- on-key-typed [{:keys [state id ^KeyEvent fx/event]}]
-  (let [ch (.getCharacter event)
-        this (get-in state [id :popup])
-        ^String text (:filter-text this "")]
-    (cond
-      (.isEmpty ch)
-      nil
-
-      (= 27 (int (.charAt ch 0)))
-      nil
-
-      (= "\r" ch)
-      nil
-
-      (and (= "\b" ch) (not (.isEmpty text)))
-      {:state (assoc-in state [id :popup :filter-text] (subs text 0 (dec (.length text))))}
-
-
-      (= "\b" ch)
-      nil
-
-      :else
-      {:state (assoc-in state [id :popup :filter-text] (str text ch))})))
-
-(defn- on-selected-action-changed [{:keys [state id fx/event]}]
-  {:state (assoc-in state [id :popup :selected-action] event)})
-
-(defn- on-item-hover [{:keys [state id action]}]
-  {:state (assoc-in state [id :popup :selected-action] action)})
+(defn- on-text-focused [{:keys [state id fx/event]}]
+  (when event (state-fx state id dissoc :selected-index)))
 
 (def ^:private lifecycle
   (fx.composite/describe Popup
@@ -84,19 +118,34 @@
                                   fx.lifecycle/scalar
                                   :default []]))))
 
-(defn view [{:keys [actions
+(defn focus-when-on-scene! [^Node node]
+  (if (some? (.getScene node))
+    (.requestFocus node)
+    (.addListener (.sceneProperty node)
+                  (reify ChangeListener
+                    (changed [this _ _ new-scene]
+                      (when (some? new-scene)
+                        (.removeListener (.sceneProperty node) this)
+                        (.requestFocus node)))))))
+
+(def ext-with-focused-ref
+  (fx/make-ext-with-props
+    {:focused-ref (fx.prop/make (fx.mutator/setter
+                                  (fn [_ ^Node node]
+                                    (some-> node focus-when-on-scene!)))
+                                (fx.lifecycle/get-ref identity))}))
+
+(defn view [{:keys [val
+                    ann
                     ^Bounds bounds
                     id
                     on-cancel
-                    filter-text
-                    selected-action
-                    output
+                    text
+                    selected-index
                     segments]
-             :or {filter-text ""
-                  output ::no-output}}]
-  (let [actions (cond-> actions
-                        (not= "" filter-text)
-                        (search/select filter-text :label))
+             :or {text ""}
+             :as this}]
+  (let [actions (displayed-actions this)
         ^Screen screen (first (Screen/getScreensForRectangle (.getMinX bounds)
                                                              (.getMinY bounds)
                                                              (.getWidth bounds)
@@ -139,7 +188,18 @@
         max-content-height (- (if popup-at-the-bottom
                                 space-below
                                 space-above)
-                              arrow-height)]
+                              arrow-height)
+        action-view {:fx/type :scroll-pane
+                     :style-class "reveal-popup-scroll-pane"
+                     :fit-to-width true
+                     :content {:fx/type :v-box
+                               :fill-width true
+                               :children (map
+                                           (fn [action]
+                                             {:fx/type fx/ext-get-ref
+                                              :fx/key (:id action)
+                                              :ref [::action (:id action)]})
+                                           actions)}}]
     {:fx/type lifecycle
      :stylesheets [(:cljfx.css/url style/style)]
      :anchor-location (if popup-at-the-bottom :window-top-left :window-bottom-left)
@@ -170,54 +230,60 @@
                                    arrow-width arrow-height
                                    (* arrow-width 0.5) 0]}))
            (conj
-             (if (= output ::no-output)
-               {:fx/type :stack-pane
-                :style-class "reveal-popup"
-                :children
-                (cond-> [{:fx/type fx.ext.list-view/with-selection-props
-                          :props {:selected-item (or (and selected-action
-                                                          (some #(when (= % selected-action) %) actions))
-                                                     (first actions))
-                                  :on-selected-item-changed {::event/handler on-selected-action-changed :id id}}
-                          :desc {:fx/type :list-view
-                                 :style-class "reveal-popup-list-view"
-                                 :placeholder {:fx/type :label
-                                               :style-class "reveal-placeholder"
-                                               :text "No actions match"}
-                                 :pref-height (+ (::style/scroll-bar-size style/style)
-                                                 1
-                                                 (* (count actions)
-                                                    (::style/cell-height style/style)))
-                                 :on-key-typed {::event/handler on-key-typed :id id}
-                                 :on-key-pressed {::event/handler on-key-pressed
-                                                  :id id
-                                                  :on-cancel on-cancel
-                                                  :segments segments}
-                                 :max-height max-content-height
-                                 :cell-factory (fn [action]
-                                                 {:text (:label action)
-                                                  :on-mouse-entered {::event/handler on-item-hover
-                                                                     :id id
-                                                                     :action action}
-                                                  :on-mouse-clicked {::event/handler on-item-clicked
-                                                                     :action action
-                                                                     :segments segments
-                                                                     :on-cancel on-cancel}})
-                                 :items actions}}]
-                        (pos? (count filter-text))
-                        (conj {:fx/type :label
-                               :mouse-transparent true
-                               :stack-pane/alignment (if popup-at-the-bottom :top-right :bottom-right)
-                               :style-class "search-label"
-                               :text filter-text}))}
-               {:fx/type :v-box
-                :max-height max-content-height
-                :style-class "reveal-popup"
-                :on-key-pressed {::event/handler on-result-key-pressed :on-cancel on-cancel}
-                :children [{:fx/type :label
-                            :style {:-fx-text-fill :red}
-                            :text (str output)}]}))
-
+             {:fx/type fx/ext-let-refs
+              :refs (into {::text-field {:fx/type :text-field
+                                         :style-class "reveal-popup-text-field"
+                                         :text text
+                                         :on-focused-changed {::event/handler on-text-focused
+                                                              :id id}
+                                         :on-key-pressed {::event/handler on-text-key-pressed
+                                                          :id id
+                                                          :val val
+                                                          :ann ann
+                                                          :on-cancel on-cancel
+                                                          :segments segments}
+                                         :on-text-changed {::event/handler on-text-changed
+                                                           :fx/sync true
+                                                           :id id}}}
+                          (map-indexed
+                            (fn [i action]
+                              [[::action (:id action)]
+                               {:fx/type :label
+                                :style-class (cond-> ["reveal-popup-item"]
+                                                     (= i selected-index)
+                                                     (conj "reveal-popup-item-selected"))
+                                :min-width :use-pref-size
+                                :text (:label action)
+                                :on-key-pressed {::event/handler on-action-key-pressed
+                                                 :id id
+                                                 :action action
+                                                 :segments segments
+                                                 :on-cancel on-cancel}
+                                :on-mouse-pressed {::event/handler on-action-pressed
+                                                   :id id
+                                                   :action action}
+                                :on-mouse-clicked {::event/handler on-action-clicked
+                                                   :action action
+                                                   :segments segments
+                                                   :on-cancel on-cancel}}]))
+                          actions)
+              :desc {:fx/type ext-with-focused-ref
+                     :props {:focused-ref (if selected-index
+                                            [::action (:id (actions selected-index))]
+                                            ::text-field)}
+                     :desc {:fx/type :v-box
+                            :style-class "reveal-popup"
+                            :max-height max-content-height
+                            :children (-> []
+                                          (cond-> popup-at-the-bottom
+                                                  (conj {:fx/type fx/ext-get-ref
+                                                         :ref ::text-field
+                                                         :fx/key ::text-field}))
+                                          (cond-> (pos? (count actions)) (conj action-view))
+                                          (cond-> (not popup-at-the-bottom)
+                                                  (conj {:fx/type fx/ext-get-ref
+                                                         :ref ::text-field
+                                                         :fx/key ::text-field})))}}})
            (cond-> (not popup-at-the-bottom)
                    (conj {:fx/type :polygon
                           :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
