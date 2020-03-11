@@ -1,7 +1,8 @@
 (ns vlaaad.reveal.stream
   (:refer-clojure :exclude [newline])
   (:require [vlaaad.reveal.font :as font]
-            [vlaaad.reveal.style :as style])
+            [vlaaad.reveal.style :as style]
+            [clojure.main :as m])
   (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn IPersistentList ISeq MultiFn
                          IRef Var Volatile Namespace IRecord Delay IBlockingDeref TaggedLiteral Reduced ReaderConditional]
            [java.util.regex Pattern]
@@ -216,7 +217,15 @@
   (fn
     ([] (rf))
     ([result] (rf result))
-    ([result input] ((stream input) rf result))))
+    ([result input]
+     (try
+       ((stream input) rf result)
+       (catch Throwable ex
+         ((as ex
+            (raw-string
+              (-> ex Throwable->map (assoc :phase :print-eval-result) m/ex-triage m/ex-str)
+              {:fill ::style/error-color}))
+          rf result))))))
 
 (defn- blank-segment [n]
   {:text (apply str (repeat n \space))

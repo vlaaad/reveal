@@ -71,20 +71,20 @@ with 0 arguments to close the window and dispose it.
 #### As a repl in a shell
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea10"}}}' -m vlaaad.reveal.repl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea11"}}}' -m vlaaad.reveal.repl
 ```
 
 #### As a repl in a shell with prepl backend
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea10"}}}' -m vlaaad.reveal.prepl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea11"}}}' -m vlaaad.reveal.prepl
 ```
 
 #### As a nrepl middleware in a shell
 
 ```sh
 clj \
--Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea10"} nrepl {:mvn/version "0.6.0"}}}' \
+-Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea11"} nrepl {:mvn/version "0.6.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
 
@@ -135,7 +135,6 @@ alive.
       functions on it to see if they all have some attribute or statistical property.
   - documentable things (fns, vars, keywords): as formatted documentation
   - sourceable things: as source code
-- handle exceptions during streaming phase
 - multiple accordions
 - structural navigation
 - improve datafy/nav support (on sets, for example)
@@ -145,6 +144,3 @@ alive.
 - very long lines have poor performance
 - `vlaaad.reveal/-main`
 - sometimes popup does not disappear
-- actions and stacks of values+annotations:
-  - probably instead of stack for a given selection there should be single value
-  - should annotations be merged together?

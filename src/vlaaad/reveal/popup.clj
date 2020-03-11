@@ -30,11 +30,13 @@
   (let [actions (displayed-actions this)]
     (update this :selected-index
             (fn [i]
-              (let [min 0 max (dec (count actions))]
-                (if i
-                  (let [i (direction i)]
-                    (when (<= min i max) i))
-                  (if (= direction inc) min max)))))))
+              (let [min 0
+                    max (dec (count actions))
+                    i (cond
+                        i (direction i)
+                        (= direction inc) min
+                        :else max)]
+                (when (<= min i max) i))))))
 
 (defn- select-action [this action]
   (let [^List actions (displayed-actions this)
