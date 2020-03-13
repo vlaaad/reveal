@@ -117,7 +117,7 @@ alive.
 - contextual eval:
   - alt+up/down for history
   - auto-insert closing brackets
-  - peek some useful ns to eval in
+  - pick some useful ns to eval in
 - more representations of objects:
   - as arbitrary JavaFx/cljfx nodes
   - url: as content, maybe even as a web page
@@ -134,6 +134,12 @@ alive.
       datatable/vector/map/whatever datastructure of them in my REPL, and call some 
       functions on it to see if they all have some attribute or statistical property.
   - documentable things (fns, vars, keywords): as formatted documentation
+    - ns
+    - var
+    - namespaced sym -> var + spec
+    - simple sym -> ns
+    - namespaced kw -> spec
+    - fn -> var (note the suffix: assoc is `clojure.core/assoc--5416`)
   - sourceable things: as source code
 - multiple accordions
 - structural navigation

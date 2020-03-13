@@ -4,11 +4,12 @@
             [vlaaad.reveal.style :as style]
             [clojure.main :as m])
   (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn IPersistentList ISeq MultiFn
-                         IRef Var Volatile Namespace IRecord Delay IBlockingDeref TaggedLiteral Reduced ReaderConditional]
+                         IRef Var Volatile Namespace IRecord Delay IBlockingDeref TaggedLiteral Reduced ReaderConditional IPersistentCollection BigInt]
            [java.util.regex Pattern]
            [java.io File]
            [java.net URL URI]
-           [java.util UUID]))
+           [java.util UUID List Collection RandomAccess Map Set]
+           [clojure.core Eduction]))
 
 (set! *warn-on-reflection* true)
 
@@ -167,16 +168,31 @@
 (defn vertical [& sfs]
   (block :vertical (apply => sfs)))
 
+(defn kvs [m]
+  (block :vertical
+         (fn [rf acc]
+           (reduce-kv
+             (fn [acc k v]
+               ((horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
+                            (raw-string " ")
+                            (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m}))
+                rf acc))
+             acc
+             m))))
+
 (defn entries [m]
-  (fn [rf acc]
-    (reduce-kv
-      (fn [acc k v]
-        ((horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
-                     (raw-string " ")
-                     (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m}))
-         rf acc))
-      acc
-      m)))
+  (block :vertical
+         (fn [rf acc]
+           (reduce
+             (fn [acc e]
+               (let [k (key e)
+                     v (val e)]
+                 ((horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
+                              (raw-string " ")
+                              (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m}))
+                  rf acc)))
+             acc
+             m))))
 
 (defn- vertical-items [coll]
   (fn [rf acc]
@@ -346,6 +362,8 @@
     (as hash
       (raw-string (format "0x%x" hash) {:fill ::style/scalar-color}))))
 
+;; scalars
+
 (defmethod emit nil [x]
   (raw-string (pr-str x) {:fill ::style/scalar-color}))
 
@@ -373,6 +391,8 @@
   (escaped-string sym {:fill ::style/symbol-color}
                   escape-layout-chars {:fill ::style/scalar-color}))
 
+;; numbers
+
 (defmethod emit Number [n]
   (raw-string n {:fill ::style/scalar-color}))
 
@@ -394,20 +414,37 @@
       :else (str n))
     {:fill ::style/scalar-color}))
 
+(defmethod emit BigDecimal [n]
+  (raw-string (str n "M") {:fill ::style/scalar-color}))
+
+(defmethod emit BigInt [n]
+  (raw-string (str n "N") {:fill ::style/scalar-color}))
+
+;; maps
+
 (defmethod emit IPersistentMap [m]
   (horizontal
     (raw-string "{" {:fill ::style/object-color})
-    (vertical (entries m))
+    (kvs m)
     (raw-string "}" {:fill ::style/object-color})))
 
 (defmethod emit IRecord [m]
   (horizontal
     (raw-string (str "#" (.getName (class m)) "{") {:fill ::style/object-color})
-    (vertical (entries m))
+    (kvs m)
+    (raw-string "}" {:fill ::style/object-color})))
+
+(defmethod emit Map [m]
+  (horizontal
+    (raw-string "{" {:fill ::style/object-color})
+    (entries m)
     (raw-string "}" {:fill ::style/object-color})))
 
 (prefer-method emit IRecord IPersistentMap)
-(prefer-method emit ISeq IPersistentList)
+(prefer-method emit IRecord Map)
+(prefer-method emit IPersistentCollection Map)
+
+;; lists
 
 (defmethod emit IPersistentVector [v]
   (horizontal
@@ -415,11 +452,17 @@
     (items v)
     (raw-string "]" {:fill ::style/object-color})))
 
-(defmethod emit IPersistentList [v]
+(defmethod emit List [xs]
   (horizontal
     (raw-string "(" {:fill ::style/object-color})
-    (items v)
+    (sequential xs)
     (raw-string ")" {:fill ::style/object-color})))
+
+(defmethod emit RandomAccess [xs]
+  (horizontal
+    (raw-string "[" {:fill ::style/object-color})
+    (items xs)
+    (raw-string "]" {:fill ::style/object-color})))
 
 (defmethod emit ISeq [xs]
   (horizontal
@@ -427,16 +470,46 @@
     (sequential xs)
     (raw-string ")" {:fill ::style/object-color})))
 
+(prefer-method emit IPersistentCollection RandomAccess)
+(prefer-method emit IPersistentCollection Collection)
+(prefer-method emit RandomAccess List)
+(prefer-method emit ISeq IPersistentCollection)
+(prefer-method emit ISeq Collection)
+
+;; sets
+
 (defmethod emit IPersistentSet [s]
   (horizontal
     (raw-string "#{" {:fill ::style/object-color})
     (items s)
     (raw-string "}" {:fill ::style/object-color})))
 
+(defmethod emit Set [s]
+  (horizontal
+    (raw-string "#{" {:fill ::style/object-color})
+    (items s)
+    (raw-string "}" {:fill ::style/object-color})))
+
+;; exceptions
+
 (defmethod emit Throwable [t]
   (horizontal
     (raw-string "#reveal/error" {:fill ::style/object-color})
     (stream (Throwable->map t))))
+
+(defmethod emit StackTraceElement [^StackTraceElement el]
+  (horizontal
+    (raw-string "[" {:fill ::style/object-color})
+    (stream (symbol (.getClassName el)))
+    (raw-string " ")
+    (stream (symbol (.getMethodName el)))
+    (raw-string " ")
+    (stream (.getFileName el))
+    (raw-string " ")
+    (stream (.getLineNumber el))
+    (raw-string "]" {:fill ::style/object-color})))
+
+;; objects
 
 (defmethod emit MultiFn [^MultiFn f]
   (horizontal
@@ -471,7 +544,7 @@
 
 (defmethod emit IRef [*ref]
   (horizontal
-    (raw-string (str "#" (.toLowerCase (.getSimpleName (class *ref))) "[") {:fill ::style/object-color})
+    (raw-string (str "#reveal/" (.toLowerCase (.getSimpleName (class *ref))) "[") {:fill ::style/object-color})
     (identity-hash-code *ref)
     (raw-string " ")
     (stream @*ref)
@@ -581,3 +654,9 @@
 (defn system-err [line]
   (as line
     (raw-string line {:fill ::style/error-color})))
+
+(defmethod emit Eduction [eduction]
+  (horizontal
+    (raw-string "(" {:fill ::style/object-color})
+    (sequential eduction)
+    (raw-string ")" {:fill ::style/object-color})))

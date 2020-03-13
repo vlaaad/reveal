@@ -92,7 +92,7 @@
                              (let [form (read-string (:text this))
                                    form `(fn [~'*v ~'*a] ~(cond
                                                             ('#{*a *v} form) form
-                                                            (symbol? form) (list form '*v)
+                                                            (ident? form) (list form '*v)
                                                             :else form))]
                                ((eval form) val ann)))
                    :segments segments}
