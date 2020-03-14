@@ -569,12 +569,10 @@
 
 (defmethod emit File [file]
   (horizontal
-    (raw-string "#reveal/file[" {:fill ::style/object-color})
+    (raw-string "#reveal/file" {:fill ::style/object-color})
     separator
-    (escaped-string file {:fill ::style/string-color}
-                    escape-layout-chars {:fill ::style/scalar-color})
-    separator
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string " ")
+    (stream (str file))))
 
 (defmethod emit Delay [*delay]
   (horizontal
@@ -642,21 +640,17 @@
 
 (defmethod emit URL [x]
   (horizontal
-    (raw-string "#reveal/url[" {:fill ::style/object-color})
+    (raw-string "#reveal/url" {:fill ::style/object-color})
     separator
-    (escaped-string x {:fill ::style/string-color}
-                    escape-layout-chars {:fill ::style/scalar-color})
-    separator
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string " ")
+    (stream (str x))))
 
 (defmethod emit URI [x]
   (horizontal
-    (raw-string "#reveal/uri[" {:fill ::style/object-color})
+    (raw-string "#reveal/uri" {:fill ::style/object-color})
     separator
-    (escaped-string x {:fill ::style/string-color}
-                    escape-layout-chars {:fill ::style/scalar-color})
-    separator
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string " ")
+    (stream (str x))))
 
 (defmethod emit UUID [x]
   (horizontal
