@@ -226,9 +226,6 @@
 (defn sequential [xs]
   (block :vertical (vertical-items xs)))
 
-(defmethod emit :default [x]
-  (raw-string (pr-str x) {:fill ::style/object-color}))
-
 (defn- emit-xf [rf]
   (fn
     ([] (rf))
@@ -361,6 +358,19 @@
   (let [hash (System/identityHashCode x)]
     (as hash
       (raw-string (format "0x%x" hash) {:fill ::style/scalar-color}))))
+
+(defmethod emit :default [x]
+  (horizontal
+    (raw-string "#object[" {:fill ::style/object-color})
+    (let [c (class x)]
+      (if (.isArray c)
+        (as c (raw-string (pr-str (.getName c)) {:fill ::style/object-color}))
+        (stream c)))
+    (raw-string " ")
+    (identity-hash-code x)
+    (raw-string " ")
+    (stream (str x))
+    (raw-string "]" {:fill ::style/object-color})))
 
 ;; scalars
 
@@ -511,12 +521,19 @@
 
 ;; objects
 
+(def ^:private describe-multi
+  (try
+    (let [field (doto (.getDeclaredField MultiFn "name") (.setAccessible true))]
+      #(symbol (.get field %)))
+    (catch Exception _
+      #(.-dispatchFn ^MultiFn %))))
+
 (defmethod emit MultiFn [^MultiFn f]
   (horizontal
     (raw-string "#reveal/multi-fn[" {:fill ::style/object-color})
-    (identity-hash-code f)
+    (stream (describe-multi f))
     (raw-string " ")
-    (stream (.-dispatchFn f))
+    (identity-hash-code f)
     (raw-string "]" {:fill ::style/object-color})))
 
 (defmethod emit Fn [f]
@@ -545,9 +562,9 @@
 (defmethod emit IRef [*ref]
   (horizontal
     (raw-string (str "#reveal/" (.toLowerCase (.getSimpleName (class *ref))) "[") {:fill ::style/object-color})
-    (identity-hash-code *ref)
-    (raw-string " ")
     (stream @*ref)
+    (raw-string " ")
+    (identity-hash-code *ref)
     (raw-string "]" {:fill ::style/object-color})))
 
 (defmethod emit File [file]
@@ -562,11 +579,12 @@
 (defmethod emit Delay [*delay]
   (horizontal
     (raw-string "#reveal/delay[" {:fill ::style/object-color})
-    (identity-hash-code *delay)
-    (raw-string " ")
     (if (realized? *delay)
       (stream @*delay)
       (raw-string "..." {:fill ::style/util-color}))
+    separator
+    (raw-string " ")
+    (identity-hash-code *delay)
     (raw-string "]" {:fill ::style/object-color})))
 
 (defmethod emit Reduced [*reduced]
@@ -582,21 +600,21 @@
       (.startsWith class-name "clojure.core$promise$reify")
       (horizontal
         (raw-string "#reveal/promise[" {:fill ::style/object-color})
-        (identity-hash-code *blocking-deref)
-        (raw-string " ")
         (if (realized? *blocking-deref)
           (stream @*blocking-deref)
           (raw-string "..." {:fill ::style/util-color}))
+        (raw-string " ")
+        (identity-hash-code *blocking-deref)
         (raw-string "]" {:fill ::style/object-color}))
 
       (.startsWith class-name "clojure.core$future_call$reify")
       (horizontal
         (raw-string "#reveal/future[" {:fill ::style/object-color})
-        (identity-hash-code *blocking-deref)
-        (raw-string " ")
         (if (realized? *blocking-deref)
           (stream @*blocking-deref)
           (raw-string "..." {:fill ::style/util-color}))
+        (raw-string " ")
+        (identity-hash-code *blocking-deref)
         (raw-string "]" {:fill ::style/object-color}))
 
       :else
@@ -605,9 +623,9 @@
 (defmethod emit Volatile [*ref]
   (horizontal
     (raw-string "#reveal/volatile[" {:fill ::style/object-color})
-    (identity-hash-code *ref)
-    (raw-string " ")
     (stream @*ref)
+    (raw-string " ")
+    (identity-hash-code *ref)
     (raw-string "]" {:fill ::style/object-color})))
 
 (defmethod emit TaggedLiteral [x]
