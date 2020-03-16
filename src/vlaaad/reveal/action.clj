@@ -5,7 +5,7 @@
             [clojure.reflect :as reflect]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.style :as style]
-            [clojure.string :as str])
+            [clojure.spec.alpha :as s])
   (:import [clojure.lang IDeref]
            [java.awt Desktop]
            [java.net URI URL]
@@ -35,6 +35,21 @@
         (unregister id)
         (assoc-in [:keys id] key)
         (assoc-in [:actions key] action))))
+
+(s/def ::id any?)
+
+(s/def ::label string?)
+
+(s/def ::check
+  (s/fspec :args (s/cat :val any? :ann (s/nilable map?))
+           :ret (s/nilable fn?)))
+
+(s/def ::action
+  (s/keys :req-un [::id ::check ::label]))
+
+(s/fdef register!
+  :args (s/cat :action ::action)
+  :ret ::id)
 
 (defn register! [action]
   (swap! *registry register action)

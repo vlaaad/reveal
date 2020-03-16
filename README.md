@@ -141,6 +141,9 @@ alive.
     - namespaced kw -> spec
     - fn -> var (note the suffix: assoc is `clojure.core/assoc--5416`)
   - sourceable things: as source code
+- better accordion headers (limit in length, think about the contents of the headers)
+- fork out/err in repl/nrepl as well
+- investigate using executors instead of threads for streaming
 - multiple accordions
 - structural navigation
 - improve datafy/nav support (on sets, for example)

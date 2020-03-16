@@ -5,8 +5,8 @@
            :repl {:main-opts ["-m" "vlaaad.reveal.repl"]}
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "0.6.0"}}
                    :main-opts ["-m" "nrepl.cmdline" "--middleware" "[vlaaad.reveal.nrepl/middleware]"]}
-           :dev {:extra-paths ["dev"]}
-           :specs {:extra-paths ["specs"]}
+           :dev {:extra-paths ["dev"]
+                 :extra-deps {org.clojure/test.check {:mvn/version "1.0.0"}}}
            :build {:extra-paths ["build"]
                    :jvm-opts ["-Dclojure.spec.skip-macros=true"]
                    :extra-deps {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}}}

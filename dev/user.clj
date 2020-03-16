@@ -1,8 +1,11 @@
 (ns user
+  (:require [clojure.spec.test.alpha :as stest])
   (:import [clojure.lang PersistentQueue]
            [java.util UUID HashSet HashMap ArrayList Date LinkedList]
            [java.sql Timestamp]
            [java.time Instant LocalTime LocalDateTime ZoneOffset]))
+
+(stest/instrument)
 
 (def interesting-values
   {:numbers {:integer (int 1)
