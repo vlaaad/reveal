@@ -71,20 +71,20 @@ with 0 arguments to close the window and dispose it.
 #### As a repl in a shell
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea12"}}}' -m vlaaad.reveal.repl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea13"}}}' -m vlaaad.reveal.repl
 ```
 
 #### As a repl in a shell with prepl backend
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea12"}}}' -m vlaaad.reveal.prepl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea13"}}}' -m vlaaad.reveal.prepl
 ```
 
 #### As a nrepl middleware in a shell
 
 ```sh
 clj \
--Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea12"} nrepl {:mvn/version "0.6.0"}}}' \
+-Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea13"} nrepl {:mvn/version "0.6.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
 
@@ -142,7 +142,9 @@ alive.
     - fn -> var (note the suffix: assoc is `clojure.core/assoc--5416`)
   - sourceable things: as source code
 - better accordion headers (limit in length, think about the contents of the headers)
-- fork out/err in repl/nrepl as well
+- fork out/err in repl/nrepl as well:
+  - for full experience we should fork `System/out` and `System/err`, and re-bind roots of `*out*` and `*err*` — is it 
+    a good idea?
 - investigate using executors instead of threads for streaming
 - multiple accordions
 - structural navigation

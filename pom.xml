@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>vlaaad</groupId>
   <artifactId>reveal</artifactId>
-  <version>0.1.0-ea12</version>
+  <version>0.1.0-ea13</version>
   <name>reveal</name>
   <dependencies>
     <dependency>
@@ -25,9 +25,14 @@
   <build>
     <sourceDirectory>src</sourceDirectory>
   </build>
-  <repositories/>
+  <repositories>
+    <repository>
+      <id>clojars</id>
+      <url>https://repo.clojars.org/</url>
+    </repository>
+  </repositories>
   <scm>
     <url>https://github.com/vlaaad/reveal</url>
-    <tag>0.1.0-ea12</tag>
+    <tag>0.1.0-ea13</tag>
   </scm>
 </project>
