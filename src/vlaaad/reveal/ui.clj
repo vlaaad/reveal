@@ -246,10 +246,11 @@
   {:state (update state :output output-panel/add-lines event)})
 
 (defn make []
-  (let [out-queue (ArrayBlockingQueue. 1024)
+  (let [value-queue (ArrayBlockingQueue. 1024)
+        *running (volatile! true)
         xform (comp stream/stream-xf
-                    (partition-all 128))
-        output! #(.put out-queue (if (nil? %) ::stream-nil %))
+                    (partition-all 128)
+                    (take-while (fn [_] @*running)))
         ;; todo output as view?
         *state (atom {:output (output-panel/make)
                       :views {}
@@ -266,17 +267,11 @@
                           (fx/wrap-async :error-handler #(tap> %2)
                                          :fx/executor event/daemon-executor))
         add-lines! #(event-handler {::event/handler add-lines :fx/event %})
-        output-thread (doto (Thread.
-                              ^Runnable
-                              (fn []
-                                (while (not (Thread/interrupted))
-                                  (try
-                                    (let [x (.take out-queue)
-                                          x (if (= ::stream-nil x) nil x)]
-                                      (oneduce xform add-lines! x))
-                                    (catch InterruptedException _))))
-                              "reveal-stream-thread")
-                        (.setDaemon true))
+        f (.submit event/daemon-executor ^Runnable
+                   (fn []
+                     (while @*running
+                       (let [x (.take value-queue)]
+                         (oneduce xform add-lines! ({::nil nil} x x))))))
         renderer (fx/create-renderer
                    :opts {:fx.opt/map-event-handler event-handler
                           :fx.opt/type->lifecycle #(or (fx/keyword->lifecycle %)
@@ -284,13 +279,14 @@
                                                        (when (instance? MultiFn %)
                                                          fx.lifecycle/dynamic-fn->dynamic))}
                    :middleware (fx/wrap-map-desc #(view %)))]
-    (.start output-thread)
     (fx/mount-renderer *state renderer)
     (fn
       ([]
        (fx/unmount-renderer *state renderer)
-       (.interrupt output-thread)
-       (.clear out-queue))
+       (vreset! *running false)
+       (.cancel f true)
+       (.clear value-queue))
       ([x]
-       (output! x)
+       (when @*running
+         (.put value-queue ({nil ::nil} x x)))
        x))))

@@ -1,7 +1,7 @@
 (ns vlaaad.reveal.event
-  (:import [java.util.concurrent Executors ThreadFactory]))
+  (:import [java.util.concurrent Executors ThreadFactory ExecutorService]))
 
-(def daemon-executor
+(def ^ExecutorService daemon-executor
   (let [*counter (atom 0)
         factory (reify ThreadFactory
                   (newThread [_ runnable]
