@@ -51,66 +51,68 @@
                                        (search/select text :label)))
       (dissoc :selected-index)))
 
-(defn- state-fx [state id f & args]
-  {:state (apply update-in state [id :popup] f args)})
-
-(defn- on-action-key-pressed [{:keys [state id ^KeyEvent fx/event action on-cancel segments]}]
+(defmethod event/handle ::on-action-key-pressed [*state {:keys [id ^KeyEvent fx/event action on-cancel segments]}]
   (condp = (.getCode event)
     KeyCode/ESCAPE
-    {:dispatch on-cancel}
+    (event/handle *state on-cancel)
 
     KeyCode/ENTER
-    [[:dispatch on-cancel]
-     [:execute (assoc action :segments segments)]]
+    (do
+      (event/handle *state on-cancel)
+      (event/handle *state {::event/type :vlaaad.reveal.ui/on-open-view-2
+                            :action (assoc action :segments segments)}))
 
     KeyCode/UP
-    (state-fx state id move-selected-index dec)
+    (swap! *state update-in [id :popup] move-selected-index dec)
 
     KeyCode/DOWN
-    (state-fx state id move-selected-index inc)
+    (swap! *state update-in [id :popup] move-selected-index inc)
 
     nil))
 
-(defn- on-action-pressed [{:keys [state id action]}]
-  (state-fx state id select-action action))
+(defmethod event/handle ::on-action-pressed [*state {:keys [id action]}]
+  (swap! *state update-in [id :popup] select-action action))
 
-(defn- on-action-clicked [{:keys [action segments on-cancel]}]
-  [[:dispatch on-cancel]
-   [:execute (assoc action :segments segments)]])
+(defmethod event/handle ::on-action-clicked [*state {:keys [action segments on-cancel]}]
+  (event/handle *state on-cancel)
+  (event/handle *state {::event/type :vlaaad.reveal.ui/on-open-view-2
+                        :action (assoc action :segments segments)}))
 
-(defn- on-text-key-pressed [{:keys [state id ^KeyEvent fx/event on-cancel segments val ann]}]
-  (let [this (get-in state [id :popup])]
+(defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel segments val ann]}]
+  (let [this (get-in @*state [id :popup])]
     (condp = (.getCode event)
       KeyCode/ESCAPE
       (if (empty? (:text this))
-        {:dispatch on-cancel}
-        (state-fx state id set-text ""))
+        (event/handle *state on-cancel)
+        (swap! *state update-in [id :popup] set-text ""))
 
       KeyCode/ENTER
       (when-not (str/blank? (:text this))
-        {:execute {:invoke (fn []
-                             (let [form (read-string (:text this))
-                                   form `(fn [~'*v ~'*a] ~(cond
-                                                            ('#{*a *v} form) form
-                                                            (ident? form) (list form '*v)
-                                                            :else form))]
-                               ((eval form) val ann)))
-                   :segments segments}
-         :dispatch on-cancel})
+        (event/handle *state {::event/type :vlaaad.reveal.ui/on-open-view-2
+                              :action {:invoke (fn []
+                                                 (let [form (read-string (:text this))
+                                                       form `(fn [~'*v ~'*a] ~(cond
+                                                                                ('#{*a *v} form) form
+                                                                                (ident? form) (list form '*v)
+                                                                                :else form))]
+                                                   ((eval form) val ann)))
+                                       :segments segments}})
+        (event/handle *state on-cancel))
 
       KeyCode/UP
-      (state-fx state id move-selected-index dec)
+      (swap! *state update-in [id :popup] move-selected-index dec)
 
       KeyCode/DOWN
-      (state-fx state id move-selected-index inc)
+      (swap! *state update-in [id :popup] move-selected-index inc)
 
       nil)))
 
-(defn- on-text-changed [{:keys [state id fx/event]}]
-  (state-fx state id set-text event))
+(defmethod event/handle ::on-text-changed [*state {:keys [id fx/event]}]
+  (swap! *state update-in [id :popup] set-text event))
 
-(defn- on-text-focused [{:keys [state id fx/event]}]
-  (when event (state-fx state id dissoc :selected-index)))
+(defmethod event/handle ::on-text-focused [*state {:keys [id fx/event]}]
+  (when event
+    (swap! *state update-in [id :popup] dissoc :selected-index)))
 
 (def ^:private lifecycle
   (fx.composite/describe Popup
@@ -239,15 +241,15 @@
               :refs (into {::text-field {:fx/type :text-field
                                          :style-class "reveal-popup-text-field"
                                          :text text
-                                         :on-focused-changed {::event/handler on-text-focused
+                                         :on-focused-changed {::event/type ::on-text-focused
                                                               :id id}
-                                         :on-key-pressed {::event/handler on-text-key-pressed
+                                         :on-key-pressed {::event/type ::on-text-key-pressed
                                                           :id id
                                                           :val val
                                                           :ann ann
                                                           :on-cancel on-cancel
                                                           :segments segments}
-                                         :on-text-changed {::event/handler on-text-changed
+                                         :on-text-changed {::event/type ::on-text-changed
                                                            :fx/sync true
                                                            :id id}}}
                           (map-indexed
@@ -259,15 +261,15 @@
                                                      (conj "reveal-popup-item-selected"))
                                 :min-width :use-pref-size
                                 :text (:label action)
-                                :on-key-pressed {::event/handler on-action-key-pressed
+                                :on-key-pressed {::event/type ::on-action-key-pressed
                                                  :id id
                                                  :action action
                                                  :segments segments
                                                  :on-cancel on-cancel}
-                                :on-mouse-pressed {::event/handler on-action-pressed
+                                :on-mouse-pressed {::event/type ::on-action-pressed
                                                    :id id
                                                    :action action}
-                                :on-mouse-clicked {::event/handler on-action-clicked
+                                :on-mouse-clicked {::event/type ::on-action-clicked
                                                    :action action
                                                    :segments segments
                                                    :on-cancel on-cancel}}]))

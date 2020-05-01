@@ -1,5 +1,6 @@
 (ns vlaaad.reveal.event
-  (:import [java.util.concurrent Executors ThreadFactory ExecutorService]))
+  (:import [java.util.concurrent Executors ThreadFactory ExecutorService]
+           [clojure.lang IFn]))
 
 (def ^ExecutorService daemon-executor
   (let [*counter (atom 0)
@@ -9,8 +10,12 @@
                       (.setDaemon true))))]
     (Executors/newCachedThreadPool factory)))
 
-(defn- not-found-handler [e]
-  (prn (dissoc e :state)))
+(defmulti handle "[*state event]" (fn [*state e] (::type e)))
 
-(defn handler [e]
-  ((::handler e not-found-handler) e))
+(defmethod handle :default [_ e]
+  (prn e))
+
+(defrecord MapEventHandler [*state]
+  IFn
+  (invoke [_ e]
+    (handle *state e)))
