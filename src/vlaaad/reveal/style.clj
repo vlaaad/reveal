@@ -12,7 +12,9 @@
           unfocused-selection-color "#555"
           popup-color "#3b3b44"
           object-color "#f7b940"
-          background-color "#232325"]
+          background-color "#232325"
+          font-family (str \" (.getFamily font/font) \")
+          font-size (.getSize font/font)]
       {::util-color util-color
        ::string-color "#22aeaa"
        ::error-color "#f15856"
@@ -32,17 +34,17 @@
                             :-fx-padding 5
                             "-scroll-pane" {:-fx-hbar-policy :never
                                             :-fx-min-height 0}
-                            "-item" {:-fx-font-family (str \" (.getFamily font/font) \")
+                            "-item" {:-fx-font-family font-family
                                      :-fx-text-fill util-color
                                      :-fx-max-width "Infinity"
                                      :-fx-padding [3.5 7]
-                                     :-fx-font-size (.getSize font/font)
+                                     :-fx-font-size font-size
                                      ":hover" {:-fx-text-fill symbol-color}
                                      "-selected" {:-fx-background-color selection-color
                                                   :-fx-text-fill symbol-color}}
-                            "-text-field" {:-fx-font-family (str \" (.getFamily font/font) \")
+                            "-text-field" {:-fx-font-family font-family
                                            :-fx-text-fill symbol-color
-                                           :-fx-font-size (.getSize font/font)
+                                           :-fx-font-size font-size
                                            :-fx-background-color background-color
                                            :-fx-highlight-fill selection-color
                                            :-fx-highlight-text-fill symbol-color
@@ -55,6 +57,9 @@
                                       "-separator" {:-fx-min-width 1
                                                     :-fx-background-color background-color}}
                            "-scroll-pane" {:-fx-min-height 27}}}
+       ".label" {:-fx-text-fill util-color
+                 :-fx-font-family font-family
+                 :-fx-font-size font-size}
        ".cell" {:-fx-text-fill symbol-color
                 :-fx-background-color :transparent
                 ":focused" {:-fx-background-color selection-color}}

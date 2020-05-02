@@ -186,6 +186,34 @@
             (when (instance? IRef v)
               #(as {:fx/type ref-logger :ref v})))})
 
+(defn- deref-process [id blocking-deref handler]
+  (handler {::event/type ::create-view-state :id id :state {:state ::waiting}})
+  (let [f (.submit event/daemon-executor ^Runnable
+                   (fn []
+                     (try
+                       (handler {::event/type ::create-view-state
+                                 :id id
+                                 :state {:state ::value :value @blocking-deref}})
+                       (catch Throwable e
+                         (handler {::event/type ::create-view-state
+                                   :id id
+                                   :state {:state ::exception :exception e}})))))]
+    #(.cancel f true)))
+
+(defn- blocking-deref-view [{:keys [state] :as props}]
+  (case state
+    ::waiting {:fx/type :label
+               :focus-traversable true
+               :text "Loading..."}
+    ::value (make (:value props))
+    ::exception (make (:exception props))))
+
+(defn blocking-deref [{:keys [blocking-deref]}]
+  {:fx/type ext-with-process
+   :start deref-process
+   :args blocking-deref
+   :desc {:fx/type blocking-deref-view}})
+
 (extend-protocol Viewable
   nil
   (make [this] {:fx/type value :value this})

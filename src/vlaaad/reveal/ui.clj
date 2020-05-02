@@ -59,9 +59,14 @@
                         (fx/run-later
                           (.requestFocus node))))))))
 
+(defn- switch-focus! [^Node from to]
+  (when (.isFocused from)
+    (focus-when-on-scene! to)))
+
 (defn ext-focused-by-default [{:keys [desc]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created focus-when-on-scene!
+   :on-advanced switch-focus!
    :desc desc})
 
 (defmethod event/handle ::on-window-focused-changed [*state {:keys [fx/event]}]
@@ -194,20 +199,17 @@
    (let [rf (xf (completing #(f %2)))]
      (rf (rf nil x)))))
 
-(defmethod event/handle ::on-open-view-2 [*state {:keys [action]}]
-  (let [id (UUID/randomUUID)]
-    (future ;; todo future-view!
-      (let [desc (view/make (try
-                              ((:invoke action))
-                              (catch Throwable e
-                                ;; todo show errors differently
-                                e)))]
-        (swap! *state (fn [state]
-                        (let [view-order (:view-order state)]
-                          (-> state
-                              (assoc :focused-view-index (count view-order)
-                                     :view-order (conj view-order id))
-                              (assoc-in [:views id] {:action action :desc desc})))))))))
+(defmethod event/handle ::execute-action [*state {:keys [action]}]
+  (let [id (UUID/randomUUID)
+        f (future ((:invoke action)))]
+    (swap! *state (fn [state]
+                    (let [view-order (:view-order state)]
+                      (-> state
+                          (assoc :focused-view-index (count view-order)
+                                 :view-order (conj view-order id))
+                          (assoc-in [:views id] {:action action
+                                                 :desc {:fx/type view/blocking-deref
+                                                        :blocking-deref f}})))))))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)

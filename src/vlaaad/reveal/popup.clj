@@ -59,7 +59,7 @@
     KeyCode/ENTER
     (do
       (event/handle *state on-cancel)
-      (event/handle *state {::event/type :vlaaad.reveal.ui/on-open-view-2
+      (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
                             :action (assoc action :segments segments)}))
 
     KeyCode/UP
@@ -75,7 +75,7 @@
 
 (defmethod event/handle ::on-action-clicked [*state {:keys [action segments on-cancel]}]
   (event/handle *state on-cancel)
-  (event/handle *state {::event/type :vlaaad.reveal.ui/on-open-view-2
+  (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
                         :action (assoc action :segments segments)}))
 
 (defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel segments val ann]}]
@@ -88,7 +88,7 @@
 
       KeyCode/ENTER
       (when-not (str/blank? (:text this))
-        (event/handle *state {::event/type :vlaaad.reveal.ui/on-open-view-2
+        (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
                               :action {:invoke (fn []
                                                  (let [form (read-string (:text this))
                                                        form `(fn [~'*v ~'*a] ~(cond
