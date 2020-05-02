@@ -103,6 +103,50 @@
                                                    (- (.getWidth content) viewport-width)))))))
                 fx.lifecycle/scalar))}))
 
+(defn- tabs-view [{:keys [view-order views focused-view-index]}]
+  (let [focused-view-id (view-order focused-view-index)
+        tabs (->> view-order
+                  (map-indexed
+                    (fn [index id]
+                      {:fx/type fx/ext-on-instance-lifecycle
+                       :fx/key id
+                       :on-created #(.put (.getProperties ^Node %) ::id id)
+                       :desc {:fx/type :anchor-pane
+                              :style-class ["reveal-view-header-tab" (str "reveal-view-header-tab-" (if (= id focused-view-id) "focused" "blurred"))]
+                              :min-width :use-pref-size
+                              :min-height :use-pref-size
+                              :on-mouse-clicked {::event/type ::focus-on-tab :index index}
+                              :children [{:fx/type segment/view
+                                          :anchor-pane/left 5
+                                          :anchor-pane/right 5
+                                          :anchor-pane/top 5
+                                          :anchor-pane/bottom 5
+                                          :width (get-in views [id :header-width])
+                                          :on-width-changed {::event/type ::on-header-width-changed :id id}
+                                          :height (get-in views [id :header-height])
+                                          :on-height-changed {::event/type ::on-header-height-changed :id id}
+                                          :segments (get-in views [id :action :segments])}]}}))
+                  (interpose
+                    {:fx/type :region
+                     :style-class "reveal-view-header-separator"}))]
+    {:fx/type :v-box
+     :on-key-pressed {::event/type ::on-view-key-pressed :index focused-view-index}
+     :children [{:fx/type scroll-pane
+                 :style-class "reveal-view-scroll-pane"
+                 :fit-to-width true
+                 :vbar-policy :never
+                 :hbar-policy :never
+                 :focused-view focused-view-id
+                 :content {:fx/type :h-box
+                           :style-class "reveal-view-header"
+                           :min-width :use-pref-size
+                           :children tabs}}
+                {:fx/type ext-focused-by-default
+                 :fx/key focused-view-id
+                 :v-box/vgrow :always
+                 :desc {:fx/type fx/ext-get-ref
+                        :ref focused-view-id}}]}))
+
 (defn- view [{:keys [queue showing view-order views focused-view-index]}]
   {:fx/type fx/ext-let-refs
    :refs (into {} (map (juxt key #(-> % val :desc)) views))
@@ -136,52 +180,12 @@
                              :queue queue
                              :id :output}]
                            focused-view-index
-                           (conj
-                             (let [focused-view-id (view-order focused-view-index)]
-                               {:fx/type :v-box
-                                :grid-pane/row 1
-                                :grid-pane/column 0
-                                :on-key-pressed {::event/type ::on-view-key-pressed :index focused-view-index}
-                                :children [{:fx/type scroll-pane
-                                            :style-class "reveal-view-scroll-pane"
-                                            :fit-to-width true
-                                            :vbar-policy :never
-                                            :hbar-policy :never
-                                            :focused-view focused-view-id
-                                            :content
-                                            {:fx/type :h-box
-                                             :style-class "reveal-view-header"
-                                             :min-width :use-pref-size
-                                             :children
-                                             (->> view-order
-                                                  (map-indexed
-                                                    (fn [index id]
-                                                      {:fx/type fx/ext-on-instance-lifecycle
-                                                       :fx/key id
-                                                       :on-created #(.put (.getProperties ^Node %) ::id id)
-                                                       :desc {:fx/type :anchor-pane
-                                                              :style-class ["reveal-view-header-tab" (str "reveal-view-header-tab-" (if (= id focused-view-id) "focused" "blurred"))]
-                                                              :min-width :use-pref-size
-                                                              :min-height :use-pref-size
-                                                              :on-mouse-clicked {::event/type ::focus-on-tab :index index}
-                                                              :children [{:fx/type segment/view
-                                                                          :anchor-pane/left 5
-                                                                          :anchor-pane/right 5
-                                                                          :anchor-pane/top 5
-                                                                          :anchor-pane/bottom 5
-                                                                          :width (get-in views [id :header-width])
-                                                                          :on-width-changed {::event/type ::on-header-width-changed :id id}
-                                                                          :height (get-in views [id :header-height])
-                                                                          :on-height-changed {::event/type ::on-header-height-changed :id id}
-                                                                          :segments (get-in views [id :action :segments])}]}}))
-                                                  (interpose
-                                                    {:fx/type :region
-                                                     :style-class "reveal-view-header-separator"}))}}
-                                           {:fx/type ext-focused-by-default
-                                            :fx/key focused-view-id
-                                            :v-box/vgrow :always
-                                            :desc {:fx/type fx/ext-get-ref
-                                                   :ref focused-view-id}}]})))}}}})
+                           (conj {:fx/type tabs-view
+                                  :grid-pane/row 1
+                                  :grid-pane/column 0
+                                  :views views
+                                  :view-order view-order
+                                  :focused-view-index focused-view-index}))}}}})
 
 (defn oneduce
   ([xf x]

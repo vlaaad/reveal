@@ -2,7 +2,6 @@
   (:require [vlaaad.reveal.output-panel :as output-panel]
             [vlaaad.reveal.event :as event]
             [vlaaad.reveal.stream :as stream]
-            [vlaaad.reveal.layout :as layout]
             [vlaaad.reveal.action :as action]
             [vlaaad.reveal.style :as style]
             [cljfx.lifecycle :as fx.lifecycle]
@@ -96,114 +95,96 @@
    :args value
    :desc {:fx/type output-panel/view}})
 
-#_(defn value [value env]
-    ((:on-create env)
-     (fn [dispatch!]
-       (let [*running (volatile! true)]
-         (.submit event/daemon-executor
-                  ^Runnable
-                  (fn []
-                    (runduce! (comp stream/stream-xf
-                                    (partition-all 128)
-                                    (take-while (fn [_] @*running)))
-                              #(dispatch! {::event/type ::output-panel/on-add-lines
-                                           :fx/event %
-                                           :id (:id env)})
-                              value)))
-         #(vreset! *running false))))
-    {:fx/type output-panel/view
-     :id (:id env)
-     :layout (layout/make)})
+(defn- watch [id *ref handler]
+  (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
+  (let [*running (volatile! true)
+        out-queue (ArrayBlockingQueue. 1024)
+        submit! #(.put out-queue ({nil ::nil} % %))
+        watch-key (gensym "vlaaad.reveal.view/watcher")
+        f (.submit event/daemon-executor ^Runnable
+                   (fn []
+                     (while @*running
+                       (when-some [x (loop [x (.poll out-queue 1 TimeUnit/SECONDS)
+                                            found nil]
+                                       (if (some? x)
+                                         (recur (.poll out-queue) x)
+                                         found))]
+                         (handler {::event/type ::output-panel/on-clear-lines :id id})
+                         (runduce! (comp stream/stream-xf
+                                         (partition-all 128)
+                                         (take-while
+                                           (fn [_] (and @*running
+                                                        (nil? (.peek out-queue))))))
+                                   #(handler {::event/type ::output-panel/on-add-lines
+                                              :fx/event %
+                                              :id id})
+                                   ({::nil nil} x x))))))]
+    (submit! @*ref)
+    (add-watch *ref watch-key #(submit! %4))
+    #(do
+       (remove-watch *ref watch-key)
+       (vreset! *running false)
+       (.cancel f true))))
 
-#_(defn ref-watcher [*ref]
-    (reify Viewable
-      (make [_]
-        #_((:on-create env)
-           (fn [dispatch!]
-             (let [*running (volatile! true)
-                   ;; todo don't need queue here, just a single value
-                   out-queue (ArrayBlockingQueue. 1024)
-                   submit! #(.put out-queue ({nil ::nil} % %))
-                   watch-key (gensym "vlaaad.reveal.view/watcher")
-                   f (.submit event/daemon-executor ^Runnable
-                              (fn []
-                                (while @*running
-                                  (when-some [x (loop [x (.poll out-queue 1 TimeUnit/SECONDS)
-                                                       found nil]
-                                                  (if (some? x)
-                                                    (recur (.poll out-queue) x)
-                                                    found))]
-                                    (dispatch! {::event/type ::output-panel/on-clear-lines
-                                                :id (:id env)})
-                                    (runduce! (comp stream/stream-xf
-                                                    (partition-all 128)
-                                                    (take-while
-                                                      (fn [_] (and @*running
-                                                                   (nil? (.peek out-queue))))))
-                                              #(dispatch! {::event/type ::output-panel/on-add-lines
-                                                           :fx/event %
-                                                           :id (:id env)})
-                                              ({::nil nil} x x))))))]
-               (submit! @*ref)
-               (add-watch *ref watch-key #(submit! %4))
-               #(do
-                  (remove-watch *ref watch-key)
-                  (vreset! *running false)
-                  (.cancel f true)))))
-        #_{:fx/type output-panel/view
-           :id (:id env)
-           :layout (layout/make)})))
+(defn ref-watcher [{:keys [ref]}]
+  {:fx/type ext-with-process
+   :start watch
+   :args ref
+   :desc {:fx/type output-panel/view}})
 
-#_(action/register!
-    {:id ::watch
-     :label "Watch changes"
-     :check (fn [v _]
-              (when (instance? IRef v)
-                #(ref-watcher v)))})
+(defn as [desc]
+  (reify Viewable (make [_] desc)))
 
-#_(defn ref-logger [*ref]
-    (reify Viewable
-      (make [_ env]
-        ((:on-create env)
-         (fn [dispatch!]
-           (let [*running (volatile! true)
-                 out-queue (ArrayBlockingQueue. 1024)
-                 submit! #(.put out-queue ({nil ::nil} % %))
-                 watch-key (gensym "vlaaad.reveal.view/watcher")
-                 *counter (volatile! -1)
-                 f (.submit event/daemon-executor ^Runnable
-                            (fn []
-                              (while @*running
-                                (let [x (.take out-queue)]
-                                  (runduce!
-                                    (comp stream/stream-xf
-                                          (partition-all 128)
-                                          (take-while
-                                            (fn [_] @*running)))
-                                    #(dispatch! {::event/type ::output-panel/on-add-lines
-                                                 :fx/event %
-                                                 :id (:id env)})
-                                    (stream/just
-                                      (stream/horizontal
-                                        (stream/raw-string (format "%4d: " (vswap! *counter inc))
-                                                           {:fill ::style/util-color})
-                                        (stream/stream ({::nil nil} x x)))))))))]
-             (submit! @*ref)
-             (add-watch *ref watch-key #(submit! %4))
-             #(do
-                (remove-watch *ref watch-key)
-                (vreset! *running false)
-                (.cancel f true)))))
-        {:fx/type output-panel/view
-         :id (:id env)
-         :layout (layout/make)})))
+(action/register!
+  {:id ::watch
+   :label "Watch changes"
+   :check (fn [v _]
+            (when (instance? IRef v)
+              #(as {:fx/type ref-watcher :ref v})))})
 
-#_(action/register!
-    {:id ::log
-     :label "Log changes"
-     :check (fn [v _]
-              (when (instance? IRef v)
-                #(ref-logger v)))})
+(defn- log [id *ref handler]
+  (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
+  (let [*running (volatile! true)
+        out-queue (ArrayBlockingQueue. 1024)
+        submit! #(.put out-queue ({nil ::nil} % %))
+        watch-key (gensym "vlaaad.reveal.view/watcher")
+        *counter (volatile! -1)
+        f (.submit event/daemon-executor ^Runnable
+                   (fn []
+                     (while @*running
+                       (let [x (.take out-queue)]
+                         (runduce!
+                           (comp stream/stream-xf
+                                 (partition-all 128)
+                                 (take-while
+                                   (fn [_] @*running)))
+                           #(handler {::event/type ::output-panel/on-add-lines
+                                      :fx/event %
+                                      :id id})
+                           (stream/just
+                             (stream/horizontal
+                               (stream/raw-string (format "%4d: " (vswap! *counter inc))
+                                                  {:fill ::style/util-color})
+                               (stream/stream ({::nil nil} x x)))))))))]
+    (submit! @*ref)
+    (add-watch *ref watch-key #(submit! %4))
+    #(do
+       (remove-watch *ref watch-key)
+       (vreset! *running false)
+       (.cancel f true))))
+
+(defn ref-logger [{:keys [ref]}]
+  {:fx/type ext-with-process
+   :start log
+   :args ref
+   :desc {:fx/type output-panel/view}})
+
+(action/register!
+  {:id ::log
+   :label "Log changes"
+   :check (fn [v _]
+            (when (instance? IRef v)
+              #(as {:fx/type ref-logger :ref v})))})
 
 (extend-protocol Viewable
   nil
