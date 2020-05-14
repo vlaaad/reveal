@@ -125,6 +125,7 @@ alive.
   - file: as content
   - coll of maps, coll of same-length vectors: as table
   - graph-like data: as plots. see:
+    - https://github.com/thi-ng/geom/blob/master/geom-viz/src/core.org
     - https://github.com/metasoarous/oz
     - https://github.com/jsa-aerial/hanami
     - https://vega.github.io/vega-lite/docs/selection.html#filtering-data
