@@ -3,13 +3,17 @@
   (:require [vlaaad.reveal.font :as font]
             [vlaaad.reveal.style :as style]
             [clojure.main :as m])
-  (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn IPersistentList ISeq MultiFn
-                         IRef Var Volatile Namespace IRecord Delay IBlockingDeref TaggedLiteral Reduced ReaderConditional IPersistentCollection BigInt]
+  (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn
+                         ISeq MultiFn IRef Var Volatile Namespace IRecord Delay
+                         IBlockingDeref TaggedLiteral Reduced ReaderConditional
+                         IPersistentCollection BigInt]
            [java.util.regex Pattern]
            [java.io File]
            [java.net URL URI]
-           [java.util UUID List Collection RandomAccess Map Set]
-           [clojure.core Eduction]))
+           [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar]
+           [clojure.core Eduction]
+           [java.text SimpleDateFormat DateFormat]
+           [java.time Instant]))
 
 (set! *warn-on-reflection* true)
 
@@ -672,3 +676,54 @@
     (raw-string "(" {:fill ::style/object-color})
     (sequential eduction)
     (raw-string ")" {:fill ::style/object-color})))
+
+(def ^:private ^ThreadLocal utc-date-format
+  (proxy [ThreadLocal] []
+    (initialValue []
+      (doto (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss.SSS-00:00")
+        (.setTimeZone (TimeZone/getTimeZone "GMT"))))))
+
+(defmethod emit Date [^Date date]
+  (let [^DateFormat format (.get utc-date-format)]
+    (horizontal
+      (raw-string "#inst" {:fill ::style/object-color})
+      separator
+      (raw-string " ")
+      (stream (.format format date)))))
+
+(defmethod emit Calendar [^Calendar calendar]
+  (let [calendar-str (format "%1$tFT%1$tT.%1$tL%1$tz" calendar)
+        minutes-index (- (.length calendar-str) 2)]
+    (horizontal
+      (raw-string "#inst" {:fill ::style/object-color})
+      separator
+      (raw-string " ")
+      (stream (str (subs calendar-str 0 minutes-index) ":" (subs calendar-str minutes-index))))))
+
+(defmethod emit Instant [instant]
+  (horizontal
+    (raw-string "#inst" {:fill ::style/object-color})
+    separator
+    (raw-string " ")
+    (stream (str instant))))
+
+(defmacro ^:private when-class [class-name & body]
+  `(try
+     (Class/forName ^String ~class-name)
+     ~@body
+     (catch ClassNotFoundException _#)))
+
+(when-class "java.sql.Timestamp"
+  (def ^:private utc-timestamp-format
+    (proxy [ThreadLocal] []
+      (initialValue []
+        (doto (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss")
+          (.setTimeZone (TimeZone/getTimeZone "GMT"))))))
+
+  (defmethod emit java.sql.Timestamp [^java.sql.Timestamp timestamp]
+    (horizontal
+      (raw-string "#inst" {:fill ::style/object-color})
+      separator
+      (raw-string " ")
+      (stream (str (.format ^DateFormat (.get ^ThreadLocal utc-timestamp-format) timestamp)
+                   (format ".%09d-00:00" (.getNanos timestamp)))))))
