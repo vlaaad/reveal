@@ -25,7 +25,6 @@
         (stream/horizontal
           (stream/raw-string "=>" {:fill ::style/util-color})
           stream/separator
-          (stream/raw-string " " {:fill ::style/util-color})
           (stream/stream x))))
     (print x)))
 
@@ -42,7 +41,6 @@
           (stream/horizontal
             (stream/raw-string "tap>" {:fill ::style/util-color})
             stream/separator
-            (stream/raw-string " " {:fill ::style/util-color})
             (stream/stream x))))))
 
 (defn- make-print [ui out fill]

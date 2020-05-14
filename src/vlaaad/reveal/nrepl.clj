@@ -25,7 +25,6 @@
                 (stream/horizontal
                   (stream/raw-string "=>" {:fill ::style/util-color})
                   stream/separator
-                  (stream/raw-string " " {:fill ::style/util-color})
                   (stream/stream value))))
 
             (not= out ::not-found)
@@ -43,7 +42,6 @@
                 (stream/horizontal
                   (stream/raw-string "=>" {:fill ::style/util-color})
                   stream/separator
-                  (stream/raw-string " " {:fill ::style/util-color})
                   (stream/as throwable
                     (stream/raw-string
                       (.getSimpleName (class throwable))
@@ -57,8 +55,6 @@
     (stream/as {:tap value}
       (stream/horizontal
         (stream/raw-string "tap>" {:fill ::style/util-color})
-        stream/separator
-        (stream/raw-string " " {:fill ::style/util-color})
         stream/separator
         (stream/stream value)))))
 

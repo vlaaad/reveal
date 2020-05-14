@@ -10,22 +10,33 @@
            [java.util.regex Pattern]
            [java.io File]
            [java.net URL URI]
-           [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar]
+           [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar ArrayList]
            [clojure.core Eduction]
            [java.text SimpleDateFormat DateFormat]
            [java.time Instant]))
 
 (set! *warn-on-reflection* true)
 
+;; region emitter ops
+
 (defn- =>
   ([] (fn [_ acc] acc))
   ([f] f)
   ([f g]
    (fn [rf acc]
-     (g rf (f rf acc))))
+     (let [acc (f rf acc)]
+       (if (reduced? acc)
+         acc
+         (g rf acc)))))
   ([f g h]
    (fn [rf acc]
-     (h rf (g rf (f rf acc)))))
+     (let [acc (f rf acc)]
+       (if (reduced? acc)
+         acc
+         (let [acc (g rf acc)]
+           (if (reduced? acc)
+             acc
+             (h rf acc)))))))
   ([f g h & fs]
    (reduce => (cons f (cons g (cons h fs))))))
 
@@ -46,8 +57,12 @@
        :text str
        :style style}))
 
-(def ^:private newline
-  (op {:op ::newline}))
+(defn- block [block-type sf]
+  (=> (op {:op ::push-block :block block-type})
+      sf
+      (op {:op ::pop-block})))
+
+;; endregion
 
 (defn- stream-dispatch [x]
   (or (::type (meta x))
@@ -73,15 +88,15 @@
   ([x ann]
    (annotate x ann (emit x))))
 
+(defn just [sf]
+  (with-meta sf {::type ::hidden}))
+
 (defn as
   "Streams value using custom sf"
   ([x sf]
    (as x nil sf))
   ([x ann sf]
-   (with-meta (with-value x (assoc ann ::hidden true) sf) {::type ::hidden})))
-
-(defn just [sf]
-  (with-meta sf {::type ::hidden}))
+   (just (with-value x (assoc ann ::hidden true) sf))))
 
 (defn- flush-builder [^StringBuilder builder style]
   (fn [rf acc]
@@ -101,13 +116,13 @@
     (let [len (.length str)]
       (loop [i 0
              acc acc]
-        (if (= i len)
+        (if (or (== i len) (reduced? acc))
           acc
           (let [ch (.charAt str i)]
             (recur
               (inc i)
               (case ch
-                \newline ((=> (flush-builder builder style) newline) rf acc)
+                \newline ((=> (flush-builder builder style) separator) rf acc)
                 \tab (do (.append builder "    ") acc)
                 \return ((flush+util builder style "\\r") rf acc)
                 \formfeed ((flush+util builder style "\\f") rf acc)
@@ -126,31 +141,28 @@
           same-style (= style escape-style)]
       (loop [i 0
              acc acc]
-        (if (= i len)
-          ((flush-builder builder style) rf acc)
-          (let [ch (.charAt str i)
-                esc (escape ch)]
-            (recur
-              (inc i)
-              (if esc
-                (if same-style
-                  ((process-raw builder esc style) rf acc)
-                  ((=> (flush-builder builder style)
-                       (process-raw builder esc escape-style)
-                       (flush-builder builder escape-style))
-                   rf acc))
-                (case ch
-                  \newline ((=> (flush-builder builder style) newline) rf acc)
-                  \tab (do (.append builder "    ") acc)
-                  \return ((flush+util builder style "\\r") rf acc)
-                  \formfeed ((flush+util builder style "\\f") rf acc)
-                  \backspace ((flush+util builder style "\\b") rf acc)
-                  (do (.append builder ch) acc))))))))))
-
-(defn- block [block-type sf]
-  (=> (op {:op ::push-block :block block-type})
-      sf
-      (op {:op ::pop-block})))
+        (if (reduced? acc)
+          acc
+          (if (== i len)
+            ((flush-builder builder style) rf acc)
+            (let [ch (.charAt str i)
+                  esc (escape ch)]
+              (recur
+                (inc i)
+                (if esc
+                  (if same-style
+                    ((process-raw builder esc style) rf acc)
+                    ((=> (flush-builder builder style)
+                         (process-raw builder esc escape-style)
+                         (flush-builder builder escape-style))
+                     rf acc))
+                  (case ch
+                    \newline ((=> (flush-builder builder style) separator) rf acc)
+                    \tab (do (.append builder "    ") acc)
+                    \return ((flush+util builder style "\\r") rf acc)
+                    \formfeed ((flush+util builder style "\\f") rf acc)
+                    \backspace ((flush+util builder style "\\b") rf acc)
+                    (do (.append builder ch) acc)))))))))))
 
 (defn raw-string
   ([x]
@@ -170,79 +182,61 @@
   (block :horizontal (apply => sfs)))
 
 (defn vertical [& sfs]
-  (block :vertical (apply => sfs)))
-
-(defn kvs [m]
-  (block :vertical
-         (fn [rf acc]
-           (reduce-kv
-             (fn [acc k v]
-               ((horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
-                            (raw-string " ")
-                            (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m}))
-                rf acc))
-             acc
-             m))))
+  (block :vertical (apply => (interpose separator sfs))))
 
 (defn entries [m]
   (block :vertical
          (fn [rf acc]
-           (reduce
-             (fn [acc e]
-               (let [k (key e)
-                     v (val e)]
-                 ((horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
-                              (raw-string " ")
-                              (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m}))
-                  rf acc)))
+           (transduce
+             (comp
+               (map (fn [e]
+                      (let [k (key e)
+                            v (val e)]
+                        (horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
+                                    separator
+                                    (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m})))))
+               (interpose separator))
+             (fn
+               ([acc] acc)
+               ([acc sf] (sf rf acc)))
              acc
              m))))
 
-(defn- vertical-items [coll]
+(defn- delimited-items [coll]
   (fn [rf acc]
-    (let [*i (volatile! -1)]
-      (reduce (fn [acc x]
-                ;; todo sets are also here, shouldn't really use indices in that case
-                ((stream x {:vlaaad.reveal.nav/key (vswap! *i inc)
-                            :vlaaad.reveal.nav/coll coll}) rf acc))
-              acc
-              coll))))
-
-(defn- horizontal-items [coll]
-  (fn [rf acc]
-    (let [*i (volatile! -1)]
-      (transduce (interpose ::space)
-                 (completing
-                   (fn [acc x]
-                     (if (= x ::space)
-                       ((raw-string " ") rf acc)
-                       ;; todo sets are also here, shouldn't really use indices in that case
-                       ((stream x {:vlaaad.reveal.nav/key (vswap! *i inc)
-                                   :vlaaad.reveal.nav/coll coll}) rf acc))))
-                 acc
-                 coll))))
+    (transduce (comp
+                 (map-indexed (fn [i x]
+                                ;; todo sets are also here, shouldn't really use indices in that case
+                                (stream x {:vlaaad.reveal.nav/key i
+                                           :vlaaad.reveal.nav/coll coll})))
+                 (interpose separator))
+               (fn
+                 ([acc] acc)
+                 ([acc sf] (sf rf acc)))
+               acc
+               coll)))
 
 (defn items [coll]
   (if (some coll? coll)
-    (block :vertical (vertical-items coll))
-    (block :horizontal (horizontal-items coll))))
+    (block :vertical (delimited-items coll))
+    (block :horizontal (delimited-items coll))))
 
 (defn sequential [xs]
-  (block :vertical (vertical-items xs)))
+  (block :vertical (delimited-items xs)))
 
 (defn- emit-xf [rf]
   (fn
     ([] (rf))
-    ([result] (rf result))
-    ([result input]
+    ([acc] (rf acc))
+    ([acc input]
      (try
-       ((stream input) rf result)
+       ((stream input) rf acc)
        (catch Throwable ex
          ((as ex
             (raw-string
               (-> ex Throwable->map (assoc :phase :print-eval-result) m/ex-triage m/ex-str)
               {:fill ::style/error-color}))
-          rf result))))))
+          rf acc))))))
 
 (defn- blank-segment [n]
   {:text (apply str (repeat n \space))
@@ -285,78 +279,161 @@
   (let [*state (volatile! {:line [] :values [] :blocks []})]
     (fn
       ([] (rf))
-      ([result] (rf result))
-      ([result input]
+      ([acc] (rf acc))
+      ([acc input]
        (let [state @*state]
          (case (:op input)
            ::push-value
            (do (vswap! *state update :values conj (:value input))
-               result)
+               acc)
 
            ::pop-value
            (do (vswap! *state update :values pop)
-               result)
+               acc)
 
            ::push-block
            (let [blocks (:blocks state)
                  block (peek blocks)]
              (case (:block block)
                :vertical
-               (if (:had-sub-blocks block)
-                 (do (vreset!
-                       *state
-                       (assoc state
-                         :line (-> []
-                                   (add-segment (:values state) (blank-segment (:indent block)))
-                                   (add-separator))
-                         :blocks (conj blocks {:block (:block input)
-                                               :indent (:indent block)})))
-                     (rf result (:line state)))
-                 (do (vswap! *state assoc :blocks
-                             (-> blocks
-                                 (assoc-in [(dec (count blocks)) :had-sub-blocks] true)
-                                 (conj {:block (:block input)
-                                        :indent (:indent block)})))
-                     result))
+               (do (vswap! *state update :blocks conj {:block (:block input)
+                                                       :indent (:indent block)})
+                   acc)
 
                :horizontal
-               (do (vswap! *state update :blocks conj
-                           {:block (:block input)
-                            :indent (line-length (:line state))})
-                   result)
+               (do (vswap! *state update :blocks conj {:block (:block input)
+                                                       :indent (line-length (:line state))})
+                   acc)
 
                nil
-               (do (vswap! *state update :blocks conj
-                           {:block (:block input)
-                            :indent 0})
-                   result)))
+               (do (vswap! *state update :blocks conj {:block (:block input)
+                                                       :indent 0})
+                   acc)))
 
            ::pop-block
            (let [blocks (:blocks state)]
-             (vswap! *state update :blocks pop)
              (if (= 1 (count blocks))
                (do (vreset! *state (-> state
                                        (assoc :blocks (pop blocks))
                                        (assoc :line [])))
-                   (rf result (:line state)))
+                   (rf acc (:line state)))
                (do (vreset! *state (assoc state :blocks (pop blocks)))
-                   result)))
+                   acc)))
 
            ::separator
-           (do (vswap! *state update :line add-separator)
-               result)
+           (let [blocks (:blocks state)
+                 block (peek blocks)]
+             (if (= :horizontal (:block block))
+               (do (vswap! *state update :line #(-> %
+                                                    add-separator
+                                                    (add-segment (:values state) (blank-segment 1))
+                                                    add-separator))
+                   acc)
+               (do (vswap! *state assoc :line (-> []
+                                                  (add-segment (:values state) (blank-segment (:indent block 0)))
+                                                  add-separator))
+                   (rf acc (:line state)))))
 
            ::string
            (do (vswap! *state update :line add-segment (:values state) (string-segment input))
-               result)
-
-           ::newline
-           (let [block (peek (:blocks state))]
-             (do (vswap! *state assoc :line (add-segment [] (:values state) (blank-segment (:indent block))))
-                 (rf result (:line state))))))))))
+               acc)))))))
 
 (def stream-xf
   (comp emit-xf format-xf))
+
+#_(defn ensure-horizontal-xf [rf]
+    (let [*stack (volatile! [])]
+      (fn
+        ([] (rf))
+        ([acc] (rf acc))
+        ([acc instruction]
+         (let [op (:op instruction)]
+           (cond
+             (= op ::newline)
+             (rf acc {:op ::string :text " " :style {}})
+
+             (= op ::push-block)
+             (let [stack @*stack
+                   block (peek stack)
+                   was-vertical (:vertical block)
+                   had-sub-blocks (:had-sub-blocks block)
+                   add-separator (and was-vertical had-sub-blocks)
+                   vertical (= :vertical (:block instruction))
+                   out-instruction (if vertical {:op ::push-block :block :horizontal} instruction)]
+               (vreset! *stack (-> stack
+                                   (cond-> (and was-vertical (not had-sub-blocks))
+                                           (assoc-in [(dec (count stack)) :had-sub-blocks] true))
+                                   (conj {:vertical vertical})))
+               (if add-separator
+                 (let [acc-with-space (rf acc {:op ::string :text " " :style {}})]
+                   (if (reduced? acc-with-space)
+                     acc-with-space
+                     (rf acc-with-space out-instruction)))
+                 (rf acc out-instruction)))
+
+             (= op ::pop-block)
+             (do (vswap! *stack pop)
+                 (rf acc instruction))
+
+             :else
+             (rf acc instruction)))))))
+
+#_(defn limit-output-length-xf [n]
+    (fn [rf]
+      (let [*block-depth (volatile! 0)
+            *value-depth (volatile! 0)
+            *length (volatile! n)
+            stash (ArrayList.)
+            *string-index (volatile! -1)]
+        (fn
+          ([] (rf))
+          ([acc]
+           (if (neg? @*length)
+             (rf acc)
+             (let [stash-vec (vec (.toArray stash))]
+               (.clear stash)
+               (reduce rf acc stash-vec))))
+          ([acc instruction]
+           (.add stash instruction)
+           (case (:op instruction)
+             ::string
+             (let [text (:text instruction)
+                   text-len (count text)]
+               (if (zero? text-len)
+                 acc
+                 (let [len @*length
+                       new-len (- len text-len)]
+                   (vreset! *length new-len)
+                   (if (and (not (neg? len))
+                            (neg? new-len))
+                     (let [stash-vec (vec (.toArray stash))]
+                       (.clear stash)
+                       (ensure-reduced
+                         (reduce
+                           rf
+                           acc
+                           (-> stash-vec
+                               (cond-> (pos? len) (update-in [(dec (count stash-vec)) :text] #(subs % 0 (dec len))))
+                               (cond-> (zero? len) (-> pop (update-in [@*string-index :text] #(subs % 0 (dec (count %)))))) ;; what if length was 1? should remove it alltogether?
+                               (conj {:op ::string :text "…" :style {:fill ::style/util-color}})
+                               (into (repeat @*block-depth {:op ::pop-block}))
+                               (into (repeat @*value-depth {:op ::pop-value}))))))
+                     (do (vreset! *string-index (dec (.size stash))) acc)))))
+             ::push-block (do (vswap! *block-depth inc) acc)
+             ::pop-block (do (vswap! *block-depth dec) acc)
+             ::push-value (do (vswap! *value-depth inc) acc)
+             ::pop-value (do (vswap! *value-depth dec) acc)
+             acc))))))
+
+#_(let [ret (into []
+                  (comp
+                    emit-xf
+                    ensure-horizontal-xf
+                    (map #(doto % tap>))
+                    (limit-output-length-xf 6))
+                  [(keyword "asd\nb")])]
+    (Thread/sleep 10)
+    ret)
 
 (defn- identity-hash-code [x]
   (let [hash (System/identityHashCode x)]
@@ -439,13 +516,13 @@
 (defmethod emit IPersistentMap [m]
   (horizontal
     (raw-string "{" {:fill ::style/object-color})
-    (kvs m)
+    (entries m)
     (raw-string "}" {:fill ::style/object-color})))
 
 (defmethod emit IRecord [m]
   (horizontal
     (raw-string (str "#" (.getName (class m)) "{") {:fill ::style/object-color})
-    (kvs m)
+    (entries m)
     (raw-string "}" {:fill ::style/object-color})))
 
 (defmethod emit Map [m]
@@ -575,7 +652,6 @@
   (horizontal
     (raw-string "#reveal/file" {:fill ::style/object-color})
     separator
-    (raw-string " ")
     (stream (str file))))
 
 (defmethod emit Delay [*delay]
@@ -585,7 +661,6 @@
       (stream @*delay)
       (raw-string "..." {:fill ::style/util-color}))
     separator
-    (raw-string " ")
     (identity-hash-code *delay)
     (raw-string "]" {:fill ::style/object-color})))
 
@@ -593,7 +668,6 @@
   (horizontal
     (raw-string "#reveal/reduced" {:fill ::style/object-color})
     separator
-    (raw-string " ")
     (stream @*reduced)))
 
 (defmethod emit IBlockingDeref [*blocking-deref]
@@ -646,21 +720,18 @@
   (horizontal
     (raw-string "#reveal/url" {:fill ::style/object-color})
     separator
-    (raw-string " ")
     (stream (str x))))
 
 (defmethod emit URI [x]
   (horizontal
     (raw-string "#reveal/uri" {:fill ::style/object-color})
     separator
-    (raw-string " ")
     (stream (str x))))
 
 (defmethod emit UUID [x]
   (horizontal
     (raw-string "#uuid" {:fill ::style/object-color})
     separator
-    (raw-string " ")
     (stream (str x))))
 
 (defn system-out [line]
@@ -688,7 +759,6 @@
     (horizontal
       (raw-string "#inst" {:fill ::style/object-color})
       separator
-      (raw-string " ")
       (stream (.format format date)))))
 
 (defmethod emit Calendar [^Calendar calendar]
@@ -697,14 +767,12 @@
     (horizontal
       (raw-string "#inst" {:fill ::style/object-color})
       separator
-      (raw-string " ")
       (stream (str (subs calendar-str 0 minutes-index) ":" (subs calendar-str minutes-index))))))
 
 (defmethod emit Instant [instant]
   (horizontal
     (raw-string "#inst" {:fill ::style/object-color})
     separator
-    (raw-string " ")
     (stream (str instant))))
 
 (defmacro ^:private when-class [class-name & body]
@@ -724,6 +792,5 @@
     (horizontal
       (raw-string "#inst" {:fill ::style/object-color})
       separator
-      (raw-string " ")
       (stream (str (.format ^DateFormat (.get ^ThreadLocal utc-timestamp-format) timestamp)
                    (format ".%09d-00:00" (.getNanos timestamp)))))))
