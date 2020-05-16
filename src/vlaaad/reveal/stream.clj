@@ -184,6 +184,135 @@
 (defn vertical [& sfs]
   (block :vertical (apply => (interpose separator sfs))))
 
+(defn- format-horizontal [sf]
+  (fn [rf acc]
+    (let [hrf (fn [acc input]
+                (rf acc (cond-> input (= ::push-block (:op input)) (assoc :block :horizontal))))]
+      (sf hrf acc))))
+
+(defn- returning-xf [rf]
+  (fn
+    ([acc]
+     (cond-> acc (::return acc) ::return))
+    ([acc input]
+     (let [ret (rf acc input)]
+       (if (reduced? ret)
+         (reduced {::return ret})
+         ret)))))
+
+(defn- through [xf sf]
+  (fn [rf acc]
+    (let [f (xf (returning-xf rf))
+          ret (sf f acc)]
+      (if (reduced? ret)
+        (if (::return @ret)
+          (::return @ret)
+          (f @ret))
+        (f ret)))))
+
+;; problem: do I want generic re-formatter and output char limiter available to everyone or is it
+;; only for tables?
+
+;; char limiter:
+;; if available to everyone, should not assume its horizontal.
+;; if internal for tables, can smoosh together limiter and re-formatter
+
+;; horizontal re-formatter:
+;; - should be for everyone? why?
+
+;; divide x into cells, emit every cell with length limit to vector, calc size, stream every row
+;; row is a vec of cells
+;; cell is a :length and :ops
+
+
+
+#_(just (through
+         (comp
+          (map #(cond-> % (= ::push-block (:op %)) (assoc :block :horizontal)))
+          (map #(cond-> % (= ::separator (:op %)) (assoc :op ::string :text " " :style {})))
+          (limit-output-length-xf 8))
+         (stream {:a 1 :b 2})))
+
+;; I guess completion stage is not really a thing for sf?
+
+;; what I want for tables:
+;; - format every value horizontal
+;; - limit every cell in length (ellipsis if exceeds) — should be after format-xf?
+;;   separator might add a space or a bunch of spaces...
+;; - align cells (padding if column is wider than a cell)
+
+;; think of acc as of `[]` and rf as of `conj`
+;; sf: streaming function;
+;; takes 2 args: reducing function and accumulator.
+;; might call reducing function with acc and some values.
+;; returns the same thing as reducing function: either reduced, or next acc
+
+;; if rf returns reduced, it means we cancel streaming all-together.
+;; think "closing the output panel" that streams `(range)`
+
+;; limiter pipes sf to rf until runs out of length, then pipes popping of values and
+;; blocks.
+
+;; should limit only sf!
+
+(just (through (comp
+                (map #(cond-> % (= ::separator (:op %)) (assoc :op ::string :text " " :style {})))
+                (limit-output-length-xf 6))
+               (format-horizontal (stream {:a 1 :b 2}))))
+
+
+#_(into [] emit-xf [(just (l2 1 (stream 2)))])
+
+;; another reduced example: someone want only a single line, and we have multi-line limit
+;; that stops on the second line. if we received reduced from rf, it means we are on a
+;; second line now and should just stop.
+
+;; sf run inside a single rf step, should not complete rf — handled outside
+
+#_((limit-length 64 (stream 1)) conj [])
+
+#_(comp)
+
+#_(((map str) conj) [] 1)
+
+#_(just (format-horizontal (stream {:a 1 :b (range 4)})))
+
+;; problems:
+;; - can't combine several lines into one (need to adjust region indices)
+
+;; at emit level:
+;; - ensure horizontal and convert every separator to single space.
+;; - sf until runs out of characters and pop values/blocks
+;; - get length of text ops
+
+;; at line level:
+;; - split format-xf to 2 xforms:
+;;   - regions-xf: streams regions (without indices) and line breaks
+;;   - lines-xf: assembles lines (adds indices)
+;; - line limiter:
+;;   - uses format-horizontal + emit-xf + regions-xf to assemble shorter regions
+;;   - calculates cell lengths from regions
+;;   - then emits regions and line breaks. gets combined with lines-xf by views.
+;; - this requires more effort to integrate table view into sf context: need to convert
+;;   regions back into ops. is it good? should table view be streamable so I can define
+;;   my data representation as table view?
+;; - problem: horizontal indent requires to know line index
+
+;; I can produce indices when sending a line downstream...
+
+;; index is a char index for vertical mouse movement
+
+#_(println (transduce
+                 (comp
+                   emit-xf
+                   format-xf
+                   (interpose [{:segments [{:text "\n"}]}])
+                   cat
+                   (mapcat :segments)
+                   (map :text))
+                 str
+                 [[{:a 1 :b (range 2)}]]))
+
 (defn entries [m]
   (block :vertical
          (fn [rf acc]
@@ -237,6 +366,49 @@
               (-> ex Throwable->map (assoc :phase :print-eval-result) m/ex-triage m/ex-str)
               {:fill ::style/error-color}))
           rf acc))))))
+
+(defn- oneduce [xform f init x]
+  (let [f (xform f)]
+    (f (unreduced (f init x)))))
+
+(defn- oneto [xform x]
+  (persistent! (oneduce xform conj! (transient []) x)))
+
+(defn table [seqable]
+  (let [xs (seq seqable)
+        head (first xs)
+        max-length 32
+        columns (cond
+                  (map? head)
+                  (for [k (keys head)]
+                    {:header k :cell #(get % k)})
+
+                  (map-entry? head)
+                  [{:header 'key :cell key} {:header 'val :cell val}]
+
+                  (indexed? head)
+                  (for [i (range (count head))]
+                    {:header i :cell #(nth % i)})
+
+                  :else
+                  [{:header 'value :cell identity}])
+        ->cell (fn [x]
+                 {:value x
+                  ;; here: stream horizontal, count separators as single spaces
+                  :ops (oneto
+                        (comp
+                         emit-xf)
+                        x)})
+        ->row (fn [x columns]
+                (mapv #(->cell (try ((:cell %) x) (catch Throwable e e)))
+                      columns))
+        row-values (into [(mapv #(-> % :header ->cell) columns)]
+                         (map #(->row % columns))
+                         xs)]
+    {:columns columns
+     :rows row-values}))
+
+(table {:a 1 :b (range 2)})
 
 (defn- blank-segment [n]
   {:text (apply str (repeat n \space))
@@ -341,99 +513,66 @@
 (def stream-xf
   (comp emit-xf format-xf))
 
-#_(defn ensure-horizontal-xf [rf]
-    (let [*stack (volatile! [])]
+(defn limit-output-length-xf [n]
+  (fn [rf]
+    (let [*pop-stack (volatile! [])
+          *length (volatile! n)
+          stash (ArrayList.)
+          *string-index (volatile! -1)]
       (fn
         ([] (rf))
-        ([acc] (rf acc))
+        ([acc]
+         (if (neg? @*length)
+           (rf acc)
+           (let [stash-vec (vec (.toArray stash))]
+             (.clear stash)
+             (reduce rf acc stash-vec))))
         ([acc instruction]
-         (let [op (:op instruction)]
-           (cond
-             (= op ::newline)
-             (rf acc {:op ::string :text " " :style {}})
-
-             (= op ::push-block)
-             (let [stack @*stack
-                   block (peek stack)
-                   was-vertical (:vertical block)
-                   had-sub-blocks (:had-sub-blocks block)
-                   add-separator (and was-vertical had-sub-blocks)
-                   vertical (= :vertical (:block instruction))
-                   out-instruction (if vertical {:op ::push-block :block :horizontal} instruction)]
-               (vreset! *stack (-> stack
-                                   (cond-> (and was-vertical (not had-sub-blocks))
-                                           (assoc-in [(dec (count stack)) :had-sub-blocks] true))
-                                   (conj {:vertical vertical})))
-               (if add-separator
-                 (let [acc-with-space (rf acc {:op ::string :text " " :style {}})]
-                   (if (reduced? acc-with-space)
-                     acc-with-space
-                     (rf acc-with-space out-instruction)))
-                 (rf acc out-instruction)))
-
-             (= op ::pop-block)
-             (do (vswap! *stack pop)
-                 (rf acc instruction))
-
-             :else
-             (rf acc instruction)))))))
-
-#_(defn limit-output-length-xf [n]
-    (fn [rf]
-      (let [*block-depth (volatile! 0)
-            *value-depth (volatile! 0)
-            *length (volatile! n)
-            stash (ArrayList.)
-            *string-index (volatile! -1)]
-        (fn
-          ([] (rf))
-          ([acc]
-           (if (neg? @*length)
-             (rf acc)
-             (let [stash-vec (vec (.toArray stash))]
-               (.clear stash)
-               (reduce rf acc stash-vec))))
-          ([acc instruction]
-           (.add stash instruction)
-           (case (:op instruction)
-             ::string
-             (let [text (:text instruction)
-                   text-len (count text)]
-               (if (zero? text-len)
-                 acc
-                 (let [len @*length
-                       new-len (- len text-len)]
-                   (vreset! *length new-len)
-                   (if (and (not (neg? len))
-                            (neg? new-len))
-                     (let [stash-vec (vec (.toArray stash))]
-                       (.clear stash)
-                       (ensure-reduced
-                         (reduce
-                           rf
-                           acc
-                           (-> stash-vec
-                               (cond-> (pos? len) (update-in [(dec (count stash-vec)) :text] #(subs % 0 (dec len))))
-                               (cond-> (zero? len) (-> pop (update-in [@*string-index :text] #(subs % 0 (dec (count %)))))) ;; what if length was 1? should remove it alltogether?
-                               (conj {:op ::string :text "…" :style {:fill ::style/util-color}})
-                               (into (repeat @*block-depth {:op ::pop-block}))
-                               (into (repeat @*value-depth {:op ::pop-value}))))))
-                     (do (vreset! *string-index (dec (.size stash))) acc)))))
-             ::push-block (do (vswap! *block-depth inc) acc)
-             ::pop-block (do (vswap! *block-depth dec) acc)
-             ::push-value (do (vswap! *value-depth inc) acc)
-             ::pop-value (do (vswap! *value-depth dec) acc)
-             acc))))))
+         (.add stash instruction)
+         (case (:op instruction)
+           ::string
+           (let [text (:text instruction)
+                 text-len (count text)]
+             (if (zero? text-len)
+               acc
+               (let [len @*length
+                     new-len (- len text-len)]
+                 (vreset! *length new-len)
+                 (if (and (not (neg? len))
+                          (neg? new-len))
+                   (let [stash-vec (vec (.toArray stash))]
+                     (.clear stash)
+                     (ensure-reduced
+                       (reduce
+                         rf
+                         acc
+                         (-> stash-vec
+                             (cond-> (pos? len) (update-in [(dec (count stash-vec)) :text] #(subs % 0 (dec len))))
+                             (cond-> (zero? len)
+                               (-> pop
+                                   (update-in [@*string-index :text] #(subs % 0 (dec (count %)))))) ;; what if length was 1? should remove it alltogether?
+                             (conj {:op ::string :text "…" :style {:fill ::style/util-color}})
+                             (into @*pop-stack)))))
+                   (do (vreset! *string-index (dec (.size stash))) acc)))))
+           ::push-block (do (vswap! *pop-stack conj {:op ::pop-block}) acc)
+           ::pop-block (do (vswap! *pop-stack pop) acc)
+           ::push-value (do (vswap! *pop-stack conj {:op ::pop-value}) acc)
+           ::pop-value (do (vswap! *pop-stack pop) acc)
+           acc))))))
 
 #_(let [ret (into []
                   (comp
                     emit-xf
-                    ensure-horizontal-xf
                     (map #(doto % tap>))
                     (limit-output-length-xf 6))
-                  [(keyword "asd\nb")])]
+                  [{:a (keyword "asd\nb")}])]
     (Thread/sleep 10)
     ret)
+
+{:a (just (through
+           (limit-output-length-xf 5000000)
+           (stream {:a (range 10000000)})))
+ :b 2}
 
 (defn- identity-hash-code [x]
   (let [hash (System/identityHashCode x)]
