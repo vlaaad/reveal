@@ -26,9 +26,11 @@
 (s/def ::width ::size-dimension)
 
 (s/def :vlaaad.reveal.layout.style/fill any?)
+(s/def :vlaaad.reveal.layout.style/selectable boolean?)
 
 (s/def ::style
-  (s/keys :opt-un [:vlaaad.reveal.layout.style/fill]))
+  (s/keys :opt-un [:vlaaad.reveal.layout.style/fill
+                   :vlaaad.reveal.layout.style/selectable]))
 
 (s/def ::segment
   (s/keys :req-un [::text ::width ::style]))
@@ -403,7 +405,8 @@
       make))
 
 (defn empty-region? [region]
-  (every? #(-> % :text str/blank?) (:segments region)))
+  (every? #(false? (:selectable (:style %) true))
+          (:segments region)))
 
 (def non-empty-region?
   (complement empty-region?))

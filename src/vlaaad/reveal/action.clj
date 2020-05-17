@@ -139,15 +139,15 @@
                                                  stream/horizontal
                                                  (stream/as name
                                                    (stream/raw-string name {:fill ::style/symbol-color}))
-                                                 (stream/raw-string " ")
+                                                 stream/separator
                                                  (->> kinds
                                                       (map (fn [kind]
                                                              (stream/as kind
                                                                (stream/raw-string (.getSimpleName (class kind))
                                                                                   {:fill ::style/util-color}))))
-                                                      (interpose (stream/raw-string " "))))
+                                                      (interpose stream/separator)))
                                                (stream/horizontal
-                                                 (stream/raw-string "  ")
+                                                 (stream/raw-string "  " {:selectable false})
                                                  (stream/stream value))))))))]
                   (stream/just
                     (stream/sequential sorted))))))})
@@ -193,3 +193,10 @@
    :check (fn [v _]
             (when (and v (.isArray (class v)))
               #(vec v)))})
+
+(register!
+  {:id ::as-table
+   :label "View as table"
+   :check (fn [v _]
+            (when (seqable? v)
+              #(stream/just (stream/table v))))})

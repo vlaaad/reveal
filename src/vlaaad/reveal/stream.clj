@@ -184,37 +184,57 @@
 (defn vertical [& sfs]
   (block :vertical (apply => (interpose separator sfs))))
 
+#_(defn- returning-xf [rf]
+    (fn
+      ([acc]
+       (cond-> acc (::return acc) ::return))
+      ([acc input]
+       (let [ret (rf acc input)]
+         (if (reduced? ret)
+           (reduced {::return ret})
+           ret)))))
+
+#_(defn- through [xf sf]
+    (fn [rf acc]
+      (let [f (xf (returning-xf rf))
+            ret (sf f acc)]
+        (if (reduced? ret)
+          (if (::return @ret)
+            (::return @ret)
+            (f @ret))
+          (f ret)))))
+
+(defn- streamduce [xf coll]
+  (fn [rf acc]
+    (transduce xf (fn ([acc] acc) ([acc sf] (sf rf acc))) acc coll)))
+
 (defn entries [m]
   (block :vertical
-         (fn [rf acc]
-           (transduce
-             (comp
-               (map (fn [e]
-                      (let [k (key e)
-                            v (val e)]
-                        (horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
-                                    separator
-                                    (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m})))))
-               (interpose separator))
-             (fn
-               ([acc] acc)
-               ([acc sf] (sf rf acc)))
-             acc
-             m))))
+    (streamduce
+      (comp
+        (map (fn [e]
+               (let [k (key e)
+                     v (val e)]
+                 (horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
+                             separator
+                             (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m})))))
+        (interpose separator))
+      m)))
 
 (defn- delimited-items [coll]
-  (fn [rf acc]
-    (transduce (comp
-                 (map-indexed (fn [i x]
-                                ;; todo sets are also here, shouldn't really use indices in that case
-                                (stream x {:vlaaad.reveal.nav/key i
-                                           :vlaaad.reveal.nav/coll coll})))
-                 (interpose separator))
-               (fn
-                 ([acc] acc)
-                 ([acc sf] (sf rf acc)))
-               acc
-               coll)))
+  (streamduce
+    (comp
+      (if (set? coll)
+        (map
+          (fn [x]
+            (stream x {:vlaaad.reveal.nav/key x
+                       :vlaaad.reveal.nav/coll coll})))
+        (map-indexed
+          (fn [i x]
+            (stream x {:vlaaad.reveal.nav/key i
+                       :vlaaad.reveal.nav/coll coll}))))
+      (interpose separator))
+    coll))
 
 (defn items [coll]
   (if (some coll? coll)
@@ -238,10 +258,125 @@
               {:fill ::style/error-color}))
           rf acc))))))
 
+(defn- oneduce [xform f init x]
+  (let [f (xform f)]
+    (f (unreduced (f init x)))))
+
+(defn- cell-xf
+  [max-length]
+  (comp
+    emit-xf
+    (map (fn [input]
+           (case (:op input)
+             ::push-block (assoc input :block :horizontal)
+             ::separator {:op ::string :text " " :style {:selectable false}}
+             input)))
+    (fn [rf]
+      (let [*pop-stack (volatile! [])
+            *length (volatile! max-length)
+            stash (ArrayList.)
+            *string-index (volatile! -1)]
+        (fn
+          ([] (rf))
+          ([acc]
+           (if (neg? @*length)
+             {:length max-length
+              :steps (rf acc)}
+             (let [stash-vec (vec (.toArray stash))]
+               (.clear stash)
+               {:length (- max-length @*length)
+                :steps (reduce rf acc stash-vec)})))
+          ([acc instruction]
+           (.add stash instruction)
+           (case (:op instruction)
+             ::string
+             (let [text (:text instruction)
+                   text-len (count text)]
+               (if (zero? text-len)
+                 acc
+                 (let [len @*length
+                       new-len (- len text-len)]
+                   (vreset! *length new-len)
+                   (if (and (not (neg? len))
+                            (neg? new-len))
+                     (let [stash-vec (vec (.toArray stash))]
+                       (.clear stash)
+                       (ensure-reduced
+                         (reduce
+                           rf
+                           acc
+                           (-> stash-vec
+                               (cond-> (pos? len) (update-in [(dec (count stash-vec)) :text] #(subs % 0 (dec len))))
+                               (cond-> (zero? len)
+                                       (-> pop
+                                           (update-in [@*string-index :text] #(subs % 0 (dec (count %)))))) ;; what if length was 1? should remove it alltogether?
+                               (conj {:op ::string :text "…" :style {:fill ::style/util-color}})
+                               (into @*pop-stack)))))
+                     (do (vreset! *string-index (dec (.size stash))) acc)))))
+             ::push-block (do (vswap! *pop-stack conj {:op ::pop-block}) acc)
+             ::pop-block (do (vswap! *pop-stack pop) acc)
+             ::push-value (do (vswap! *pop-stack conj {:op ::pop-value}) acc)
+             ::pop-value (do (vswap! *pop-stack pop) acc)
+             acc)))))))
+
+(defn- emit-ops [ops]
+  (fn [rf acc]
+    (reduce rf acc ops)))
+
+(defn table [seqable]
+  (let [xs (seq seqable)
+        head (first xs)
+        columns (cond
+                  (map? head)
+                  (for [k (keys head)]
+                    {:header k :cell #(get % k)})
+
+                  (map-entry? head)
+                  [{:header 'key :cell key} {:header 'val :cell val}]
+
+                  (indexed? head)
+                  (for [i (range (count head))]
+                    {:header i :cell #(nth % i)})
+
+                  :else
+                  [{:header 'value :cell identity}])
+        ->cell (fn [x]
+                 (assoc (oneduce (cell-xf 48) conj [] x) :value x))
+        ->row (fn [x columns]
+                (mapv #(->cell (try ((:cell %) x) (catch Throwable e e)))
+                      columns))
+        row-values (into [(mapv #(-> % :header ->cell) columns)]
+                         (map #(->row % columns))
+                         xs)
+        cell-lengths (mapv :length (apply mapv #(apply max-key :length %&) row-values))]
+    (block :vertical
+      (streamduce
+        (comp
+          (map-indexed
+            (fn stream-row [row cells]
+              (block :horizontal
+                (streamduce
+                  (comp
+                    (map-indexed
+                      (fn stream-cell [col cell]
+                        (let [pad (- (cell-lengths col) (:length cell))]
+                          (if (and (pos? row) (number? (:value cell)))
+                            (horizontal
+                              (string (apply str (repeat pad \space)) {:selectable false})
+                              (emit-ops (:steps cell)))
+                            (horizontal
+                              (emit-ops (:steps cell))
+                              (string (apply str (repeat pad \space)) {:selectable false}))))))
+                    (interpose (string " │ " {:fill ::style/unfocused-selection-color
+                                              :selectable false})))
+                  cells))))
+          (interpose separator))
+        row-values))))
+
 (defn- blank-segment [n]
   {:text (apply str (repeat n \space))
    :width (* n (font/char-width \space))
-   :style {}})
+   :style {:selectable false}})
 
 (defn- string-segment [string-op]
   (-> string-op
@@ -341,100 +476,6 @@
 (def stream-xf
   (comp emit-xf format-xf))
 
-#_(defn ensure-horizontal-xf [rf]
-    (let [*stack (volatile! [])]
-      (fn
-        ([] (rf))
-        ([acc] (rf acc))
-        ([acc instruction]
-         (let [op (:op instruction)]
-           (cond
-             (= op ::newline)
-             (rf acc {:op ::string :text " " :style {}})
-
-             (= op ::push-block)
-             (let [stack @*stack
-                   block (peek stack)
-                   was-vertical (:vertical block)
-                   had-sub-blocks (:had-sub-blocks block)
-                   add-separator (and was-vertical had-sub-blocks)
-                   vertical (= :vertical (:block instruction))
-                   out-instruction (if vertical {:op ::push-block :block :horizontal} instruction)]
-               (vreset! *stack (-> stack
-                                   (cond-> (and was-vertical (not had-sub-blocks))
-                                           (assoc-in [(dec (count stack)) :had-sub-blocks] true))
-                                   (conj {:vertical vertical})))
-               (if add-separator
-                 (let [acc-with-space (rf acc {:op ::string :text " " :style {}})]
-                   (if (reduced? acc-with-space)
-                     acc-with-space
-                     (rf acc-with-space out-instruction)))
-                 (rf acc out-instruction)))
-
-             (= op ::pop-block)
-             (do (vswap! *stack pop)
-                 (rf acc instruction))
-
-             :else
-             (rf acc instruction)))))))
-
-#_(defn limit-output-length-xf [n]
-    (fn [rf]
-      (let [*block-depth (volatile! 0)
-            *value-depth (volatile! 0)
-            *length (volatile! n)
-            stash (ArrayList.)
-            *string-index (volatile! -1)]
-        (fn
-          ([] (rf))
-          ([acc]
-           (if (neg? @*length)
-             (rf acc)
-             (let [stash-vec (vec (.toArray stash))]
-               (.clear stash)
-               (reduce rf acc stash-vec))))
-          ([acc instruction]
-           (.add stash instruction)
-           (case (:op instruction)
-             ::string
-             (let [text (:text instruction)
-                   text-len (count text)]
-               (if (zero? text-len)
-                 acc
-                 (let [len @*length
-                       new-len (- len text-len)]
-                   (vreset! *length new-len)
-                   (if (and (not (neg? len))
-                            (neg? new-len))
-                     (let [stash-vec (vec (.toArray stash))]
-                       (.clear stash)
-                       (ensure-reduced
-                         (reduce
-                           rf
-                           acc
-                           (-> stash-vec
-                               (cond-> (pos? len) (update-in [(dec (count stash-vec)) :text] #(subs % 0 (dec len))))
-                               (cond-> (zero? len) (-> pop (update-in [@*string-index :text] #(subs % 0 (dec (count %)))))) ;; what if length was 1? should remove it alltogether?
-                               (conj {:op ::string :text "…" :style {:fill ::style/util-color}})
-                               (into (repeat @*block-depth {:op ::pop-block}))
-                               (into (repeat @*value-depth {:op ::pop-value}))))))
-                     (do (vreset! *string-index (dec (.size stash))) acc)))))
-             ::push-block (do (vswap! *block-depth inc) acc)
-             ::pop-block (do (vswap! *block-depth dec) acc)
-             ::push-value (do (vswap! *value-depth inc) acc)
-             ::pop-value (do (vswap! *value-depth dec) acc)
-             acc))))))
-
-#_(let [ret (into []
-                  (comp
-                    emit-xf
-                    ensure-horizontal-xf
-                    (map #(doto % tap>))
-                    (limit-output-length-xf 6))
-                  [(keyword "asd\nb")])]
-    (Thread/sleep 10)
-    ret)
-
 (defn- identity-hash-code [x]
   (let [hash (System/identityHashCode x)]
     (as hash
@@ -447,9 +488,9 @@
       (if (.isArray c)
         (as c (raw-string (pr-str (.getName c)) {:fill ::style/object-color}))
         (stream c)))
-    (raw-string " ")
+    separator
     (identity-hash-code x)
-    (raw-string " ")
+    separator
     (stream (str x))
     (raw-string "]" {:fill ::style/object-color})))
 
@@ -592,11 +633,11 @@
   (horizontal
     (raw-string "[" {:fill ::style/object-color})
     (stream (symbol (.getClassName el)))
-    (raw-string " ")
+    separator
     (stream (symbol (.getMethodName el)))
-    (raw-string " ")
+    separator
     (stream (.getFileName el))
-    (raw-string " ")
+    separator
     (stream (.getLineNumber el))
     (raw-string "]" {:fill ::style/object-color})))
 
@@ -613,7 +654,7 @@
   (horizontal
     (raw-string "#reveal/multi-fn[" {:fill ::style/object-color})
     (stream (describe-multi f))
-    (raw-string " ")
+    separator
     (identity-hash-code f)
     (raw-string "]" {:fill ::style/object-color})))
 
@@ -644,7 +685,7 @@
   (horizontal
     (raw-string (str "#reveal/" (.toLowerCase (.getSimpleName (class *ref))) "[") {:fill ::style/object-color})
     (stream @*ref)
-    (raw-string " ")
+    separator
     (identity-hash-code *ref)
     (raw-string "]" {:fill ::style/object-color})))
 
@@ -679,7 +720,7 @@
         (if (realized? *blocking-deref)
           (stream @*blocking-deref)
           (raw-string "..." {:fill ::style/util-color}))
-        (raw-string " ")
+        separator
         (identity-hash-code *blocking-deref)
         (raw-string "]" {:fill ::style/object-color}))
 
@@ -689,7 +730,7 @@
         (if (realized? *blocking-deref)
           (stream @*blocking-deref)
           (raw-string "..." {:fill ::style/util-color}))
-        (raw-string " ")
+        separator
         (identity-hash-code *blocking-deref)
         (raw-string "]" {:fill ::style/object-color}))
 
@@ -700,7 +741,7 @@
   (horizontal
     (raw-string "#reveal/volatile[" {:fill ::style/object-color})
     (stream @*ref)
-    (raw-string " ")
+    separator
     (identity-hash-code *ref)
     (raw-string "]" {:fill ::style/object-color})))
 
@@ -708,7 +749,7 @@
   (horizontal
     (raw-string "#" {:fill ::style/object-color})
     (stream (:tag x))
-    (raw-string " ")
+    separator
     (stream (:form x))))
 
 (defmethod emit ReaderConditional [^ReaderConditional x]
