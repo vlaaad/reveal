@@ -198,5 +198,5 @@
   {:id ::as-table
    :label "View as table"
    :check (fn [v _]
-            (when (seqable? v)
+            (when (and (not (string? v)) (seqable? v))
               #(stream/just (stream/table v))))})
