@@ -6,9 +6,12 @@
             [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.mutator :as fx.mutator]
             [vlaaad.reveal.style :as style]
+            [vlaaad.reveal.fx :as rfx]
             [cljfx.api :as fx]
             [clojure.string :as str]
-            [cljfx.prop :as fx.prop])
+            [cljfx.prop :as fx.prop]
+            [clojure.walk :as walk]
+            [vlaaad.reveal.action :as action])
   (:import [javafx.geometry Bounds Rectangle2D]
            [javafx.stage Screen Popup]
            [com.sun.javafx.event RedirectedEvent]
@@ -51,7 +54,7 @@
                                        (search/select text :label)))
       (dissoc :selected-index)))
 
-(defmethod event/handle ::on-action-key-pressed [*state {:keys [id ^KeyEvent fx/event action on-cancel segments]}]
+(defmethod event/handle ::on-action-key-pressed [*state {:keys [id ^KeyEvent fx/event action on-cancel]}]
   (condp = (.getCode event)
     KeyCode/ESCAPE
     (event/handle *state on-cancel)
@@ -60,59 +63,69 @@
     (do
       (event/handle *state on-cancel)
       (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
-                            :action (assoc action :segments segments)}))
+                            :action action}))
 
     KeyCode/UP
-    (swap! *state update-in [id :popup] move-selected-index dec)
+    (swap! *state update id move-selected-index dec)
 
     KeyCode/DOWN
-    (swap! *state update-in [id :popup] move-selected-index inc)
+    (swap! *state update id move-selected-index inc)
 
     nil))
 
 (defmethod event/handle ::on-action-pressed [*state {:keys [id action]}]
-  (swap! *state update-in [id :popup] select-action action))
+  (swap! *state update id select-action action))
 
-(defmethod event/handle ::on-action-clicked [*state {:keys [action segments on-cancel]}]
+(defmethod event/handle ::on-action-clicked [*state {:keys [action on-cancel]}]
   (event/handle *state on-cancel)
   (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
-                        :action (assoc action :segments segments)}))
+                        :action action}))
 
-(defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel segments val ann]}]
-  (let [this (get-in @*state [id :popup])]
+(defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel val+ann]}]
+  (let [this (get @*state id)]
     (condp = (.getCode event)
       KeyCode/ESCAPE
       (if (empty? (:text this))
         (event/handle *state on-cancel)
-        (swap! *state update-in [id :popup] set-text ""))
+        (swap! *state update id set-text ""))
 
       KeyCode/ENTER
       (when-not (str/blank? (:text this))
-        (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
-                              :action {:invoke (fn []
-                                                 (let [form (read-string (:text this))
-                                                       form `(fn [~'*v ~'*a] ~(cond
-                                                                                ('#{*a *v} form) form
-                                                                                (ident? form) (list form '*v)
-                                                                                :else form))]
-                                                   ((eval form) val ann)))
-                                       :segments segments}})
-        (event/handle *state on-cancel))
+        (try
+          (let [[val ann] val+ann
+                form (read-string (:text this))
+                fn-form `(fn [~'*v ~'*a]
+                           ~(cond
+                              ('#{*a *v} form) form
+                              (ident? form) (list form '*v)
+                              :else form))]
+            (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
+                                  :action {:form (cond
+                                                   (= '*v form) (list 'identity val)
+                                                   (= '*a form) (list 'annotation val)
+                                                   (ident? form) (list form val)
+                                                   :else (walk/prewalk-replace
+                                                           {'*v val '*a ann}
+                                                           form))
+                                           :invoke (fn []
+                                                     ((eval fn-form) val ann))}})
+            (event/handle *state on-cancel))
+          (catch Exception _)))
 
       KeyCode/UP
-      (swap! *state update-in [id :popup] move-selected-index dec)
+      (swap! *state update id move-selected-index dec)
 
       KeyCode/DOWN
-      (swap! *state update-in [id :popup] move-selected-index inc)
+      (swap! *state update id move-selected-index inc)
 
       nil)))
 
 (defmethod event/handle ::on-text-changed [*state {:keys [id fx/event]}]
-  (swap! *state update-in [id :popup] set-text event))
+  (swap! *state update id set-text event))
 
 (defmethod event/handle ::on-text-focused [*state {:keys [id fx/event]}]
   (when event
-    (swap! *state update-in [id :popup] dissoc :selected-index)))
+    (swap! *state update id dissoc :selected-index)))
 
 (def ^:private lifecycle
   (fx.composite/describe Popup
@@ -142,16 +155,14 @@
                                     (some-> node focus-when-on-scene!)))
                                 (fx.lifecycle/get-ref identity))}))
 
-(defn view [{:keys [val
-                    ann
-                    ^Bounds bounds
-                    id
-                    on-cancel
-                    text
-                    selected-index
-                    segments]
-             :or {text ""}
-             :as this}]
+(defn- view-impl [{:keys [val+ann
+                          ^Bounds bounds
+                          id
+                          on-cancel
+                          text
+                          selected-index]
+                   :or {text ""}
+                   :as this}]
   (let [actions (displayed-actions this)
         ^Screen screen (first (Screen/getScreensForRectangle (.getMinX bounds)
                                                              (.getMinY bounds)
@@ -245,10 +256,8 @@
                                                               :id id}
                                          :on-key-pressed {::event/type ::on-text-key-pressed
                                                           :id id
-                                                          :val val
-                                                          :ann ann
-                                                          :on-cancel on-cancel
-                                                          :segments segments}
+                                                          :val+ann val+ann
+                                                          :on-cancel on-cancel}
                                          :on-text-changed {::event/type ::on-text-changed
                                                            :fx/sync true
                                                            :id id}}}
@@ -264,14 +273,12 @@
                                 :on-key-pressed {::event/type ::on-action-key-pressed
                                                  :id id
                                                  :action action
-                                                 :segments segments
                                                  :on-cancel on-cancel}
                                 :on-mouse-pressed {::event/type ::on-action-pressed
                                                    :id id
                                                    :action action}
                                 :on-mouse-clicked {::event/type ::on-action-clicked
                                                    :action action
-                                                   :segments segments
                                                    :on-cancel on-cancel}}]))
                           actions)
               :desc {:fx/type ext-with-focused-ref
@@ -298,3 +305,36 @@
                           :points [0 0
                                    arrow-width 0
                                    (* arrow-width 0.5) arrow-height]})))}]}))
+
+(defmethod event/handle ::init-popup [*state {:keys [id actions]}]
+  (swap! *state assoc id {:actions actions :id id}))
+
+(defn- init-popup! [id val+ann handler]
+  (handler {::event/type ::init-popup :id id :actions (action/collect val+ann)})
+  nil)
+
+(defn view [{:keys [val+ann bounds id on-cancel]
+             :or {id ::rfx/undefined}}]
+  {:fx/type rfx/ext-with-process
+   :id id
+   :args val+ann
+   :start init-popup!
+   :desc {:fx/type view-impl
+          :val+ann val+ann
+          :on-cancel on-cancel
+          :bounds bounds}})
+
+;; split actions to actions + commands or something, add some sugar on top.
+
+;; popup inputs:
+;; - data (value + annotation)
+;; - screen position and window
+;; - event handler to submit action to
+
+;; as cljfx:
+;; - extension lifecycle on a node (gets screen position and window from the node,
+;;   installs click and "space" listeners on node, marks it as focus-traversable, gets
+;;   event handler from opts, data and annotation are props)
+;; - managed type: explicit bounds and window are provided from state
+
+;; manages its local state itself.

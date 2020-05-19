@@ -373,6 +373,9 @@
           (interpose separator))
         row-values))))
 
+(defn summary [max-length x]
+  (emit-ops (:steps (oneduce (cell-xf max-length) conj [] x))))
+
 (defn- blank-segment [n]
   {:text (apply str (repeat n \space))
    :width (* n (font/char-width \space))

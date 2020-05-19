@@ -1,7 +1,6 @@
 (ns vlaaad.reveal.output-panel
   (:require [vlaaad.reveal.event :as event]
             [vlaaad.reveal.layout :as layout]
-            [vlaaad.reveal.action :as action]
             [vlaaad.reveal.popup :as popup]
             [cljfx.api :as fx]
             [vlaaad.reveal.canvas :as canvas])
@@ -38,14 +37,14 @@
   (let [layout (layout/ensure-cursor-visible (:layout this))
         {:keys [lines cursor]} layout
         region (get-in lines cursor)
-        actions (action/collect (:values region))
-        bounds (layout/cursor->canvas-bounds layout)
-        ^Canvas target (.getTarget event)
-        screen-bounds (.localToScreen target bounds)]
+        val+ann (peek (:values region))]
     (-> this
         (assoc :layout layout)
-        (cond-> actions
-                (assoc :popup (assoc actions :bounds screen-bounds :segments (:segments region)))))))
+        (cond-> val+ann
+                (assoc :popup {:bounds (-> ^Canvas (.getTarget event)
+                                           (.localToScreen
+                                             (layout/cursor->canvas-bounds layout)))
+                               :val+ann val+ann})))))
 
 (defn- handle-mouse-pressed [this ^MouseEvent event]
   (cond
@@ -194,7 +193,6 @@
 
             popup
             (assoc :popup (assoc popup :fx/type popup/view
-                                       :id id
                                        :on-cancel {::event/type ::hide-popup :id id})))))
 
 (defn make []

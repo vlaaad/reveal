@@ -130,7 +130,7 @@
                                           :on-width-changed {::event/type ::on-header-width-changed :id id}
                                           :height (get-in views [id :header-height])
                                           :on-height-changed {::event/type ::on-header-height-changed :id id}
-                                          :segments (get-in views [id :action :segments])}]}}))
+                                          :value (get-in views [id :action :form])}]}}))
                   (interpose
                     {:fx/type :region
                      :style-class "reveal-view-header-separator"}))]
