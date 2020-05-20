@@ -102,13 +102,9 @@
 (defn as [desc]
   (reify Viewable (make [_] desc)))
 
-(action/register!
-  {:id ::watch
-   :label "Watch changes"
-   :check (fn [v _]
-            (when (instance? IRef v)
-              {:invoke #(as {:fx/type ref-watcher :ref v})
-               :form (list 'watch v)}))})
+(action/def ::watch [v]
+  (when (instance? IRef v)
+    #(as {:fx/type ref-watcher :ref v})))
 
 (defn- log [id *ref handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
@@ -147,13 +143,9 @@
    :args ref
    :desc {:fx/type output-panel/view}})
 
-(action/register!
-  {:id ::log
-   :label "Log all changes"
-   :check (fn [v _]
-            (when (instance? IRef v)
-              {:invoke #(as {:fx/type ref-logger :ref v})
-               :form (list 'log v)}))})
+(action/def ::log [v]
+  (when (instance? IRef v)
+    #(as {:fx/type ref-logger :ref v})))
 
 (defn- deref-process [id blocking-deref handler]
   (handler {::event/type ::create-view-state :id id :state {:state ::waiting}})

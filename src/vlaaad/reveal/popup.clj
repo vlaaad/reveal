@@ -81,7 +81,7 @@
   (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
                         :action action}))
 
-(defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel val+ann]}]
+(defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel value]}]
   (let [this (get @*state id)]
     (condp = (.getCode event)
       KeyCode/ESCAPE
@@ -92,23 +92,21 @@
       KeyCode/ENTER
       (when-not (str/blank? (:text this))
         (try
-          (let [[val ann] val+ann
-                form (read-string (:text this))
-                fn-form `(fn [~'*v ~'*a]
+          (let [form (read-string (:text this))
+                fn-form `(fn [~'*v]
                            ~(cond
-                              ('#{*a *v} form) form
+                              (= '*v form) form
                               (ident? form) (list form '*v)
                               :else form))]
             (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
                                   :action {:form (cond
-                                                   (= '*v form) (list 'identity val)
-                                                   (= '*a form) (list 'annotation val)
-                                                   (ident? form) (list form val)
+                                                   (= '*v form) (list 'identity value)
+                                                   (ident? form) (list form value)
                                                    :else (walk/prewalk-replace
-                                                           {'*v val '*a ann}
+                                                           {'*v value}
                                                            form))
                                            :invoke (fn []
-                                                     ((eval fn-form) val ann))}})
+                                                     ((eval fn-form) value))}})
             (event/handle *state on-cancel))
           (catch Exception _)))
 
@@ -155,7 +153,7 @@
                                     (some-> node focus-when-on-scene!)))
                                 (fx.lifecycle/get-ref identity))}))
 
-(defn- view-impl [{:keys [val+ann
+(defn- view-impl [{:keys [value
                           ^Bounds bounds
                           id
                           on-cancel
@@ -256,7 +254,7 @@
                                                               :id id}
                                          :on-key-pressed {::event/type ::on-text-key-pressed
                                                           :id id
-                                                          :val+ann val+ann
+                                                          :value value
                                                           :on-cancel on-cancel}
                                          :on-text-changed {::event/type ::on-text-changed
                                                            :fx/sync true
@@ -309,22 +307,20 @@
 (defmethod event/handle ::init-popup [*state {:keys [id actions]}]
   (swap! *state assoc id {:actions actions :id id}))
 
-(defn- init-popup! [id val+ann handler]
-  (handler {::event/type ::init-popup :id id :actions (action/collect val+ann)})
+(defn- init-popup! [id {:keys [value annotation]} handler]
+  (handler {::event/type ::init-popup :id id :actions (action/collect value annotation)})
   nil)
 
-(defn view [{:keys [val+ann bounds id on-cancel]
+(defn view [{:keys [value annotation bounds id on-cancel]
              :or {id ::rfx/undefined}}]
   {:fx/type rfx/ext-with-process
    :id id
-   :args val+ann
+   :args {:value value :annotation annotation}
    :start init-popup!
    :desc {:fx/type view-impl
-          :val+ann val+ann
+          :value value
           :on-cancel on-cancel
           :bounds bounds}})
-
-;; split actions to actions + commands or something, add some sugar on top.
 
 ;; popup inputs:
 ;; - data (value + annotation)
