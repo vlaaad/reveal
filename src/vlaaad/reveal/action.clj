@@ -73,7 +73,7 @@
 
 (vlaaad.reveal.action/def ::show-actual-value [x ann]
   (when (::stream/hidden ann)
-    (constantly val)))
+    (constantly x)))
 
 (vlaaad.reveal.action/def ::java-bean [x]
   (when (some? x)
