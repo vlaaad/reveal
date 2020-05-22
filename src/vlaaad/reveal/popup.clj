@@ -1,5 +1,6 @@
 (ns vlaaad.reveal.popup
   (:require [vlaaad.reveal.event :as event]
+            [vlaaad.reveal.stream :as stream]
             [cljfx.fx.popup :as fx.popup]
             [vlaaad.reveal.search :as search]
             [cljfx.composite :as fx.composite]
@@ -10,13 +11,14 @@
             [cljfx.api :as fx]
             [clojure.string :as str]
             [cljfx.prop :as fx.prop]
+            [cljfx.fx.node :as fx.node]
             [clojure.walk :as walk]
             [vlaaad.reveal.action :as action])
   (:import [javafx.geometry Bounds Rectangle2D]
            [javafx.stage Screen Popup]
            [com.sun.javafx.event RedirectedEvent]
            [javafx.event Event]
-           [javafx.scene.input KeyCode KeyEvent]
+           [javafx.scene.input KeyCode KeyEvent ContextMenuEvent]
            [java.util Collection List]
            [javafx.beans.value ChangeListener]
            [javafx.scene Node]))
@@ -322,15 +324,53 @@
           :on-cancel on-cancel
           :bounds bounds}})
 
-;; popup inputs:
-;; - data (value + annotation)
-;; - screen position and window
-;; - event handler to submit action to
+(defmethod event/handle ::init-ext [*state {:keys [id]}]
+  (swap! *state assoc id {:id id}))
 
-;; as cljfx:
-;; - extension lifecycle on a node (gets screen position and window from the node,
-;;   installs click and "space" listeners on node, marks it as focus-traversable, gets
-;;   event handler from opts, data and annotation are props)
-;; - managed type: explicit bounds and window are provided from state
+(defmethod event/handle ::set-bounds [*state {:keys [id bounds]}]
+  (swap! *state assoc-in [id :bounds] bounds))
 
-;; manages its local state itself.
+(defmethod event/handle ::on-popup-node-event [*state {:keys [id ^Event fx/event]}]
+  (when (or (instance? ContextMenuEvent event)
+            (and (instance? KeyEvent event) (= KeyCode/SPACE (.getCode ^KeyEvent event))))
+    (let [node ^Node (.getTarget event)]
+      (swap! *state assoc-in [id :bounds] (.localToScreen node (.getBoundsInLocal node))))))
+
+
+(defmethod event/handle ::close [*state {:keys [id]}]
+  (swap! *state update id dissoc :bounds))
+
+(defn- init-ext! [id _ handler]
+  (handler {::event/type ::init-ext :id id})
+  nil)
+
+(def ^:private ext-with-popup-on-node-props
+  (fx/make-ext-with-props
+    (assoc fx.node/props
+      :popup (fx.prop/make
+               (fx.mutator/adder-remover
+                 (fn [^Node node ^Popup popup]
+                   (.show popup (.getWindow (.getScene node))))
+                 (fn [_ ^Popup popup]
+                   (.hide popup)))
+               fx.lifecycle/dynamic))))
+
+(defn- ext-impl [{:keys [desc value annotation id bounds]}]
+  {:fx/type ext-with-popup-on-node-props
+   :props (cond-> {:event-handler {::event/type ::on-popup-node-event :id id}
+                   :focus-traversable true}
+                  bounds
+                  (assoc :popup {:fx/type view
+                                 :value value
+                                 :annotation (assoc annotation ::stream/hidden true)
+                                 :bounds bounds
+                                 :id [id :popup]
+                                 :on-cancel {::event/type ::close :id id}}))
+   :desc desc})
+
+(defn ext [props]
+  {:fx/type rfx/ext-with-process
+   :start init-ext!
+   :desc (assoc props :fx/type ext-impl)})
+
+;; todo "annotated value"
