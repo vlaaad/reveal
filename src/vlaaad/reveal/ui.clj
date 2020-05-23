@@ -1,7 +1,6 @@
 (ns vlaaad.reveal.ui
   (:require [cljfx.api :as fx]
             [vlaaad.reveal.style :as style]
-            [vlaaad.reveal.segment :as segment]
             [vlaaad.reveal.event :as event]
             [vlaaad.reveal.view :as view]
             [cljfx.lifecycle :as fx.lifecycle]
@@ -17,36 +16,39 @@
            [java.util UUID]
            [javafx.scene.control ScrollPane]))
 
-(defmethod event/handle ::on-header-width-changed [*state {:keys [id fx/event]}]
-  (swap! *state assoc-in [:views id :header-width] event))
+(defmethod event/handle ::on-view-event [*state {:keys [index ^Event fx/event]}]
+  (when (and (instance? KeyEvent event)
+             (= KeyEvent/KEY_PRESSED (.getEventType event)))
+    (let [^KeyEvent event event
+          code (.getCode event)]
+      (cond
+        (and (= KeyCode/LEFT code) (.isShortcutDown event))
+        (do
+          (.consume event)
+          (swap! *state update :focused-view-index #(max 0 (dec %))))
 
-(defmethod event/handle ::on-header-height-changed [*state {:keys [id fx/event]}]
-  (swap! *state assoc-in [:views id :header-height] event))
+        (and (= KeyCode/RIGHT code) (.isShortcutDown event))
+        (do
+          (.consume event)
+          (swap! *state (fn [state]
+                          (update state :focused-view-index #(min (inc %) (dec (count (:view-order state))))))))
 
-(defmethod event/handle ::on-view-key-pressed [*state {:keys [index ^KeyEvent fx/event]}]
-  (let [code (.getCode event)]
-    (cond
-      (and (= KeyCode/LEFT code) (.isShortcutDown event))
-      (swap! *state update :focused-view-index #(max 0 (dec %)))
-
-      (and (= KeyCode/RIGHT code) (.isShortcutDown event))
-      (swap! *state (fn [state]
-                      (update state :focused-view-index #(min (inc %) (dec (count (:view-order state)))))))
-
-      (= KeyCode/ESCAPE code)
-      (swap! *state (fn [state]
-                      (let [id (get-in state [:view-order index])
-                            view-order (:view-order state)
-                            new-view-order (into (subvec view-order 0 index)
-                                                 (subvec view-order (inc index)))]
-                        (-> state
-                            (dissoc id)
-                            (assoc :view-order new-view-order)
-                            (as-> $ (if (empty? new-view-order)
-                                      (dissoc $ :focused-view-index)
-                                      (assoc $ :focused-view-index
-                                               (min index (dec (count new-view-order))))))
-                            (update :views dissoc id))))))))
+        (= KeyCode/ESCAPE code)
+        (do
+          (.consume event)
+          (swap! *state (fn [state]
+                          (let [id (get-in state [:view-order index])
+                                view-order (:view-order state)
+                                new-view-order (into (subvec view-order 0 index)
+                                                     (subvec view-order (inc index)))]
+                            (-> state
+                                (dissoc id)
+                                (assoc :view-order new-view-order)
+                                (as-> $ (if (empty? new-view-order)
+                                          (dissoc $ :focused-view-index)
+                                          (assoc $ :focused-view-index
+                                                   (min index (dec (count new-view-order))))))
+                                (update :views dissoc id))))))))))
 
 (defn focus-when-on-scene! [^Node node]
   (if (some? (.getScene node))
@@ -104,6 +106,7 @@
                                     (- region-x (- region-end canvas-end))
                                     region-x)
                             start (max start canvas-start)]
+                        ;; fixme something is wrong here
                         (.setHvalue scroll-pane (/ (- region-x start viewport-x)
                                                    (- (.getWidth content) viewport-width)))))))
                 fx.lifecycle/scalar))}))
@@ -121,21 +124,17 @@
                               :min-width :use-pref-size
                               :min-height :use-pref-size
                               :on-mouse-clicked {::event/type ::focus-on-tab :index index}
-                              :children [{:fx/type segment/view
+                              :children [{:fx/type view/summary
                                           :anchor-pane/left 5
                                           :anchor-pane/right 5
                                           :anchor-pane/top 5
                                           :anchor-pane/bottom 5
-                                          :width (get-in views [id :header-width])
-                                          :on-width-changed {::event/type ::on-header-width-changed :id id}
-                                          :height (get-in views [id :header-height])
-                                          :on-height-changed {::event/type ::on-header-height-changed :id id}
                                           :value (get-in views [id :action :form])}]}}))
                   (interpose
                     {:fx/type :region
                      :style-class "reveal-view-header-separator"}))]
     {:fx/type :v-box
-     :on-key-pressed {::event/type ::on-view-key-pressed :index focused-view-index}
+     :event-filter {::event/type ::on-view-event :index focused-view-index}
      :children [{:fx/type scroll-pane
                  :style-class "reveal-view-scroll-pane"
                  :fit-to-width true

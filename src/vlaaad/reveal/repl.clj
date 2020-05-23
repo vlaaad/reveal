@@ -7,7 +7,7 @@
 
 (defn stream-read [form ui]
   (ui (stream/as form
-        (stream/raw-string (pr-str form) {:fill ::style/util-color}))))
+        (stream/raw-string (pr-str form) {:fill style/util-color}))))
 
 (defn wrap-read [ui read]
   (fn [request-prompt request-exit]
@@ -23,7 +23,7 @@
     (ui
       (stream/just
         (stream/horizontal
-          (stream/raw-string "=>" {:fill ::style/util-color})
+          (stream/raw-string "=>" {:fill style/util-color})
           stream/separator
           (stream/stream x))))
     (print x)))
@@ -32,14 +32,14 @@
   (fn [ex]
     (ui (stream/as ex
           (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
-                             {:fill ::style/error-color})))
+                             {:fill style/error-color})))
     (caught ex)))
 
 (defn make-tap [ui]
   (fn [x]
     (ui (stream/just
           (stream/horizontal
-            (stream/raw-string "tap>" {:fill ::style/util-color})
+            (stream/raw-string "tap>" {:fill style/util-color})
             stream/separator
             (stream/stream x))))))
 
@@ -55,8 +55,8 @@
     nil))
 
 (defn wrap-eval [ui eval]
-  (let [out (make-print ui *out* ::style/string-color)
-        err (make-print ui *err* ::style/error-color)]
+  (let [out (make-print ui *out* style/string-color)
+        err (make-print ui *err* style/error-color)]
     (fn [form]
       (binding [*out* out
                 *err* err]
@@ -78,7 +78,7 @@
                       (update :print #(wrap-print ui (or % prn)))
                       (update :caught #(wrap-caught ui (or % m/repl-caught))))]
     (ui (stream/as *clojure-version*
-          (stream/raw-string version {:fill ::style/util-color})))
+          (stream/raw-string version {:fill style/util-color})))
     (println version)
     (add-tap tap)
     (apply m/repl (mapcat identity repl-args))

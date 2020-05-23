@@ -53,10 +53,4 @@
                                    fx.lifecycle/scalar
                                    :coerce double]
                      :on-width-changed [:property-change-listener fx.lifecycle/change-listener]
-                     :on-height-changed [:property-change-listener fx.lifecycle/change-listener]
-                     :popup [(fx.mutator/adder-remover
-                               (fn [^Canvas canvas ^Popup popup]
-                                 (.show popup (.getWindow (.getScene canvas))))
-                               (fn [_ ^Popup popup]
-                                 (.hide popup)))
-                             fx.lifecycle/dynamic]))}))
+                     :on-height-changed [:property-change-listener fx.lifecycle/change-listener]))}))

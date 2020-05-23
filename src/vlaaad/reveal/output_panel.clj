@@ -6,7 +6,8 @@
             [vlaaad.reveal.canvas :as canvas])
   (:import [javafx.scene.input ScrollEvent KeyEvent MouseEvent MouseButton KeyCode Clipboard ClipboardContent]
            [javafx.scene.canvas Canvas]
-           [javafx.event Event]))
+           [javafx.event Event]
+           [javafx.scene Node]))
 
 (defmethod event/handle ::on-scroll [*state {:keys [id ^ScrollEvent fx/event]}]
   (swap! *state update-in [id :layout] layout/scroll-by (.getDeltaX event) (.getDeltaY event)))
@@ -37,13 +38,13 @@
   (let [layout (layout/ensure-cursor-visible (:layout this))
         {:keys [lines cursor]} layout
         region (get-in lines cursor)
-        [value annotation :as val+ann] (peek (:values region))]
+        [value annotation :as val+ann] (peek (:values region))
+        ^Node target (.getTarget event)]
     (-> this
         (assoc :layout layout)
         (cond-> val+ann
-                (assoc :popup {:bounds (-> ^Canvas (.getTarget event)
-                                           (.localToScreen
-                                             (layout/cursor->canvas-bounds layout)))
+                (assoc :popup {:bounds (.localToScreen target (layout/cursor->canvas-bounds layout))
+                               :window (.getWindow (.getScene target))
                                :value value
                                :annotation annotation})))))
 
@@ -176,25 +177,25 @@
 
 (defn view [{:keys [layout popup id]}]
   (let [{:keys [canvas-width canvas-height document-width document-height]} layout]
-    (cond-> {:fx/type canvas/view
-             :draw [layout/draw layout]
-             :width canvas-width
-             :height canvas-height
-             :pref-width document-width
-             :pref-height document-height
-             :focus-traversable true
-             :on-focused-changed {::event/type ::on-focus-changed :id id}
-             :on-key-pressed {::event/type ::on-key-pressed :id id}
-             :on-mouse-dragged {::event/type ::on-mouse-dragged :id id}
-             :on-mouse-pressed {::event/type ::on-mouse-pressed :id id}
-             :on-mouse-released {::event/type ::on-mouse-released :id id}
-             :on-width-changed {::event/type ::on-width-changed :id id}
-             :on-height-changed {::event/type ::on-height-changed :id id}
-             :on-scroll {::event/type ::on-scroll :id id}}
-
-            popup
-            (assoc :popup (assoc popup :fx/type popup/view
-                                       :on-cancel {::event/type ::hide-popup :id id})))))
+    {:fx/type fx/ext-let-refs
+     :refs (when popup
+             {::popup (assoc popup :fx/type popup/view
+                                   :on-cancel {::event/type ::hide-popup :id id})})
+     :desc {:fx/type canvas/view
+            :draw [layout/draw layout]
+            :width canvas-width
+            :height canvas-height
+            :pref-width document-width
+            :pref-height document-height
+            :focus-traversable true
+            :on-focused-changed {::event/type ::on-focus-changed :id id}
+            :on-key-pressed {::event/type ::on-key-pressed :id id}
+            :on-mouse-dragged {::event/type ::on-mouse-dragged :id id}
+            :on-mouse-pressed {::event/type ::on-mouse-pressed :id id}
+            :on-mouse-released {::event/type ::on-mouse-released :id id}
+            :on-width-changed {::event/type ::on-width-changed :id id}
+            :on-height-changed {::event/type ::on-height-changed :id id}
+            :on-scroll {::event/type ::on-scroll :id id}}}))
 
 (defn make []
   {:layout (layout/make)})

@@ -45,11 +45,11 @@
                       :label label
                       :form (stream/just
                               (stream/horizontal
-                                (stream/raw-string "(" {:fill ::style/util-color})
-                                (stream/raw-string label {:fill ::style/symbol-color})
+                                (stream/raw-string "(" {:fill style/util-color})
+                                (stream/raw-string label {:fill style/symbol-color})
                                 stream/separator
                                 (stream/stream value)
-                                (stream/raw-string ")" {:fill ::style/util-color})))
+                                (stream/raw-string ")" {:fill style/util-color})))
                       :invoke f}))
                  (catch Exception _))))
        (sort-by :label)
@@ -71,7 +71,7 @@
           (not= key ::not-found) #(p/nav coll key x)
           (not= val ::not-found) #(p/nav coll x val))))))
 
-(vlaaad.reveal.action/def ::show-actual-value [x ann]
+(vlaaad.reveal.action/def ::show-value [x ann]
   (when (::stream/hidden ann)
     (constantly x)))
 
@@ -113,13 +113,13 @@
                                      (apply
                                        stream/horizontal
                                        (stream/as name
-                                         (stream/raw-string name {:fill ::style/symbol-color}))
+                                         (stream/raw-string name {:fill style/symbol-color}))
                                        stream/separator
                                        (->> kinds
                                             (map (fn [kind]
                                                    (stream/as kind
                                                      (stream/raw-string (.getSimpleName (class kind))
-                                                                        {:fill ::style/util-color}))))
+                                                                        {:fill style/util-color}))))
                                             (interpose stream/separator)))
                                      (stream/horizontal
                                        (stream/raw-string "  " {:selectable false})
@@ -153,9 +153,3 @@
 (vlaaad.reveal.action/def ::vec [v]
   (when (and v (.isArray (class v)))
     #(vec v)))
-
-(vlaaad.reveal.action/def ::view-as-table [v]
-  (when (and (some? v)
-             (not (string? v))
-             (seqable? v))
-    #(stream/just (stream/table v))))

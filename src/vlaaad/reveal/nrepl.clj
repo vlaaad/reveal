@@ -21,9 +21,9 @@
             (not= value ::not-found)
             (stream/as {:request request :message message}
               (stream/vertical
-                (stream/raw-string code {:fill ::style/util-color})
+                (stream/raw-string code {:fill style/util-color})
                 (stream/horizontal
-                  (stream/raw-string "=>" {:fill ::style/util-color})
+                  (stream/raw-string "=>" {:fill style/util-color})
                   stream/separator
                   (stream/stream value))))
 
@@ -38,14 +38,14 @@
             (not= throwable ::not-found)
             (stream/as {:request request :message message}
               (stream/vertical
-                (stream/raw-string code {:fill ::style/util-color})
+                (stream/raw-string code {:fill style/util-color})
                 (stream/horizontal
-                  (stream/raw-string "=>" {:fill ::style/util-color})
+                  (stream/raw-string "=>" {:fill style/util-color})
                   stream/separator
                   (stream/as throwable
                     (stream/raw-string
                       (.getSimpleName (class throwable))
-                      {:fill ::style/error-color})))))
+                      {:fill style/error-color})))))
 
             :else
             {:request request :message message}))))))
@@ -54,7 +54,7 @@
   (ui
     (stream/as {:tap value}
       (stream/horizontal
-        (stream/raw-string "tap>" {:fill ::style/util-color})
+        (stream/raw-string "tap>" {:fill style/util-color})
         stream/separator
         (stream/stream value)))))
 

@@ -261,8 +261,8 @@
                    (cursor/min [last-visible-line-index (dec (count (lines last-visible-line-index)))]))]
         (when-not (cursor/before? to from)
           (.setFill ctx (fx.coerce/color (if focused
-                                           (::style/selection-color style/style)
-                                           (::style/unfocused-selection-color style/style))))
+                                           style/selection-color
+                                           style/unfocused-selection-color)))
           (doseq [i (range (cursor/row from) (inc (cursor/row to)))]
             (let [line (lines i)
                   start-col (if (= i (cursor/row from))

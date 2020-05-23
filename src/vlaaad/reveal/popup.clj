@@ -11,17 +11,20 @@
             [cljfx.api :as fx]
             [clojure.string :as str]
             [cljfx.prop :as fx.prop]
-            [cljfx.fx.node :as fx.node]
             [clojure.walk :as walk]
-            [vlaaad.reveal.action :as action])
+            [vlaaad.reveal.action :as action]
+            [cljfx.component :as component]
+            [cljfx.fx.node :as fx.node])
   (:import [javafx.geometry Bounds Rectangle2D]
-           [javafx.stage Screen Popup]
+           [javafx.stage Screen Popup Window]
            [com.sun.javafx.event RedirectedEvent]
-           [javafx.event Event]
+           [javafx.event Event EventHandler]
            [javafx.scene.input KeyCode KeyEvent ContextMenuEvent]
            [java.util Collection List]
            [javafx.beans.value ChangeListener]
            [javafx.scene Node]))
+
+(set! *warn-on-reflection* true)
 
 (defn- consume-popup-event [^Event e]
   (if (instance? RedirectedEvent e)
@@ -128,15 +131,23 @@
     (swap! *state update id dissoc :selected-index)))
 
 (def ^:private lifecycle
-  (fx.composite/describe Popup
-    :ctor []
-    :props (merge fx.popup/props
-                  (fx.composite/props Popup
-                    :stylesheets [(fx.mutator/setter
-                                    (fn [^Popup popup ^Collection styles]
-                                      (.setAll (.getStylesheets (.getScene popup)) styles)))
-                                  fx.lifecycle/scalar
-                                  :default []]))))
+  (fx.lifecycle/wrap-on-delete
+    (fx.composite/describe Popup
+      :ctor []
+      :props (merge fx.popup/props
+                    (fx.composite/props Popup
+                      :window [(fx.mutator/setter
+                                 (fn [^Popup popup ^Window window]
+                                   (if window
+                                     (.show popup window)
+                                     (.hide popup))))
+                               fx.lifecycle/scalar]
+                      :stylesheets [(fx.mutator/setter
+                                      (fn [^Popup popup ^Collection styles]
+                                        (.setAll (.getStylesheets (.getScene popup)) styles)))
+                                    fx.lifecycle/scalar
+                                    :default []])))
+    #(.hide ^Popup %)))
 
 (defn focus-when-on-scene! [^Node node]
   (if (some? (.getScene node))
@@ -157,6 +168,7 @@
 
 (defn- view-impl [{:keys [value
                           ^Bounds bounds
+                          window
                           id
                           on-cancel
                           text
@@ -219,6 +231,7 @@
                                               :ref [::action (:id action)]})
                                            actions)}}]
     {:fx/type lifecycle
+     :window window
      :stylesheets [(:cljfx.css/url style/style)]
      :anchor-location (if popup-at-the-bottom :window-top-left :window-bottom-left)
      :anchor-x (+ pref-anchor-x anchor-fix-x)
@@ -243,7 +256,7 @@
            (cond-> popup-at-the-bottom
                    (conj {:fx/type :polygon
                           :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                          :fill (::style/popup-color style/style)
+                          :fill style/popup-color
                           :points [0 arrow-height
                                    arrow-width arrow-height
                                    (* arrow-width 0.5) 0]}))
@@ -301,7 +314,7 @@
            (cond-> (not popup-at-the-bottom)
                    (conj {:fx/type :polygon
                           :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                          :fill (::style/popup-color style/style)
+                          :fill style/popup-color
                           :points [0 0
                                    arrow-width 0
                                    (* arrow-width 0.5) arrow-height]})))}]}))
@@ -309,11 +322,14 @@
 (defmethod event/handle ::init-popup [*state {:keys [id actions]}]
   (swap! *state assoc id {:actions actions :id id}))
 
+(defmethod event/handle ::dispose-popup [*state {:keys [id]}]
+  (swap! *state dissoc id))
+
 (defn- init-popup! [id {:keys [value annotation]} handler]
   (handler {::event/type ::init-popup :id id :actions (action/collect value annotation)})
-  nil)
+  #(handler {::event/type ::dispose-popup :id id}))
 
-(defn view [{:keys [value annotation bounds id on-cancel]
+(defn view [{:keys [value annotation bounds window id on-cancel]
              :or {id ::rfx/undefined}}]
   {:fx/type rfx/ext-with-process
    :id id
@@ -322,27 +338,42 @@
    :desc {:fx/type view-impl
           :value value
           :on-cancel on-cancel
-          :bounds bounds}})
+          :bounds bounds
+          :window window}})
 
 (defmethod event/handle ::init-ext [*state {:keys [id]}]
   (swap! *state assoc id {:id id}))
 
-(defmethod event/handle ::set-bounds [*state {:keys [id bounds]}]
-  (swap! *state assoc-in [id :bounds] bounds))
+(defmethod event/handle ::dispose-ext [*state {:keys [id]}]
+  (swap! *state dissoc id))
 
-(defmethod event/handle ::on-popup-node-event [*state {:keys [id ^Event fx/event]}]
+(defmethod event/handle ::on-popup-node-event [*state {:keys [id select ^Event fx/event]}]
   (when (or (instance? ContextMenuEvent event)
-            (and (instance? KeyEvent event) (= KeyCode/SPACE (.getCode ^KeyEvent event))))
-    (let [node ^Node (.getTarget event)]
-      (swap! *state assoc-in [id :bounds] (.localToScreen node (.getBoundsInLocal node))))))
+            (and (instance? KeyEvent event)
+                 (= KeyCode/SPACE (.getCode ^KeyEvent event))
+                 (= KeyEvent/KEY_PRESSED (.getEventType event))))
 
+    (let [node ^Node (.getSource event)]
+      (if select
+        (when-let [{:keys [bounds value annotation]} (select node)]
+          (.consume event)
+          (swap! *state update id assoc
+                 :value value
+                 :annotation annotation
+                 :bounds bounds
+                 :window (.getWindow (.getScene node))))
+        (do
+          (.consume event)
+          (swap! *state update id assoc
+                 :bounds (.localToScreen node (.getBoundsInLocal node))
+                 :window (.getWindow (.getScene node))))))))
 
 (defmethod event/handle ::close [*state {:keys [id]}]
-  (swap! *state update id dissoc :bounds))
+  (swap! *state update id dissoc :bounds :window :value :annotation))
 
 (defn- init-ext! [id _ handler]
   (handler {::event/type ::init-ext :id id})
-  nil)
+  #(handler {::event/type ::dispose-ext :id id}))
 
 (def ^:private ext-with-popup-on-node-props
   (fx/make-ext-with-props
@@ -355,15 +386,18 @@
                    (.hide popup)))
                fx.lifecycle/dynamic))))
 
-(defn- ext-impl [{:keys [desc value annotation id bounds]}]
+(defn- ext-impl [{:keys [desc value annotation id bounds window select]}]
   {:fx/type ext-with-popup-on-node-props
-   :props (cond-> {:event-handler {::event/type ::on-popup-node-event :id id}
+   :props (cond-> {:event-filter {::event/type ::on-popup-node-event
+                                  :id id
+                                  :select select}
                    :focus-traversable true}
                   bounds
                   (assoc :popup {:fx/type view
                                  :value value
                                  :annotation (assoc annotation ::stream/hidden true)
                                  :bounds bounds
+                                 :window window
                                  :id [id :popup]
                                  :on-cancel {::event/type ::close :id id}}))
    :desc desc})
@@ -372,5 +406,3 @@
   {:fx/type rfx/ext-with-process
    :start init-ext!
    :desc (assoc props :fx/type ext-impl)})
-
-;; todo "annotated value"

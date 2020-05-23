@@ -109,7 +109,7 @@
 
 (defn- flush+util [builder style str]
   (=> (flush-builder builder style)
-      (string str {:fill ::style/util-color})))
+      (string str {:fill style/util-color})))
 
 (defn- process-raw [^StringBuilder builder ^String str style]
   (fn [rf acc]
@@ -255,126 +255,55 @@
          ((as ex
             (raw-string
               (-> ex Throwable->map (assoc :phase :print-eval-result) m/ex-triage m/ex-str)
-              {:fill ::style/error-color}))
+              {:fill style/error-color}))
           rf acc))))))
 
 (defn- oneduce [xform f init x]
   (let [f (xform f)]
     (f (unreduced (f init x)))))
 
-(defn- cell-xf
-  [max-length]
-  (comp
-    emit-xf
-    (map (fn [input]
-           (case (:op input)
-             ::push-block (assoc input :block :horizontal)
-             ::separator {:op ::string :text " " :style {:selectable false}}
-             input)))
-    (fn [rf]
-      (let [*pop-stack (volatile! [])
-            *length (volatile! max-length)
-            stash (ArrayList.)
-            *string-index (volatile! -1)]
-        (fn
-          ([] (rf))
-          ([acc]
-           (if (neg? @*length)
-             {:length max-length
-              :steps (rf acc)}
-             (let [stash-vec (vec (.toArray stash))]
-               (.clear stash)
-               {:length (- max-length @*length)
-                :steps (reduce rf acc stash-vec)})))
-          ([acc instruction]
-           (.add stash instruction)
-           (case (:op instruction)
-             ::string
-             (let [text (:text instruction)
-                   text-len (count text)]
-               (if (zero? text-len)
-                 acc
-                 (let [len @*length
-                       new-len (- len text-len)]
-                   (vreset! *length new-len)
-                   (if (and (not (neg? len))
-                            (neg? new-len))
-                     (let [stash-vec (vec (.toArray stash))]
-                       (.clear stash)
-                       (ensure-reduced
-                         (reduce
-                           rf
-                           acc
-                           (-> stash-vec
-                               (cond-> (pos? len) (update-in [(dec (count stash-vec)) :text] #(subs % 0 (dec len))))
-                               (cond-> (zero? len)
-                                       (-> pop
-                                           (update-in [@*string-index :text] #(subs % 0 (dec (count %)))))) ;; what if length was 1? should remove it alltogether?
-                               (conj {:op ::string :text "…" :style {:fill ::style/util-color}})
-                               (into @*pop-stack)))))
-                     (do (vreset! *string-index (dec (.size stash))) acc)))))
-             ::push-block (do (vswap! *pop-stack conj {:op ::pop-block}) acc)
-             ::pop-block (do (vswap! *pop-stack pop) acc)
-             ::push-value (do (vswap! *pop-stack conj {:op ::pop-value}) acc)
-             ::pop-value (do (vswap! *pop-stack pop) acc)
-             acc)))))))
+(defn fx-summary [max-length value]
+  (oneduce
+    (comp
+      emit-xf
+      (keep #(case (:op %)
+               ::string {:fx/type :text
+                         :text (:text %)
+                         :fill (:fill (:style %) :black)}
+               ::separator {:fx/type :text
+                            :text " "
+                            :fill style/util-color}
+               nil)))
+    (fn
+      ([acc] {:fx/type :text-flow
+              :style-class "reveal-summary"
+              :children (:children acc)})
+      ([{:keys [length children] :as acc} desc]
+       (let [text (:text desc)
+             text-length (count text)
+             new-length (- length text-length)]
+         (cond
+           (zero? text-length)
+           acc
 
-(defn- emit-ops [ops]
-  (fn [rf acc]
-    (reduce rf acc ops)))
+           (neg? new-length)
+           (reduced
+             {:children (-> (if (pos? length)
+                              (conj children
+                                    (assoc desc :text (subs text 0 (dec length))))
+                              (update-in children [(dec (count children)) :text]
+                                         #(subs % 0 (dec (count %)))))
+                            (conj {:fx/type :text
+                                   :text "…"
+                                   :fill style/util-color}))
+              :length new-length})
 
-(defn table [seqable]
-  (let [xs (seq seqable)
-        head (first xs)
-        columns (cond
-                  (map? head)
-                  (for [k (keys head)]
-                    {:header k :cell #(get % k)})
-
-                  (map-entry? head)
-                  [{:header 'key :cell key} {:header 'val :cell val}]
-
-                  (indexed? head)
-                  (for [i (range (count head))]
-                    {:header i :cell #(nth % i)})
-
-                  :else
-                  [{:header 'value :cell identity}])
-        ->cell (fn [x]
-                 (assoc (oneduce (cell-xf 48) conj [] x) :value x))
-        ->row (fn [x columns]
-                (mapv #(->cell (try ((:cell %) x) (catch Throwable e e)))
-                      columns))
-        row-values (into [(mapv #(-> % :header ->cell) columns)]
-                         (map #(->row % columns))
-                         xs)
-        cell-lengths (mapv :length (apply mapv #(apply max-key :length %&) row-values))]
-    (block :vertical
-      (streamduce
-        (comp
-          (map-indexed
-            (fn stream-row [row cells]
-              (block :horizontal
-                (streamduce
-                  (comp
-                    (map-indexed
-                      (fn stream-cell [col cell]
-                        (let [pad (- (cell-lengths col) (:length cell))]
-                          (if (and (pos? row) (number? (:value cell)))
-                            (horizontal
-                              (string (apply str (repeat pad \space)) {:selectable false})
-                              (emit-ops (:steps cell)))
-                            (horizontal
-                              (emit-ops (:steps cell))
-                              (string (apply str (repeat pad \space)) {:selectable false}))))))
-                    (interpose (string " │ " {:fill ::style/unfocused-selection-color
-                                              :selectable false})))
-                  cells))))
-          (interpose separator))
-        row-values))))
-
-(defn summary [max-length x]
-  (emit-ops (:steps (oneduce (cell-xf max-length) conj [] x))))
+           :else
+           {:children (conj children desc)
+            :length new-length}))))
+    {:length max-length
+     :children []}
+    value))
 
 (defn- blank-segment [n]
   {:text (apply str (repeat n \space))
@@ -482,34 +411,34 @@
 (defn- identity-hash-code [x]
   (let [hash (System/identityHashCode x)]
     (as hash
-      (raw-string (format "0x%x" hash) {:fill ::style/scalar-color}))))
+      (raw-string (format "0x%x" hash) {:fill style/scalar-color}))))
 
 (defmethod emit :default [x]
   (horizontal
-    (raw-string "#object[" {:fill ::style/object-color})
+    (raw-string "#object[" {:fill style/object-color})
     (let [c (class x)]
       (if (.isArray c)
-        (as c (raw-string (pr-str (.getName c)) {:fill ::style/object-color}))
+        (as c (raw-string (pr-str (.getName c)) {:fill style/object-color}))
         (stream c)))
     separator
     (identity-hash-code x)
     separator
     (stream (str x))
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string "]" {:fill style/object-color})))
 
 ;; scalars
 
 (defmethod emit nil [x]
-  (raw-string (pr-str x) {:fill ::style/scalar-color}))
+  (raw-string (pr-str x) {:fill style/scalar-color}))
 
 (defmethod emit Boolean [x]
-  (raw-string (pr-str x) {:fill ::style/scalar-color}))
+  (raw-string (pr-str x) {:fill style/scalar-color}))
 
 (defmethod emit String [s]
-  (raw-string (pr-str s) {:fill ::style/string-color}))
+  (raw-string (pr-str s) {:fill style/string-color}))
 
 (defmethod emit Character [ch]
-  (raw-string (pr-str ch) {:fill ::style/string-color}))
+  (raw-string (pr-str ch) {:fill style/string-color}))
 
 (def escape-layout-chars
   {\newline "\\n"
@@ -519,17 +448,17 @@
    \backspace "\\b"})
 
 (defmethod emit Keyword [k]
-  (escaped-string k {:fill ::style/keyword-color}
-                  escape-layout-chars {:fill ::style/scalar-color}))
+  (escaped-string k {:fill style/keyword-color}
+                  escape-layout-chars {:fill style/scalar-color}))
 
 (defmethod emit Symbol [sym]
-  (escaped-string sym {:fill ::style/symbol-color}
-                  escape-layout-chars {:fill ::style/scalar-color}))
+  (escaped-string sym {:fill style/symbol-color}
+                  escape-layout-chars {:fill style/scalar-color}))
 
 ;; numbers
 
 (defmethod emit Number [n]
-  (raw-string n {:fill ::style/scalar-color}))
+  (raw-string n {:fill style/scalar-color}))
 
 (defmethod emit Float [n]
   (raw-string
@@ -538,7 +467,7 @@
       (= Float/NEGATIVE_INFINITY n) "##-Inf"
       (Float/isNaN n) "##NaN"
       :else (str n))
-    {:fill ::style/scalar-color}))
+    {:fill style/scalar-color}))
 
 (defmethod emit Double [n]
   (raw-string
@@ -547,33 +476,33 @@
       (= Double/NEGATIVE_INFINITY n) "##-Inf"
       (Double/isNaN n) "##NaN"
       :else (str n))
-    {:fill ::style/scalar-color}))
+    {:fill style/scalar-color}))
 
 (defmethod emit BigDecimal [n]
-  (raw-string (str n "M") {:fill ::style/scalar-color}))
+  (raw-string (str n "M") {:fill style/scalar-color}))
 
 (defmethod emit BigInt [n]
-  (raw-string (str n "N") {:fill ::style/scalar-color}))
+  (raw-string (str n "N") {:fill style/scalar-color}))
 
 ;; maps
 
 (defmethod emit IPersistentMap [m]
   (horizontal
-    (raw-string "{" {:fill ::style/object-color})
+    (raw-string "{" {:fill style/object-color})
     (entries m)
-    (raw-string "}" {:fill ::style/object-color})))
+    (raw-string "}" {:fill style/object-color})))
 
 (defmethod emit IRecord [m]
   (horizontal
-    (raw-string (str "#" (.getName (class m)) "{") {:fill ::style/object-color})
+    (raw-string (str "#" (.getName (class m)) "{") {:fill style/object-color})
     (entries m)
-    (raw-string "}" {:fill ::style/object-color})))
+    (raw-string "}" {:fill style/object-color})))
 
 (defmethod emit Map [m]
   (horizontal
-    (raw-string "{" {:fill ::style/object-color})
+    (raw-string "{" {:fill style/object-color})
     (entries m)
-    (raw-string "}" {:fill ::style/object-color})))
+    (raw-string "}" {:fill style/object-color})))
 
 (prefer-method emit IRecord IPersistentMap)
 (prefer-method emit IRecord Map)
@@ -583,27 +512,27 @@
 
 (defmethod emit IPersistentVector [v]
   (horizontal
-    (raw-string "[" {:fill ::style/object-color})
+    (raw-string "[" {:fill style/object-color})
     (items v)
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string "]" {:fill style/object-color})))
 
 (defmethod emit List [xs]
   (horizontal
-    (raw-string "(" {:fill ::style/object-color})
+    (raw-string "(" {:fill style/object-color})
     (sequential xs)
-    (raw-string ")" {:fill ::style/object-color})))
+    (raw-string ")" {:fill style/object-color})))
 
 (defmethod emit RandomAccess [xs]
   (horizontal
-    (raw-string "[" {:fill ::style/object-color})
+    (raw-string "[" {:fill style/object-color})
     (items xs)
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string "]" {:fill style/object-color})))
 
 (defmethod emit ISeq [xs]
   (horizontal
-    (raw-string "(" {:fill ::style/object-color})
+    (raw-string "(" {:fill style/object-color})
     (sequential xs)
-    (raw-string ")" {:fill ::style/object-color})))
+    (raw-string ")" {:fill style/object-color})))
 
 (prefer-method emit IPersistentCollection RandomAccess)
 (prefer-method emit IPersistentCollection Collection)
@@ -615,26 +544,26 @@
 
 (defmethod emit IPersistentSet [s]
   (horizontal
-    (raw-string "#{" {:fill ::style/object-color})
+    (raw-string "#{" {:fill style/object-color})
     (items s)
-    (raw-string "}" {:fill ::style/object-color})))
+    (raw-string "}" {:fill style/object-color})))
 
 (defmethod emit Set [s]
   (horizontal
-    (raw-string "#{" {:fill ::style/object-color})
+    (raw-string "#{" {:fill style/object-color})
     (items s)
-    (raw-string "}" {:fill ::style/object-color})))
+    (raw-string "}" {:fill style/object-color})))
 
 ;; exceptions
 
 (defmethod emit Throwable [t]
   (horizontal
-    (raw-string "#reveal/error" {:fill ::style/object-color})
+    (raw-string "#reveal/error" {:fill style/object-color})
     (stream (Throwable->map t))))
 
 (defmethod emit StackTraceElement [^StackTraceElement el]
   (horizontal
-    (raw-string "[" {:fill ::style/object-color})
+    (raw-string "[" {:fill style/object-color})
     (stream (symbol (.getClassName el)))
     separator
     (stream (symbol (.getMethodName el)))
@@ -642,7 +571,7 @@
     (stream (.getFileName el))
     separator
     (stream (.getLineNumber el))
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string "]" {:fill style/object-color})))
 
 ;; objects
 
@@ -655,62 +584,62 @@
 
 (defmethod emit MultiFn [^MultiFn f]
   (horizontal
-    (raw-string "#reveal/multi-fn[" {:fill ::style/object-color})
+    (raw-string "#reveal/multi-fn[" {:fill style/object-color})
     (stream (describe-multi f))
     separator
     (identity-hash-code f)
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string "]" {:fill style/object-color})))
 
 (defmethod emit Fn [f]
-  (escaped-string (Compiler/demunge (.getName (class f))) {:fill ::style/object-color}
-                  escape-layout-chars {:fill ::style/scalar-color}))
+  (escaped-string (Compiler/demunge (.getName (class f))) {:fill style/object-color}
+                  escape-layout-chars {:fill style/scalar-color}))
 
 (defmethod emit Pattern [re]
   (horizontal
-    (raw-string "#" {:fill ::style/object-color})
-    (raw-string (str \" re \") {:fill ::style/string-color})))
+    (raw-string "#" {:fill style/object-color})
+    (raw-string (str \" re \") {:fill style/string-color})))
 
 (defmethod emit Var [var]
-  (raw-string (pr-str var) {:fill ::style/object-color}))
+  (raw-string (pr-str var) {:fill style/object-color}))
 
 (defmethod emit Namespace [^Namespace ns]
-  (raw-string (name (.getName ns)) {:fill ::style/object-color}))
+  (raw-string (name (.getName ns)) {:fill style/object-color}))
 
 (defmethod emit Class [^Class class]
-  (raw-string (.getName class) {:fill ::style/object-color}))
+  (raw-string (.getName class) {:fill style/object-color}))
 
 (defmethod emit Enum [^Enum enum]
   (raw-string
     (str (.getName (.getDeclaringClass enum)) "/" (.name enum))
-    {:fill ::style/scalar-color}))
+    {:fill style/scalar-color}))
 
 (defmethod emit IRef [*ref]
   (horizontal
-    (raw-string (str "#reveal/" (.toLowerCase (.getSimpleName (class *ref))) "[") {:fill ::style/object-color})
+    (raw-string (str "#reveal/" (.toLowerCase (.getSimpleName (class *ref))) "[") {:fill style/object-color})
     (stream @*ref)
     separator
     (identity-hash-code *ref)
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string "]" {:fill style/object-color})))
 
 (defmethod emit File [file]
   (horizontal
-    (raw-string "#reveal/file" {:fill ::style/object-color})
+    (raw-string "#reveal/file" {:fill style/object-color})
     separator
     (stream (str file))))
 
 (defmethod emit Delay [*delay]
   (horizontal
-    (raw-string "#reveal/delay[" {:fill ::style/object-color})
+    (raw-string "#reveal/delay[" {:fill style/object-color})
     (if (realized? *delay)
       (stream @*delay)
-      (raw-string "..." {:fill ::style/util-color}))
+      (raw-string "..." {:fill style/util-color}))
     separator
     (identity-hash-code *delay)
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string "]" {:fill style/object-color})))
 
 (defmethod emit Reduced [*reduced]
   (horizontal
-    (raw-string "#reveal/reduced" {:fill ::style/object-color})
+    (raw-string "#reveal/reduced" {:fill style/object-color})
     separator
     (stream @*reduced)))
 
@@ -719,78 +648,78 @@
     (cond
       (.startsWith class-name "clojure.core$promise$reify")
       (horizontal
-        (raw-string "#reveal/promise[" {:fill ::style/object-color})
+        (raw-string "#reveal/promise[" {:fill style/object-color})
         (if (realized? *blocking-deref)
           (stream @*blocking-deref)
-          (raw-string "..." {:fill ::style/util-color}))
+          (raw-string "..." {:fill style/util-color}))
         separator
         (identity-hash-code *blocking-deref)
-        (raw-string "]" {:fill ::style/object-color}))
+        (raw-string "]" {:fill style/object-color}))
 
       (.startsWith class-name "clojure.core$future_call$reify")
       (horizontal
-        (raw-string "#reveal/future[" {:fill ::style/object-color})
+        (raw-string "#reveal/future[" {:fill style/object-color})
         (if (realized? *blocking-deref)
           (stream @*blocking-deref)
-          (raw-string "..." {:fill ::style/util-color}))
+          (raw-string "..." {:fill style/util-color}))
         separator
         (identity-hash-code *blocking-deref)
-        (raw-string "]" {:fill ::style/object-color}))
+        (raw-string "]" {:fill style/object-color}))
 
       :else
-      (raw-string (pr-str *blocking-deref) {:fill ::style/object-color}))))
+      (raw-string (pr-str *blocking-deref) {:fill style/object-color}))))
 
 (defmethod emit Volatile [*ref]
   (horizontal
-    (raw-string "#reveal/volatile[" {:fill ::style/object-color})
+    (raw-string "#reveal/volatile[" {:fill style/object-color})
     (stream @*ref)
     separator
     (identity-hash-code *ref)
-    (raw-string "]" {:fill ::style/object-color})))
+    (raw-string "]" {:fill style/object-color})))
 
 (defmethod emit TaggedLiteral [x]
   (horizontal
-    (raw-string "#" {:fill ::style/object-color})
+    (raw-string "#" {:fill style/object-color})
     (stream (:tag x))
     separator
     (stream (:form x))))
 
 (defmethod emit ReaderConditional [^ReaderConditional x]
   (horizontal
-    (raw-string (str "#?" (when (.-splicing x) "@")) {:fill ::style/object-color})
+    (raw-string (str "#?" (when (.-splicing x) "@")) {:fill style/object-color})
     (stream (.-form x))))
 
 (defmethod emit URL [x]
   (horizontal
-    (raw-string "#reveal/url" {:fill ::style/object-color})
+    (raw-string "#reveal/url" {:fill style/object-color})
     separator
     (stream (str x))))
 
 (defmethod emit URI [x]
   (horizontal
-    (raw-string "#reveal/uri" {:fill ::style/object-color})
+    (raw-string "#reveal/uri" {:fill style/object-color})
     separator
     (stream (str x))))
 
 (defmethod emit UUID [x]
   (horizontal
-    (raw-string "#uuid" {:fill ::style/object-color})
+    (raw-string "#uuid" {:fill style/object-color})
     separator
     (stream (str x))))
 
 (defn system-out [line]
   (as line
-    (raw-string line {:fill ::style/string-color})))
+    (raw-string line {:fill style/string-color})))
 
 (defn system-err [line]
   (as line
-    (raw-string line {:fill ::style/error-color})))
+    (raw-string line {:fill style/error-color})))
 
 (defmethod emit Eduction [eduction]
   (horizontal
-    (raw-string "(" {:fill ::style/object-color})
+    (raw-string "(" {:fill style/object-color})
     (sequential eduction)
-    (raw-string ")" {:fill ::style/object-color})))
+    (raw-string ")" {:fill style/object-color})))
 
 (def ^:private ^ThreadLocal utc-date-format
   (proxy [ThreadLocal] []
@@ -801,7 +730,7 @@
 (defmethod emit Date [^Date date]
   (let [^DateFormat format (.get utc-date-format)]
     (horizontal
-      (raw-string "#inst" {:fill ::style/object-color})
+      (raw-string "#inst" {:fill style/object-color})
       separator
       (stream (.format format date)))))
 
@@ -809,13 +738,13 @@
   (let [calendar-str (format "%1$tFT%1$tT.%1$tL%1$tz" calendar)
         minutes-index (- (.length calendar-str) 2)]
     (horizontal
-      (raw-string "#inst" {:fill ::style/object-color})
+      (raw-string "#inst" {:fill style/object-color})
       separator
       (stream (str (subs calendar-str 0 minutes-index) ":" (subs calendar-str minutes-index))))))
 
 (defmethod emit Instant [instant]
   (horizontal
-    (raw-string "#inst" {:fill ::style/object-color})
+    (raw-string "#inst" {:fill style/object-color})
     separator
     (stream (str instant))))
 
@@ -834,7 +763,7 @@
 
   (defmethod emit java.sql.Timestamp [^java.sql.Timestamp timestamp]
     (horizontal
-      (raw-string "#inst" {:fill ::style/object-color})
+      (raw-string "#inst" {:fill style/object-color})
       separator
       (stream (str (.format ^DateFormat (.get ^ThreadLocal utc-timestamp-format) timestamp)
                    (format ".%09d-00:00" (.getNanos timestamp)))))))

@@ -1,5 +1,5 @@
 {:deps {org.clojure/clojure {:mvn/version "1.10.1"}
-        cljfx {:mvn/version "1.7.2"}
+        cljfx {:mvn/version "1.7.3"}
         cljfx/css {:mvn/version "1.1.0"}}
  :aliases {:prepl {:main-opts ["-m" "vlaaad.reveal.prepl"]}
            :repl {:main-opts ["-m" "vlaaad.reveal.repl"]}
