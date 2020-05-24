@@ -6,16 +6,13 @@
             [vlaaad.reveal.action :as action]
             [vlaaad.reveal.style :as style]
             [vlaaad.reveal.fx :as rfx]
-            [cljfx.api :as fx]
-            [cljfx.prop :as fx.prop]
-            [cljfx.lifecycle :as fx.lifecycle]
-            [cljfx.mutator :as fx.mutator]
-            [cljfx.fx.table-cell :as fx.table-cell])
+            [cljfx.api :as fx])
   (:import [clojure.lang IRef]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
-           [javafx.scene.control TableView TableColumn TablePosition]
+           [javafx.scene.control TableView TablePosition]
            [javafx.scene Node]
-           [javafx.css PseudoClass]))
+           [javafx.css PseudoClass]
+           [java.net URL URI]))
 
 (defn- runduce!
   ([xf x]
@@ -268,3 +265,10 @@
              (not (string? v))
              (seqable? v))
     #(as {:fx/type table :seqable v})))
+
+(vlaaad.reveal.action/def ::open-web-page [v]
+  (when (or (instance? URI v)
+            (instance? URL v)
+            (and (string? v) (re-matches #"^https?://.+" v)))
+    #(as {:fx/type :web-view
+          :url (str v)})))

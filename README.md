@@ -115,15 +115,13 @@ alive.
   - an alternative can be searching one item at a time synchronously. might have bad 
     performance.
 - contextual eval:
-  - alt+up/down for history
+  - alt+up/down for history (persist history? per what?)
   - auto-insert closing brackets
   - pick some useful ns to eval in
 - more representations of objects:
   - as arbitrary JavaFx/cljfx nodes
-  - url: as content, maybe even as a web page
   - directory: as file tree
   - file: as content
-  - coll of maps, coll of same-length vectors: as table
   - graph-like data: as plots. see:
     - https://github.com/thi-ng/geom/blob/master/geom-viz/src/core.org
     - https://github.com/metasoarous/oz
@@ -142,11 +140,9 @@ alive.
     - namespaced kw -> spec
     - fn -> var (note the suffix: assoc is `clojure.core/assoc--5416`)
   - sourceable things: as source code
-- better accordion headers (limit in length, think about the contents of the headers)
 - fork out/err in repl/nrepl as well:
   - for full experience we should fork `System/out` and `System/err`, and re-bind roots of `*out*` and `*err*` — is it 
     a good idea?
-- investigate using executors instead of threads for streaming
 - multiple accordions
 - structural navigation
 - improve datafy/nav support (on sets, for example)

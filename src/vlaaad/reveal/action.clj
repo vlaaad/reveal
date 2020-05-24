@@ -141,6 +141,7 @@
     (constantly m)))
 
 (vlaaad.reveal.action/def ::browse [v]
+  ;; todo don't open result panel
   (cond
     (instance? URI v)
     #(deref (future (.browse (Desktop/getDesktop) v)))
