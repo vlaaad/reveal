@@ -35,11 +35,12 @@
                       2 bindings)]
     `(register! ~id (fn ~fn-bindings ~@body))))
 
-(defn collect [value annotation]
+(defn collect [annotated-value]
   (->> @*registry
        (keep (fn [[id check]]
                (try
-                 (when-let [f (check value annotation)]
+                 (when-let [f (check (stream/value annotated-value)
+                                     (stream/annotation annotated-value))]
                    (let [label (name id)]
                      {:id id
                       :label label
@@ -48,7 +49,7 @@
                                 (stream/raw-string "(" {:fill style/util-color})
                                 (stream/raw-string label {:fill style/symbol-color})
                                 stream/separator
-                                (stream/stream value)
+                                (stream/stream annotated-value)
                                 (stream/raw-string ")" {:fill style/util-color})))
                       :invoke f}))
                  (catch Exception _))))

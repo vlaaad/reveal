@@ -38,15 +38,14 @@
   (let [layout (layout/ensure-cursor-visible (:layout this))
         {:keys [lines cursor]} layout
         region (get-in lines cursor)
-        [value annotation :as val+ann] (peek (:values region))
+        values (:values region)
         ^Node target (.getTarget event)]
     (-> this
         (assoc :layout layout)
-        (cond-> val+ann
+        (cond-> (pos? (count values))
                 (assoc :popup {:bounds (.localToScreen target (layout/cursor->canvas-bounds layout))
                                :window (.getWindow (.getScene target))
-                               :value value
-                               :annotation annotation})))))
+                               :value (peek values)})))))
 
 (defn- handle-mouse-pressed [this ^MouseEvent event]
   (cond

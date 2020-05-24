@@ -119,7 +119,6 @@ alive.
   - auto-insert closing brackets
   - pick some useful ns to eval in
 - more representations of objects:
-  - "annotated-value" instead of value+annotation
   - as arbitrary JavaFx/cljfx nodes
   - url: as content, maybe even as a web page
   - directory: as file tree

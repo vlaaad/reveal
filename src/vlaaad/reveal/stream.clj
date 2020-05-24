@@ -17,6 +17,34 @@
 
 (set! *warn-on-reflection* true)
 
+(defprotocol Value
+  (value [this]))
+
+(extend-protocol Value
+  Object
+  (value [x] x)
+  nil
+  (value [x] x))
+
+(defprotocol Annotation
+  :extend-via-metadata true
+  (annotation [this]))
+
+(extend-protocol Annotation
+  Object
+  (annotation [_] nil)
+  nil
+  (annotation [_] nil))
+
+(deftype AnnotatedValue [value annotation]
+  Value
+  (value [_] value)
+  Annotation
+  (annotation [_] annotation))
+
+(defn annotate [val ann]
+  (AnnotatedValue. (value val) (into (or (annotation val) {}) ann)))
+
 ;; region emitter ops
 
 (defn- =>
@@ -44,8 +72,8 @@
   (fn [rf acc]
     (rf acc op)))
 
-(defn- with-value [x ann sf]
-  (=> (op {:op ::push-value :value [x ann]})
+(defn- with-value [sf x]
+  (=> (op {:op ::push-value :value x})
       sf
       (op {:op ::pop-value})))
 
@@ -64,39 +92,29 @@
 
 ;; endregion
 
-(defn- stream-dispatch [x]
-  (or (::type (meta x))
-      (class x)))
+(defmulti emit (fn emit-dispatch [x]
+                 (or (::type (meta x))
+                     (class x))))
 
-(defmulti emit stream-dispatch)
-
-(defmulti annotate (fn [x ann sf]
-                     (stream-dispatch x)))
-
-(defmethod annotate :default [x ann sf]
-  (with-value x ann sf))
-
-(defmethod emit ::hidden [x] x)
-
-(defmethod annotate ::hidden [_ _ sf]
-  sf)
+(defmethod emit ::sf [sf] sf)
 
 (defn stream
   "Streams value using default emitting"
-  ([x]
-   (stream x nil))
-  ([x ann]
-   (annotate x ann (emit x))))
+  [x]
+  (cond-> (emit (value x))
+          (not (::hidden (annotation x)))
+          (with-value x)))
 
-(defn just [sf]
-  (with-meta sf {::type ::hidden}))
+(defn just
+  "Streams sf"
+  [sf]
+  (with-meta sf {::type ::sf
+                 `annotation (constantly {::hidden true})}))
 
 (defn as
   "Streams value using custom sf"
-  ([x sf]
-   (as x nil sf))
-  ([x ann sf]
-   (just (with-value x (assoc ann ::hidden true) sf))))
+  [x sf]
+  (just (with-value sf (annotate x {::hidden true}))))
 
 (defn- flush-builder [^StringBuilder builder style]
   (fn [rf acc]
@@ -215,9 +233,11 @@
         (map (fn [e]
                (let [k (key e)
                      v (val e)]
-                 (horizontal (stream k {:vlaaad.reveal.nav/val v :vlaaad.reveal.nav/coll m})
+                 (horizontal (stream (annotate k {:vlaaad.reveal.nav/val v
+                                                  :vlaaad.reveal.nav/coll m}))
                              separator
-                             (stream v {:vlaaad.reveal.nav/key k :vlaaad.reveal.nav/coll m})))))
+                             (stream (annotate v {:vlaaad.reveal.nav/key k
+                                                  :vlaaad.reveal.nav/coll m}))))))
         (interpose separator))
       m)))
 
@@ -227,12 +247,12 @@
       (if (set? coll)
         (map
           (fn [x]
-            (stream x {:vlaaad.reveal.nav/key x
-                       :vlaaad.reveal.nav/coll coll})))
+            (stream (annotate x {:vlaaad.reveal.nav/key x
+                                 :vlaaad.reveal.nav/coll coll}))))
         (map-indexed
           (fn [i x]
-            (stream x {:vlaaad.reveal.nav/key i
-                       :vlaaad.reveal.nav/coll coll}))))
+            (stream (annotate x {:vlaaad.reveal.nav/key i
+                                 :vlaaad.reveal.nav/coll coll})))))
       (interpose separator))
     coll))
 

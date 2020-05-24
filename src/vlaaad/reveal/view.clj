@@ -240,7 +240,7 @@
                          {:header i :cell #(nth % i)})
 
                        :else
-                       [{:header 'value :cell identity}])
+                       [{:header 'item :cell identity}])
                      (map (fn [{:keys [cell header]}]
                             {:fx/type :table-column
                              :style-class "reveal-table-column"
