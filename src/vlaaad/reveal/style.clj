@@ -52,6 +52,7 @@
           {" .arrow" {:-fx-background-color util-color
                       :-fx-padding [3 4 3 4]
                       :-fx-shape "\"M 0 0 h 7 l -3.5 4 z\""}
+           " .filler" {:-fx-background-color unfocused-background-color}
            :-fx-table-cell-border-color unfocused-selection-color
            "-column" {:-fx-padding 0
                       :-fx-background-color unfocused-background-color
