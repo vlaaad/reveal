@@ -303,10 +303,12 @@
              text-length (count text)
              new-length (- length text-length)]
          (cond
-           (zero? text-length)
+           (or (zero? text-length) (neg? length))
            acc
 
-           (neg? new-length)
+           (and
+             (neg? new-length)
+             (not (neg? length)))
            (reduced
              {:children (-> (if (pos? length)
                               (conj children
@@ -323,6 +325,62 @@
             :length new-length}))))
     {:length max-length
      :children []}
+    value))
+
+(defn str-summary
+  ([value]
+   (str-summary 48 value))
+  ([max-length value]
+   (oneduce
+     (comp
+       emit-xf
+       (keep #(case (:op %)
+                ::string (:text %)
+                ::separator " "
+                nil)))
+     (fn
+       ([{:keys [^StringBuilder builder]}]
+        (.toString builder))
+       ([{:keys [length ^StringBuilder builder] :as acc} ^String text]
+        (let [text-length (count text)
+              new-length (- length text-length)]
+          (cond
+            (or (zero? text-length) (neg? length))
+            acc
+
+            (and
+              (neg? new-length)
+              (not (neg? length)))
+            (reduced
+              {:builder (doto builder
+                          (as-> $
+                                (if (pos? length)
+                                  (.append $ (subs text 0 (dec length)))
+                                  (.delete $ (dec max-length) max-length)))
+                          (.append "…"))
+               :length new-length})
+
+            :else
+            {:builder (doto builder (.append text))
+             :length new-length}))))
+     {:length max-length
+      :builder (StringBuilder.)}
+     value)))
+
+(defn ->str [value]
+  (oneduce
+    (comp
+      emit-xf
+      (keep #(case (:op %)
+               ::string (:text %)
+               ::separator " "
+               nil)))
+    (fn
+      ([^StringBuilder builder]
+       (.toString builder))
+      ([^StringBuilder builder ^String text]
+       (doto builder (.append text))))
+    (StringBuilder.)
     value))
 
 (defn- blank-segment [n]

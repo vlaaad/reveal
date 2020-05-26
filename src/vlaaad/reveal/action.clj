@@ -72,7 +72,7 @@
           (not= key ::not-found) #(p/nav coll key x)
           (not= val ::not-found) #(p/nav coll x val))))))
 
-(vlaaad.reveal.action/def ::show-value [x ann]
+(vlaaad.reveal.action/def ::view:value [x ann]
   (when (::stream/hidden ann)
     (constantly x)))
 

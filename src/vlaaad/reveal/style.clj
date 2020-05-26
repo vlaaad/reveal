@@ -61,6 +61,21 @@
                     :-fx-padding 0
                     ":selected" {:-fx-background-color unfocused-selection-color}}
            ":focused .reveal-table-cell:selected" {:-fx-background-color selection-color}}
+        "-chart"
+          {:-fx-focus-traversable true
+           :-fx-padding 2
+           ":focused" {:-fx-border-color selection-color
+                       :-fx-border-width [0 0 2 0]
+                       :-fx-padding [2 2 0 2]}
+           " .chart-pie-label" {:-fx-fill symbol-color
+                                :-fx-font-family font-family}
+           " .axis" {:AXIS_COLOR unfocused-selection-color
+                     :-fx-tick-label-fill util-color}
+           " .chart-vertical-grid-lines" {:-fx-stroke unfocused-selection-color}
+           " .chart-horizontal-grid-lines" {:-fx-stroke unfocused-selection-color}
+           " .chart-plot-background" {:-fx-background-color unfocused-background-color}
+           " .chart-content" {:-fx-padding 8}
+           " .chart-legend" {:-fx-background-color unfocused-background-color}}
         "-view" {"-header" {:-fx-background-color popup-color
                             "-tab" {"-focused" {:-fx-background-color background-color}}
                             "-separator" {:-fx-min-width 1

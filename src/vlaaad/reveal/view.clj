@@ -6,13 +6,17 @@
             [vlaaad.reveal.action :as action]
             [vlaaad.reveal.style :as style]
             [vlaaad.reveal.fx :as rfx]
-            [cljfx.api :as fx])
+            [cljfx.api :as fx]
+            [cljfx.prop :as fx.prop]
+            [cljfx.mutator :as fx.mutator]
+            [cljfx.lifecycle :as fx.lifecycle])
   (:import [clojure.lang IRef]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
            [javafx.scene.control TableView TablePosition]
            [javafx.scene Node]
            [javafx.css PseudoClass]
-           [java.net URL URI]))
+           [java.net URL URI]
+           [javafx.event Event]))
 
 (defn- runduce!
   ([xf x]
@@ -212,14 +216,15 @@
   (.selectFirst (.getSelectionModel view))
   (.setCellSelectionEnabled (.getSelectionModel view) true))
 
-(defn- select-bounds-and-value! [^TableView view]
-  (when-let [^TablePosition pos (first (.getSelectedCells (.getSelectionModel view)))]
-    (when-let [cell (->> (.lookupAll view ".reveal-table-cell:selected")
-                         (some #(when (contains? (.getPseudoClassStates ^Node %)
-                                                 (PseudoClass/getPseudoClass "selected"))
-                                  %)))]
-      {:bounds (.localToScreen cell (.getBoundsInLocal cell))
-       :value (.getCellData (.getTableColumn pos) (.getRow pos))})))
+(defn- select-bounds-and-value! [^Event event]
+  (let [^TableView view (.getSource event)]
+    (when-let [^TablePosition pos (first (.getSelectedCells (.getSelectionModel view)))]
+      (when-let [cell (->> (.lookupAll view ".reveal-table-cell:selected")
+                           (some #(when (contains? (.getPseudoClassStates ^Node %)
+                                                   (PseudoClass/getPseudoClass "selected"))
+                                    %)))]
+        {:bounds (.localToScreen cell (.getBoundsInLocal cell))
+         :value (.getCellData (.getTableColumn pos) (.getRow pos))}))))
 
 (defn table [{:keys [seqable]}]
   (let [xs (seq seqable)
@@ -272,3 +277,189 @@
             (and (string? v) (re-matches #"^https?://.+" v)))
     #(as {:fx/type :web-view
           :url (str v)})))
+
+(defn- request-source-focus! [^Event e]
+  (.requestFocus ^Node (.getSource e)))
+
+(defn- tagged->values [tagged]
+  (cond-> tagged (map? tagged) vals))
+
+(defn- tagged->tag+values [tagged]
+  (if (map? tagged)
+    tagged
+    (map-indexed vector tagged)))
+
+(defn- tagged?
+  "Check if every value in a coll of specified size has uniquely identifying tag"
+  [x pred & {:keys [min max]
+             :or {min 1 max 8}}]
+  (and (or (map? x)
+           (sequential? x))
+       (<= min (bounded-count (inc max) x) max)
+       (every? pred (tagged->values x))))
+
+(action/def ::view:pie-chart [x]
+  (when (tagged? x number? :min 2 :max 32)
+    #(as {:fx/type :pie-chart
+          :style-class "reveal-chart"
+          :on-mouse-pressed request-source-focus!
+          :animated false
+          :data (for [[k v] (tagged->tag+values x)]
+                  {:fx/type :pie-chart-data
+                   :name (stream/str-summary k)
+                   :pie-value v})})))
+
+(def ^:private ext-with-value-on-node
+  (fx/make-ext-with-props
+    {::value (fx.prop/make
+               (fx.mutator/setter (fn [^Node node value]
+                                    (if (some? value)
+                                      (.put (.getProperties node) ::value value)
+                                      (.remove (.getProperties node) ::value))))
+               fx.lifecycle/scalar)}))
+
+(defn- select-chart-node! [^Event event]
+  (let [^Node node (.getTarget event)]
+    (when-let [value (::value (.getProperties node))]
+      {:value value
+       :bounds (.localToScreen node (.getBoundsInLocal node))})))
+
+(defn- numbered? [x]
+  (or (number? x)
+      (and (sequential? x)
+           (number? (first x)))))
+
+(defn- numbered->number [numbered]
+  (cond-> numbered (not (number? numbered)) first))
+
+(defn- bar-chart [{:keys [data]}]
+  {:fx/type popup/ext
+   :select select-chart-node!
+   :desc {:fx/type :bar-chart
+          :style-class "reveal-chart"
+          :on-mouse-pressed request-source-focus!
+          :animated false
+          :x-axis {:fx/type :category-axis :label "key"}
+          :y-axis {:fx/type :number-axis :label "value"}
+          :data (for [[series v] (tagged->tag+values data)]
+                  {:fx/type :xy-chart-series
+                   :name (stream/str-summary series)
+                   :data (for [[key value] (tagged->tag+values v)]
+                           {:fx/type :xy-chart-data
+                            :x-value (stream/->str key)
+                            :y-value (numbered->number value)
+                            :node {:fx/type ext-with-value-on-node
+                                   :props {::value {:value value
+                                                    :key key
+                                                    :series series}}
+                                   :desc {:fx/type :region}}})})}})
+
+(action/def ::view:bar-chart [x]
+  (when-let [data (cond
+                    (tagged? x numbered?)
+                    {x x}
+
+                    (tagged? x #(tagged? % numbered?))
+                    x)]
+    #(as {:fx/type bar-chart
+          :data data})))
+
+(defn- numbereds? [x]
+  (and (sequential? x)
+       (<= 2 (bounded-count 1025 x) 1024)
+       (every? numbered? x)))
+
+(defn line-chart [{:keys [data]}]
+  {:fx/type popup/ext
+   :select select-chart-node!
+   :desc {:fx/type :line-chart
+          :style-class "reveal-chart"
+          :on-mouse-pressed request-source-focus!
+          :animated false
+          :x-axis {:fx/type :number-axis
+                   :label "index"
+                   :auto-ranging false
+                   :lower-bound 0
+                   :upper-bound (dec (transduce
+                                       (comp (map second) (map count))
+                                       max
+                                       0
+                                       (tagged->tag+values data)))
+                   :tick-unit 10
+                   :minor-tick-count 10}
+          :y-axis {:fx/type :number-axis :label "value"}
+          :data (for [[series numbers] (tagged->tag+values data)]
+                  {:fx/type :xy-chart-series
+                   :name (stream/str-summary series)
+                   :data (->> numbers
+                              (map-indexed
+                                (fn [index value]
+                                  {:fx/type :xy-chart-data
+                                   :x-value index
+                                   :y-value (numbered->number value)
+                                   :node {:fx/type ext-with-value-on-node
+                                          :props {::value {:value value
+                                                           :index index
+                                                           :series series}}
+                                          :desc {:fx/type :region}}})))})}})
+
+(action/def ::view:line-chart [x]
+  (when-let [data (cond
+                    (numbereds? x)
+                    {x x}
+
+                    (tagged? x numbereds?)
+                    x)]
+    #(as {:fx/type line-chart :data data})))
+
+(defn- coordinate? [x]
+  (and (sequential? x)
+       (= 2 (bounded-count 3 x))
+       (number? (nth x 0))
+       (number? (nth x 1))))
+
+(defn- scattered? [x]
+  (or (coordinate? x)
+      (and (sequential? x)
+           (coordinate? (first x)))))
+
+(defn- scattered->coordinate [x]
+  (let [f (first x)]
+    (if (sequential? f) f x)))
+
+(defn- scattereds? [x]
+  (and (coll? x)
+       (<= 1 (bounded-count 1025 x) 1024)
+       (every? scattered? x)))
+
+(defn scatter-chart [{:keys [data]}]
+  {:fx/type popup/ext
+   :select select-chart-node!
+   :desc {:fx/type :scatter-chart
+          :style-class "reveal-chart"
+          :on-mouse-pressed request-source-focus!
+          :animated false
+          :x-axis {:fx/type :number-axis :label "x"}
+          :y-axis {:fx/type :number-axis :label "y"}
+          :data (for [[series places] (tagged->tag+values data)]
+                  {:fx/type :xy-chart-series
+                   :name (stream/str-summary series)
+                   :data (for [value places
+                               :let [[x y :as с] (scattered->coordinate value)]]
+                           {:fx/type :xy-chart-data
+                            :x-value x
+                            :y-value y
+                            :node {:fx/type ext-with-value-on-node
+                                   :props {::value {:value value
+                                                    :coordinate с
+                                                    :series series}}
+                                   :desc {:fx/type :region}}})})}})
+
+(action/def ::view:scatter-chart [x]
+  (when-let [data (cond
+                    (tagged? x scattereds?)
+                    x
+
+                    (scattereds? x)
+                    {x x})]
+    #(as {:fx/type scatter-chart :data data})))

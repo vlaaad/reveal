@@ -351,10 +351,9 @@
             (and (instance? KeyEvent event)
                  (= KeyCode/SPACE (.getCode ^KeyEvent event))
                  (= KeyEvent/KEY_PRESSED (.getEventType event))))
-
     (let [node ^Node (.getSource event)]
       (if select
-        (when-let [{:keys [bounds value]} (select node)]
+        (when-let [{:keys [bounds value]} (select event)]
           (.consume event)
           (swap! *state update id assoc
                  :value value
