@@ -50,18 +50,21 @@
         "-summary" {:-fx-font-family font-family
                     :-fx-font-size font-size}
         "-table"
-          {" .arrow" {:-fx-background-color util-color
+          {:-fx-table-cell-border-color unfocused-selection-color
+           :-fx-border-width [0 0 2 0]
+           :-fx-border-color :transparent
+           " .arrow" {:-fx-background-color util-color
                       :-fx-padding [3 4 3 4]
                       :-fx-shape "\"M 0 0 h 7 l -3.5 4 z\""}
            " .filler" {:-fx-background-color unfocused-background-color}
-           :-fx-table-cell-border-color unfocused-selection-color
            "-column" {:-fx-padding 0
                       :-fx-background-color unfocused-background-color
                       :-fx-border-color [:transparent unfocused-selection-color :transparent :transparent]}
            "-cell" {:-fx-border-color [:transparent unfocused-selection-color :transparent :transparent]
                     :-fx-padding 0
                     ":selected" {:-fx-background-color unfocused-selection-color}}
-           ":focused .reveal-table-cell:selected" {:-fx-background-color selection-color}}
+           ":focused" {:-fx-border-color selection-color
+                       " .reveal-table-cell:selected" {:-fx-background-color selection-color}}}
         "-chart"
           {:-fx-focus-traversable true
            :-fx-padding 2

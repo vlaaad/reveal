@@ -226,6 +226,8 @@
         {:bounds (.localToScreen cell (.getBoundsInLocal cell))
          :value (.getCellData (.getTableColumn pos) (.getRow pos))}))))
 
+;; todo table view does not like repeated items, should use indices!
+
 (defn table [{:keys [seqable]}]
   (let [xs (seq seqable)
         head (first xs)

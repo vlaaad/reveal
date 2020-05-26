@@ -356,7 +356,7 @@
                           (as-> $
                                 (if (pos? length)
                                   (.append $ (subs text 0 (dec length)))
-                                  (.delete $ (dec max-length) max-length)))
+                                  (.delete $ ^int (dec max-length) ^int max-length)))
                           (.append "…"))
                :length new-length})
 

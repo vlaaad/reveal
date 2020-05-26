@@ -251,6 +251,10 @@
                 gesture
                 focused]} layout]
     (.clearRect ctx 0 0 canvas-width canvas-height)
+    (when focused
+      (doto ctx
+        (.setFill (fx.coerce/color style/selection-color))
+        (.fillRect 0 (- canvas-height 2) canvas-width 2)))
     (when (and cursor anchor)
       (let [from (-> anchor
                      (cursor/min cursor)
