@@ -71,20 +71,20 @@ with 0 arguments to close the window and dispose it.
 #### As a repl in a shell
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea17"}}}' -m vlaaad.reveal.repl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea18"}}}' -m vlaaad.reveal.repl
 ```
 
 #### As a repl in a shell with prepl backend
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea17"}}}' -m vlaaad.reveal.prepl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea18"}}}' -m vlaaad.reveal.prepl
 ```
 
 #### As a nrepl middleware in a shell
 
 ```sh
 clj \
--Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea17"} nrepl {:mvn/version "0.6.0"}}}' \
+-Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea18"} nrepl {:mvn/version "0.6.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
 
