@@ -14,6 +14,7 @@
 (def background-color "#232325")
 (def font-family (str \" (.getFamily font/font) \"))
 (def font-size (.getSize font/font))
+(def smaller-font-size (int (* font-size 0.85)))
 (def string-color "#22aeaa")
 (def error-color "#f15856")
 (def scalar-color "#649fe9")
@@ -68,9 +69,13 @@
                        :-fx-border-width [0 0 2 0]
                        :-fx-padding [2 2 0 2]}
            " .chart-pie-label" {:-fx-fill symbol-color
-                                :-fx-font-family font-family}
+                                :-fx-font-family font-family
+                                :-fx-font-size smaller-font-size}
            " .axis" {:AXIS_COLOR unfocused-selection-color
-                     :-fx-tick-label-fill util-color}
+                     :-fx-tick-label-fill util-color
+                     "> Text" {:-fx-fill symbol-color
+                               :-fx-font-family font-family
+                               :-fx-font-size smaller-font-size}}
            " .chart-vertical-grid-lines" {:-fx-stroke unfocused-selection-color}
            " .chart-horizontal-grid-lines" {:-fx-stroke unfocused-selection-color}
            " .chart-plot-background" {:-fx-background-color unfocused-background-color}
