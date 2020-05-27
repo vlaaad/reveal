@@ -137,6 +137,7 @@ alive.
 - remember window position and size
 - popup might appear in weird locations
 - adjust scroll on opening results window
+- don't scroll to bottom by default in (some?) output panels
 - very long lines have poor performance
 - `vlaaad.reveal/-main`
 - sometimes popup does not disappear
