@@ -5,6 +5,7 @@
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.action :as action]
             [vlaaad.reveal.style :as style]
+            vlaaad.reveal.doc
             [vlaaad.reveal.fx :as rfx]
             [cljfx.api :as fx]
             [cljfx.prop :as fx.prop]

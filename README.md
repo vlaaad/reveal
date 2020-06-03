@@ -100,7 +100,7 @@ It will open a window that will receive all `tap>`-ed values while the JVM proce
 alive.
 
 ## To do
- 
+- structural navigation
 - text search (triggered either just by typing or with a shortcut)
   - do I need to scroll back if I want to cancel the search? yes, accidental searches should 
     be reversible!
@@ -118,22 +118,11 @@ alive.
   - alt+up/down for history (persist history? per what?)
   - auto-insert closing brackets
   - pick some useful ns to eval in
-- more representations of objects:
-  - tree-table-view?
-  - documentable things (fns, vars, keywords): as formatted documentation
-    - ns
-    - var
-    - namespaced sym -> var + spec
-    - simple sym -> ns
-    - namespaced kw -> spec
-    - fn -> var (note the suffix: assoc is `clojure.core/assoc--5416`)
-  - sourceable things: as source code
 - fork out/err in repl/nrepl as well:
   - for full experience we should fork `System/out` and `System/err`, and re-bind roots of `*out*` and `*err*` — is it 
     a good idea?
 - multiple accordions
-- structural navigation
-- improve datafy/nav support (on sets, for example)
+- improve datafy/nav support
 - remember window position and size
 - popup might appear in weird locations
 - adjust scroll on opening results window
