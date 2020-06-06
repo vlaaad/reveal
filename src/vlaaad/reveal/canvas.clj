@@ -3,8 +3,7 @@
             [cljfx.fx.canvas :as fx.canvas]
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle])
-  (:import [javafx.scene.canvas Canvas]
-           [javafx.stage Popup]))
+  (:import [javafx.scene.canvas Canvas]))
 
 (set! *warn-on-reflection* true)
 

@@ -114,6 +114,9 @@ alive.
     too. output might be cleared for watcher views
   - an alternative can be searching one item at a time synchronously. might have bad 
     performance.
+  - text-field or custom view? custom view requires more effort for text input, text field
+    requires more effort for focus management
+  - search is a part of output panel, not layout!
 - contextual eval:
   - alt+up/down for history (persist history? per what?)
   - auto-insert closing brackets

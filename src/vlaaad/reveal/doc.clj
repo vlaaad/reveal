@@ -259,9 +259,10 @@
       (let [text (StringBuilder.)
             pushback-reader (proxy [PushbackReader] [reader]
                               (read []
-                                (let [i (proxy-super read)]
-                                  (.append text (char i))
-                                  i)))
+                                (let [^PushbackReader this this]
+                                  (let [i (proxy-super read)]
+                                    (.append text (char i))
+                                    i))))
             read-opts (if (str/ends-with? filepath "cljc") {:read-cond :allow} {})
             form (if (= :unknown *read-eval*)
                    (throw (IllegalStateException. "Unable to read source while *read-eval* is :unknown."))
