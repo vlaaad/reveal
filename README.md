@@ -105,7 +105,7 @@ alive.
   - do I need to scroll back if I want to cancel the search? yes, accidental searches should 
     be reversible!
   - jumps to first match when it's found
-  - direction of search? from the cursor (or top of the screen if no cursor) in both 
+  - direction of search? from the cursor (or top of the screen if no cursor) in both
     directions
   - enter/down/right to next occurrence, shift+enter/up/left to prev occurrence, esc to 
     abort search
@@ -125,8 +125,6 @@ alive.
 - improve datafy/nav support
 - remember window position and size
 - popup might appear in weird locations
-- adjust scroll on opening results window
-- don't scroll to bottom by default in (some?) output panels
 - very long lines have poor performance
 - `vlaaad.reveal/-main`
 - sometimes popup does not disappear

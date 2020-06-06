@@ -62,7 +62,7 @@
   (make [this] "Returns cljfx description for the viewable"))
 
 (defn- process-value [id value handler]
-  (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
+  (handler {::event/type ::create-view-state :id id :state (output-panel/make {:autoscroll false})})
   (let [*running (volatile! true)
         add-lines! #(handler {::event/type ::output-panel/on-add-lines :id id :fx/event %})
         xform (comp stream/stream-xf
@@ -80,7 +80,7 @@
    :desc {:fx/type output-panel/view}})
 
 (defn- watch [id *ref handler]
-  (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
+  (handler {::event/type ::create-view-state :id id :state (output-panel/make {:autoscroll false})})
   (let [*running (volatile! true)
         out-queue (ArrayBlockingQueue. 1024)
         submit! #(.put out-queue ({nil ::nil} % %))

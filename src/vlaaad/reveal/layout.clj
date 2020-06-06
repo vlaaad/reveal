@@ -123,6 +123,8 @@
 
 (s/def ::scrolling-enabled boolean?)
 
+(s/def ::autoscroll boolean?)
+
 (s/def ::layout
   (s/keys :req-un [::canvas-width
                    ::canvas-height
@@ -140,7 +142,8 @@
                    ::cursor
                    ::anchor
                    ::align-char-index
-                   ::gesture]))
+                   ::gesture
+                   ::autoscroll]))
 
 (defn- clamp [n min-n max-n]
   (-> n
@@ -323,12 +326,18 @@
   (make (assoc layout :canvas-width canvas-width)))
 
 (defn set-canvas-height [layout canvas-height]
-  (make (assoc layout :canvas-height canvas-height)))
+  (let [diff (- canvas-height (:canvas-height layout))]
+    (make (-> layout
+              (assoc :canvas-height canvas-height)
+              (cond-> (neg? diff) (update :scroll-y + diff))))))
 
 (defn scrolled-to-bottom? [layout]
   (let [{:keys [scroll-y canvas-height document-height]} layout]
     (or (< document-height canvas-height)
         (= scroll-y (- canvas-height document-height)))))
+
+(defn scrolled-to-top? [layout]
+  (zero? (:scroll-y layout)))
 
 (defn set-cursor
   "Set cursor
@@ -397,8 +406,13 @@
   (make (assoc layout :scroll-x ##-Inf)))
 
 (defn add-lines [layout lines]
-  (let [layout (update layout :lines into lines)]
-    (if (scrolled-to-bottom? layout)
+  (let [layout (update layout :lines into lines)
+        should-scroll (if (:autoscroll layout true)
+                        (scrolled-to-bottom? layout)
+                        (and (scrolled-to-bottom? layout)
+                             (not (scrolled-to-top? layout))))]
+
+    (if should-scroll
       (scroll-to-bottom layout)
       (make layout))))
 

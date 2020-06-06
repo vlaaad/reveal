@@ -196,8 +196,11 @@
             :on-height-changed {::event/type ::on-height-changed :id id}
             :on-scroll {::event/type ::on-scroll :id id}}}))
 
-(defn make []
-  {:layout (layout/make)})
+(defn make
+  ([]
+   (make {}))
+  ([layout]
+   {:layout (layout/make layout)}))
 
 (defmethod event/handle ::on-add-lines [*state {:keys [id fx/event]}]
   (swap! *state #(cond-> % (contains? % id) (update id add-lines event))))
