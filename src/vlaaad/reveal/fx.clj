@@ -13,6 +13,7 @@
     - id from `:id` prop
     - args from `:args` prop
     - event handler
+    If returns a function, it will be called when process is stopped
   - `:desc (required)` that will additionally receive the state"
   (reify fx.lifecycle/Lifecycle
     (create [_ {:keys [desc start args id] :or {id ::undefined}} opts]

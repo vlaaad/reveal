@@ -10,12 +10,6 @@
 
 (deftype Font [^javafx.scene.text.Font font ^double line-height ^double ascent char-width-cache])
 
-(def ^:private ^:const min-cached-char-width
-  -42)
-
-(def ^:private ^:const max-cached-char-width
-  Double/MAX_VALUE)
-
 (defmacro ^:private if-class [class-name then else]
   `(try
      (Class/forName ^String ~class-name)
@@ -39,18 +33,8 @@
   (def ^double ^:const line-height (Math/ceil (.getLineHeight metrics)))
   (def ^double ^:const ascent (.getAscent metrics)))
 
-(let [strike (.getStrike ^PGFont (get-native-font font)
-                         BaseTransform/IDENTITY_TRANSFORM
-                         FontResource/AA_GREYSCALE)
-      cache (double-array (inc (int Character/MAX_VALUE)) Double/MIN_VALUE)]
-  (defn char-width ^double [^Character character]
-    (let [ch (unchecked-char character)
-          i (unchecked-int ch)
-          cached-width (aget cache i)]
-      (if (= cached-width Double/MIN_VALUE)
-        (let [width (.getCharAdvance strike ch)]
-          (when (and (<= min-cached-char-width width)
-                     (<= width max-cached-char-width))
-            (aset cache i width))
-          width)
-        cached-width))))
+(def ^double ^:const char-width
+  (-> font
+      ^PGFont get-native-font
+      (.getStrike BaseTransform/IDENTITY_TRANSFORM FontResource/AA_GREYSCALE)
+      (.getCharAdvance \a)))

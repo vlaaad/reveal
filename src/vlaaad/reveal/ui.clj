@@ -33,7 +33,8 @@
           (swap! *state (fn [state]
                           (update state :focused-view-index #(min (inc %) (dec (count (:view-order state))))))))
 
-        (= KeyCode/ESCAPE code)
+        (and (= KeyCode/ESCAPE code)
+             (not (::consumes-escape (.getProperties ^Node (.getTarget event)))))
         (do
           (.consume event)
           (swap! *state (fn [state]
@@ -50,6 +51,10 @@
                                                    (min index (dec (count new-view-order))))))
                                 (update :views dissoc id))))))))))
 
+(defn- descendant-seq [^Node node]
+  (cons node (when (instance? Parent node)
+               (mapcat descendant-seq (.getChildrenUnmodifiable ^Parent node)))))
+
 (defn focus-when-on-scene! [^Node node]
   (if (some? (.getScene node))
     (.requestFocus node)
@@ -59,7 +64,11 @@
                       (when (some? new-scene)
                         (.removeListener (.sceneProperty node) this)
                         (fx/run-later
-                          (.requestFocus node))))))))
+                          (let [^Node node (or (->> node
+                                                    descendant-seq
+                                                    (some #(when (.isFocusTraversable ^Node %) %)))
+                                               node)]
+                            (.requestFocus node)))))))))
 
 (defn- switch-focus! [^Node from to]
   (when (.isFocused from)

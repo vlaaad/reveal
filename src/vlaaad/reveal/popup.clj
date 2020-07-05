@@ -262,7 +262,7 @@
            (conj
              {:fx/type fx/ext-let-refs
               :refs (into {::text-field {:fx/type :text-field
-                                         :style-class "reveal-popup-text-field"
+                                         :style-class "reveal-text-field"
                                          :text text
                                          :on-focused-changed {::event/type ::on-text-focused
                                                               :id id}

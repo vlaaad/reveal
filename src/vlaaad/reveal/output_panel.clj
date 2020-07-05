@@ -3,11 +3,19 @@
             [vlaaad.reveal.layout :as layout]
             [vlaaad.reveal.popup :as popup]
             [cljfx.api :as fx]
-            [vlaaad.reveal.canvas :as canvas])
+            [cljfx.lifecycle :as fx.lifecycle]
+            [vlaaad.reveal.canvas :as canvas]
+            [vlaaad.reveal.fx :as rfx]
+            [vlaaad.reveal.cursor :as cursor]
+            [vlaaad.reveal.font :as font]
+            [cljfx.coerce :as fx.coerce]
+            [vlaaad.reveal.style :as style])
   (:import [javafx.scene.input ScrollEvent KeyEvent MouseEvent MouseButton KeyCode Clipboard ClipboardContent]
-           [javafx.scene.canvas Canvas]
+           [javafx.scene.canvas Canvas GraphicsContext]
            [javafx.event Event]
-           [javafx.scene Node]))
+           [javafx.scene Node]
+           [javafx.beans.value ChangeListener]
+           [org.apache.commons.lang3 StringUtils]))
 
 (defmethod event/handle ::on-scroll [*state {:keys [id ^ScrollEvent fx/event]}]
   (swap! *state update-in [id :layout] layout/scroll-by (.getDeltaX event) (.getDeltaY event)))
@@ -22,14 +30,24 @@
   (update this :layout layout/add-lines lines))
 
 (defn clear-lines [this]
-  (update this :layout layout/clear-lines))
+  (-> this
+      (update :layout layout/clear-lines)
+      (cond-> (:search this)
+              (update :search assoc
+                      :basis 0
+                      :start 0
+                      :end 0
+                      :highlight nil
+                      :results (sorted-set)))))
 
 (defmethod event/handle ::on-mouse-released [*state {:keys [id]}]
   (swap! *state update-in [id :layout] layout/stop-gesture))
 
+(defn- swap-if-exists! [*state id f & args]
+  (swap! *state #(if (contains? % id) (apply update % id f args) %)))
+
 (defmethod event/handle ::on-focus-changed [*state {:keys [id fx/event]}]
-  (swap! *state #(cond-> %
-                   (contains? % id) (update-in [id :layout] layout/set-focused event))))
+  (swap-if-exists! *state id update :layout layout/set-focused event))
 
 (defmethod event/handle ::on-mouse-dragged [*state {:keys [id fx/event]}]
   (swap! *state update-in [id :layout] layout/perform-drag event))
@@ -46,6 +64,12 @@
                 (assoc :popup {:bounds (.localToScreen target (layout/cursor->canvas-bounds layout))
                                :window (.getWindow (.getScene target))
                                :value (peek values)})))))
+
+(defn- show-search [this]
+  (assoc this :search {:term "" :results (sorted-set)}))
+
+(defn- hide-search [this]
+  (dissoc this :search))
 
 (defn- handle-mouse-pressed [this ^MouseEvent event]
   (cond
@@ -166,6 +190,12 @@
       KeyCode/SPACE
       (cond-> this cursor (show-popup event))
 
+      KeyCode/SLASH
+      (show-search this)
+
+      KeyCode/F
+      (cond-> this (.isShortcutDown event) show-search)
+
       this)))
 
 (defmethod event/handle ::on-key-pressed [*state {:keys [id fx/event]}]
@@ -174,27 +204,250 @@
 (defmethod event/handle ::hide-popup [*state {:keys [id]}]
   (swap! *state update id dissoc :popup))
 
-(defn view [{:keys [layout popup id]}]
+(defn init-text-field-created! [^Node node]
+  (.put (.getProperties node) :vlaaad.reveal.ui/consumes-escape true)
+  (if (some? (.getScene node))
+    (.requestFocus node)
+    (.addListener (.sceneProperty node)
+                  (reify ChangeListener
+                    (changed [this _ _ new-scene]
+                      (when (some? new-scene)
+                        (.removeListener (.sceneProperty node) this)
+                        (fx/run-later
+                          (.requestFocus node))))))))
+
+(defn- result->rect [[[line] char-index] term]
+  {:x (* char-index font/char-width)
+   :y (* line font/line-height)
+   :width (* (count term) font/char-width)
+   :height font/line-height})
+
+(defn- set-highlight [this highlight]
+  (-> this
+      (assoc-in [:search :highlight] highlight)
+      (update :layout layout/ensure-rect-visible
+              (result->rect highlight (-> this :search :term)))))
+
+(defn- select-highlight [this]
+  (let [result (-> this :search :highlight)]
+    (-> this
+      hide-search
+      (cond-> result
+        (update :layout layout/set-cursor (first result))))))
+
+(defn- jump-to-prev-match [{:keys [search] :as this}]
+  (let [highlight (:highlight search)
+        highlight (when highlight
+                    (first (rsubseq (:results search) < highlight)))]
+    (cond-> this highlight (set-highlight highlight))))
+
+(defn- jump-to-next-match [{:keys [search] :as this}]
+  (let [highlight (:highlight search)
+        highlight (when highlight
+                    (first (subseq (:results search) > highlight)))]
+    (cond-> this highlight (set-highlight highlight))))
+
+(defmethod event/handle ::on-search-focus-changed [*state {:keys [id fx/event]}]
+  (when-not event
+    (swap! *state update id hide-search)))
+
+(defn- focus-on-output! [^Event event]
+  (->> ^Node (.getTarget event)
+       ;; fixme: this is a horrible hack
+       .getParent
+       .getParent
+       .getChildrenUnmodifiable
+       ^Node (some #(when (instance? Canvas %) %))
+       .requestFocus))
+
+(defmethod event/handle ::on-search-event-filter [*state {:keys [id fx/event]}]
+  (when (and (instance? KeyEvent event)
+             (= KeyEvent/KEY_PRESSED (.getEventType ^KeyEvent event)))
+    (let [^KeyEvent event event]
+      (swap! *state update id
+             (condp = (.getCode event)
+               KeyCode/ESCAPE (do (focus-on-output! event) (.consume event) hide-search)
+               KeyCode/TAB (do (.consume event) identity)
+               KeyCode/UP (do (.consume event) jump-to-prev-match)
+               KeyCode/DOWN (do (.consume event) jump-to-next-match)
+               KeyCode/ENTER select-highlight
+               identity))
+      (when (= KeyCode/ENTER (.getCode event))
+        (focus-on-output! event)))))
+
+(defmethod event/handle ::on-search-text-changed [*state {:keys [id fx/event]}]
+  (swap! *state assoc-in [id :search :term] event))
+
+;; TODO: text search mvp:
+;; - scan restarts when lines are cleared
+;; - scan resumes once new lines are added
+
+(defn- search-view-impl [{:keys [term id]}]
+  {:fx/type :stack-pane
+   :style-class "reveal-search"
+   :max-width :use-pref-size
+   :max-height :use-pref-size
+   :children [{:fx/type fx/ext-on-instance-lifecycle
+               :on-created init-text-field-created!
+               :desc {:fx/type :text-field
+                      :style-class "reveal-text-field"
+                      :prompt-text "Find..."
+                      :event-filter {::event/type ::on-search-event-filter :id id}
+                      :on-focused-changed {::event/type ::on-search-focus-changed :id id}
+                      :pref-width 200
+                      :text term
+                      :on-text-changed {::event/type ::on-search-text-changed :id id}}}]})
+
+(defn- string-builder
+  ([] (StringBuilder.))
+  ([^StringBuilder ret] (.toString ret))
+  ([^StringBuilder acc in] (.append acc in)))
+
+(defn- index-of-ignore-case [a b start]
+  (let [result (StringUtils/indexOfIgnoreCase a b start)]
+    (if (= result -1) nil result)))
+
+(defn- draw-search [^GraphicsContext ctx
+                    {:keys [dropped-line-count drawn-line-count scroll-x scroll-y-remainder]}
+                    {:keys [results term highlight]}]
+  (let [drawn-results (subseq results
+                              >= [[dropped-line-count 0] 0]
+                              <= [[(+ dropped-line-count drawn-line-count) 0] 0])
+        width (* (count term) font/char-width)]
+    (.setFill ctx (fx.coerce/color style/search-shade-color))
+    (doseq [[[line] char-index :as result] drawn-results
+            :let [x (* char-index font/char-width)
+                  vx (+ scroll-x x)
+                  vy (- (* font/line-height (- line dropped-line-count))
+                        scroll-y-remainder)
+                  highlighted (= highlight result)]]
+      (.setStroke ctx (fx.coerce/color
+                        (if highlighted style/search-color style/search-shade-color)))
+      (.strokeRect ctx vx vy width font/line-height)
+      (when-not highlighted
+        (.fillRect ctx vx vy width font/line-height)))))
+
+(defn- indices-of [str sub]
+  (if (= sub "")
+    nil
+    (->> (index-of-ignore-case str sub 0)
+         (iterate #(index-of-ignore-case str sub (+ % (count sub))))
+         (take-while some?))))
+
+(defn- search-line [{:keys [layout search] :as this} row]
+  (let [{:keys [term highlight]} search
+        line ((:lines layout) row)
+        strs (mapv #(transduce (map :text) string-builder (:segments %)) line)
+        i->col (first (reduce (fn [[m i j] str]
+                                [(assoc m j i) (inc i) (+ j (count str))])
+                              [(sorted-map) 0 0]
+                              strs))
+        line-str (transduce identity string-builder strs)
+        line-results (->> term
+                       (indices-of line-str)
+                       (map #(vector [row (val (first (rsubseq i->col <= %)))] %)))
+        highlight (when-not highlight
+                    (first line-results))]
+    (-> this
+        (update-in [:search :results] into line-results)
+        (cond-> highlight (set-highlight highlight)))))
+
+(defn- search-back [this]
+  (-> this
+      (search-line (dec (:start (:search this))))
+      (update-in [:search :start] dec)))
+
+(defn- search-forward [this]
+  (-> this
+      (search-line (:end (:search this)))
+      (update-in [:search :end] inc)))
+
+(defn- perform-search [{:keys [layout search] :as this}]
+  (if search
+    (cond-> this
+            (< (:end search) (count (:lines layout)))
+            search-forward
+            (pos? (:start search))
+            search-back)
+    this))
+
+(defn- init-search [this pid]
+  (let [cursor (-> this :layout :cursor)
+        basis (if cursor (cursor/row cursor) (+ (-> this :layout :dropped-line-count)
+                                                (-> this
+                                                    :layout
+                                                    :drawn-line-count
+                                                    (/ 2)
+                                                    int)))]
+    (update this :search assoc
+            :pid pid
+            :basis basis
+            :start basis
+            :end basis
+            :highlight nil
+            :results (sorted-set))))
+
+(defn- search! [pid {:keys [id term]} {:keys [*state]}]
+  (swap-if-exists! *state id init-search pid)
+  (when (seq term)
+    (let [*running (atom true)
+          f (event/daemon-future
+              (loop []
+                (let [old-state @*state
+                      {:keys [layout search] :as this} (get old-state id)]
+                  (when (and @*running
+                             (= pid (:pid search))
+                             (or (pos? (:start search))
+                                 (< (:end search) (count (:lines layout)))))
+                    (compare-and-set! *state old-state (assoc old-state id (perform-search this)))
+                    (recur)))))]
+      #(do
+         (reset! *running false)
+         (future-cancel f)))))
+
+(defn- search-view [{:keys [term id]}]
+  {:fx/type fx/ext-let-refs
+   :refs {:search {:fx/type rfx/ext-with-process
+                   :start search!
+                   :args {:id id :term term}
+                   :desc {:fx/type fx.lifecycle/scalar}}}
+   :desc {:fx/type search-view-impl
+          :term term
+          :id id}})
+
+(defn- draw [ctx layout search]
+  (layout/draw ctx layout)
+  (when search
+    (draw-search ctx layout search)))
+
+(defn view [{:keys [layout popup id search]}]
   (let [{:keys [canvas-width canvas-height document-width document-height]} layout]
     {:fx/type fx/ext-let-refs
      :refs (when popup
              {::popup (assoc popup :fx/type popup/view
                                    :on-cancel {::event/type ::hide-popup :id id})})
-     :desc {:fx/type canvas/view
-            :draw [layout/draw layout]
-            :width canvas-width
-            :height canvas-height
-            :pref-width document-width
-            :pref-height document-height
-            :focus-traversable true
-            :on-focused-changed {::event/type ::on-focus-changed :id id}
-            :on-key-pressed {::event/type ::on-key-pressed :id id}
-            :on-mouse-dragged {::event/type ::on-mouse-dragged :id id}
-            :on-mouse-pressed {::event/type ::on-mouse-pressed :id id}
-            :on-mouse-released {::event/type ::on-mouse-released :id id}
-            :on-width-changed {::event/type ::on-width-changed :id id}
-            :on-height-changed {::event/type ::on-height-changed :id id}
-            :on-scroll {::event/type ::on-scroll :id id}}}))
+     :desc {:fx/type :stack-pane
+            :children (cond->
+                        [{:fx/type canvas/view
+                          :draw [draw layout search]
+                          :width canvas-width
+                          :height canvas-height
+                          :pref-width document-width
+                          :pref-height document-height
+                          :focus-traversable true
+                          :on-focused-changed {::event/type ::on-focus-changed :id id}
+                          :on-key-pressed {::event/type ::on-key-pressed :id id}
+                          :on-mouse-dragged {::event/type ::on-mouse-dragged :id id}
+                          :on-mouse-pressed {::event/type ::on-mouse-pressed :id id}
+                          :on-mouse-released {::event/type ::on-mouse-released :id id}
+                          :on-width-changed {::event/type ::on-width-changed :id id}
+                          :on-height-changed {::event/type ::on-height-changed :id id}
+                          :on-scroll {::event/type ::on-scroll :id id}}]
+                        search
+                        (conj (assoc search
+                                :fx/type search-view
+                                :stack-pane/alignment :bottom-right
+                                :id id)))}}))
 
 (defn make
   ([]
@@ -203,7 +456,7 @@
    {:layout (layout/make layout)}))
 
 (defmethod event/handle ::on-add-lines [*state {:keys [id fx/event]}]
-  (swap! *state #(cond-> % (contains? % id) (update id add-lines event))))
+  (swap-if-exists! *state id add-lines event))
 
 (defmethod event/handle ::on-clear-lines [*state {:keys [id]}]
-  (swap! *state #(cond-> % (contains? % id) (update id clear-lines))))
+  (swap-if-exists! *state id clear-lines))

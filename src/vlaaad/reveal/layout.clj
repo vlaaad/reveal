@@ -530,16 +530,22 @@
                 start)]
     (- scroll (- region-start start))))
 
-(defn ensure-cursor-visible [layout]
-  (let [{:keys [lines cursor canvas-width canvas-height]} layout
-        [row col] cursor
-        line (lines row)
-        region-size (region-width (line col))
-        region-start (transduce (map region-width) + (subvec line 0 col))]
+(defn ensure-rect-visible [layout {:keys [x y width height]}]
+  (let [{:keys [canvas-width canvas-height]} layout]
     (-> layout
-        (update :scroll-y adjust-scroll canvas-height (* font/line-height (cursor/row cursor)) font/line-height)
-        (update :scroll-x adjust-scroll canvas-width region-start region-size)
+        (update :scroll-y adjust-scroll canvas-height y height)
+        (update :scroll-x adjust-scroll canvas-width x width)
         make)))
+
+(defn ensure-cursor-visible [layout]
+  (let [{:keys [lines cursor]} layout
+        [row col] cursor
+        line (lines row)]
+    (ensure-rect-visible layout
+                         {:x (transduce (map region-width) + (subvec line 0 col))
+                          :y (* font/line-height (cursor/row cursor))
+                          :width (region-width (line col))
+                          :height font/line-height})))
 
 (defn cursor->canvas-bounds ^Bounds [layout]
   (let [{:keys [lines cursor scroll-x scroll-y]} layout

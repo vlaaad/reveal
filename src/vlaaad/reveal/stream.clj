@@ -385,13 +385,13 @@
 
 (defn- blank-segment [n]
   {:text (apply str (repeat n \space))
-   :width (* n (font/char-width \space))
+   :width (* n font/char-width)
    :style {:selectable false}})
 
 (defn- string-segment [string-op]
   (-> string-op
       (dissoc :op)
-      (assoc :width (transduce (map font/char-width) + (:text string-op)))))
+      (assoc :width (* font/char-width (count (:text string-op))))))
 
 (defn- segment-length [segment]
   (count (:text segment)))

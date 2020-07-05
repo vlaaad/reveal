@@ -10,7 +10,8 @@
 (defn- show-output [ui request message]
   (when-let [code (:code request)]
     (when-not (or (str/starts-with? code "(cursive.repl.runtime/")
-                  (:done (:status message)))
+                  (:done (:status message))
+                  (= 0 (:pprint request)))
       (let [{:keys [out value err nrepl.middleware.caught/throwable]
              :or {out ::not-found
                   value ::not-found

@@ -17,7 +17,8 @@
            [javafx.scene Node]
            [javafx.css PseudoClass]
            [java.net URL URI]
-           [javafx.event Event]))
+           [javafx.event Event]
+           [javafx.scene.paint Color]))
 
 (defn- runduce!
   ([xf x]
@@ -39,15 +40,13 @@
         xform (comp stream/stream-xf
                     (partition-all 128)
                     (take-while (fn [_] @*running)))
-        f (.submit event/daemon-executor
-                   ^Runnable
-                   (fn []
-                     (while @*running
-                       (let [x (.take queue)]
-                         (runduce! xform add-lines! ({::nil nil} x x))))))]
+        f (event/daemon-future
+            (while @*running
+              (let [x (.take queue)]
+                (runduce! xform add-lines! ({::nil nil} x x)))))]
     #(do
        (handler {::event/type ::dispose-state :id id})
-       (.cancel f true)
+       (future-cancel f)
        (vreset! *running false))))
 
 (defn queue [{:keys [^BlockingQueue queue id]
@@ -68,7 +67,8 @@
         xform (comp stream/stream-xf
                     (partition-all 128)
                     (take-while (fn [_] @*running)))]
-    (.submit event/daemon-executor ^Runnable (fn [] (runduce! xform add-lines! value)))
+    (event/daemon-future
+      (runduce! xform add-lines! value))
     #(do
        (vreset! *running false)
        (handler {::event/type ::dispose-state :id id}))))
@@ -85,30 +85,29 @@
         out-queue (ArrayBlockingQueue. 1024)
         submit! #(.put out-queue ({nil ::nil} % %))
         watch-key (gensym "vlaaad.reveal.view/watcher")
-        f (.submit event/daemon-executor ^Runnable
-                   (fn []
-                     (while @*running
-                       (when-some [x (loop [x (.poll out-queue 1 TimeUnit/SECONDS)
-                                            found nil]
-                                       (if (some? x)
-                                         (recur (.poll out-queue) x)
-                                         found))]
-                         (handler {::event/type ::output-panel/on-clear-lines :id id})
-                         (runduce! (comp stream/stream-xf
-                                         (partition-all 128)
-                                         (take-while
-                                           (fn [_] (and @*running
-                                                        (nil? (.peek out-queue))))))
-                                   #(handler {::event/type ::output-panel/on-add-lines
-                                              :fx/event %
-                                              :id id})
-                                   ({::nil nil} x x))))))]
+        f (event/daemon-future
+            (while @*running
+              (when-some [x (loop [x (.poll out-queue 1 TimeUnit/SECONDS)
+                                   found nil]
+                              (if (some? x)
+                                (recur (.poll out-queue) x)
+                                found))]
+                (handler {::event/type ::output-panel/on-clear-lines :id id})
+                (runduce! (comp stream/stream-xf
+                                (partition-all 128)
+                                (take-while
+                                  (fn [_] (and @*running
+                                               (nil? (.peek out-queue))))))
+                          #(handler {::event/type ::output-panel/on-add-lines
+                                     :fx/event %
+                                     :id id})
+                          ({::nil nil} x x)))))]
     (submit! @*ref)
     (add-watch *ref watch-key #(submit! %4))
     #(do
        (remove-watch *ref watch-key)
        (vreset! *running false)
-       (.cancel f true)
+       (future-cancel f)
        (handler {::event/type ::dispose-state :id id}))))
 
 (defn ref-watcher [{:keys [ref]}]
@@ -131,29 +130,28 @@
         submit! #(.put out-queue ({nil ::nil} % %))
         watch-key (gensym "vlaaad.reveal.view/watcher")
         *counter (volatile! -1)
-        f (.submit event/daemon-executor ^Runnable
-                   (fn []
-                     (while @*running
-                       (let [x (.take out-queue)]
-                         (runduce!
-                           (comp stream/stream-xf
-                                 (partition-all 128)
-                                 (take-while
-                                   (fn [_] @*running)))
-                           #(handler {::event/type ::output-panel/on-add-lines
-                                      :fx/event %
-                                      :id id})
-                           (stream/just
-                             (stream/horizontal
-                               (stream/raw-string (format "%4d: " (vswap! *counter inc))
-                                                  {:fill style/util-color})
-                               (stream/stream ({::nil nil} x x)))))))))]
+        f (event/daemon-future
+            (while @*running
+              (let [x (.take out-queue)]
+                (runduce!
+                  (comp stream/stream-xf
+                        (partition-all 128)
+                        (take-while
+                          (fn [_] @*running)))
+                  #(handler {::event/type ::output-panel/on-add-lines
+                             :fx/event %
+                             :id id})
+                  (stream/just
+                    (stream/horizontal
+                      (stream/raw-string (format "%4d: " (vswap! *counter inc))
+                                         {:fill style/util-color})
+                      (stream/stream ({::nil nil} x x))))))))]
     (submit! @*ref)
     (add-watch *ref watch-key #(submit! %4))
     #(do
        (remove-watch *ref watch-key)
        (vreset! *running false)
-       (.cancel f true)
+       (future-cancel f)
        (handler {::event/type ::dispose-state :id id}))))
 
 (defn ref-logger [{:keys [ref]}]
@@ -168,18 +166,17 @@
 
 (defn- deref-process [id blocking-deref handler]
   (handler {::event/type ::create-view-state :id id :state {:state ::waiting}})
-  (let [f (.submit event/daemon-executor ^Runnable
-                   (fn []
-                     (try
-                       (handler {::event/type ::create-view-state
-                                 :id id
-                                 :state {:state ::value :value @blocking-deref}})
-                       (catch Throwable e
-                         (handler {::event/type ::create-view-state
-                                   :id id
-                                   :state {:state ::exception :exception e}})))))]
+  (let [f (event/daemon-future
+            (try
+              (handler {::event/type ::create-view-state
+                        :id id
+                        :state {:state ::value :value @blocking-deref}})
+              (catch Throwable e
+                (handler {::event/type ::create-view-state
+                          :id id
+                          :state {:state ::exception :exception e}}))))]
     #(do
-       (.cancel f true)
+       (future-cancel f)
        (handler {::event/type ::dispose-state :id id}))))
 
 (defn- blocking-deref-view [{:keys [state] :as props}]
@@ -469,3 +466,11 @@
                     (scattereds? x)
                     {x x})]
     #(as {:fx/type scatter-chart :data data})))
+
+(vlaaad.reveal.action/def ::view:color [v]
+  (when-let [color (cond
+                     (instance? Color v) v
+                     (string? v) (Color/valueOf v)
+                     (keyword? v) (Color/valueOf (name v)))]
+    #(as {:fx/type :region
+          :background {:fills [{:fill color}]}})))

@@ -10,6 +10,12 @@
                       (.setDaemon true))))]
     (Executors/newCachedThreadPool factory)))
 
+(defn daemon-future-call [f]
+  (.submit daemon-executor ^Callable (bound-fn* f)))
+
+(defmacro daemon-future [& body]
+  `(daemon-future-call (^{:once true} fn* [] ~@body)))
+
 (defmulti handle "[*state event]" (fn [*state e] (::type e)))
 
 (defmethod handle :default [_ e]

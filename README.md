@@ -101,22 +101,9 @@ alive.
 
 ## To do
 - structural navigation
-- text search (triggered either just by typing or with a shortcut)
-  - do I need to scroll back if I want to cancel the search? yes, accidental searches should 
-    be reversible!
-  - jumps to first match when it's found
-  - direction of search? from the cursor (or top of the screen if no cursor) in both
-    directions
-  - enter/down/right to next occurrence, shift+enter/up/left to prev occurrence, esc to 
-    abort search
-  - starts a process that scans lines in both direction
-  - what about changes to output view? new lines can be added: they need to be searched 
-    too. output might be cleared for watcher views
-  - an alternative can be searching one item at a time synchronously. might have bad 
-    performance.
-  - text-field or custom view? custom view requires more effort for text input, text field
-    requires more effort for focus management
-  - search is a part of output panel, not layout!
+- text search (triggered either just by typing or with a shortcut):
+  - should be reversible: escape scrolls to the place of search start if there is
+    a highlight
 - contextual eval:
   - alt+up/down for history (persist history? per what?)
   - auto-insert closing brackets
@@ -128,6 +115,6 @@ alive.
 - improve datafy/nav support
 - remember window position and size
 - popup might appear in weird locations
-- very long lines have poor performance
+- *very* long lines have poor performance
 - `vlaaad.reveal/-main`
 - sometimes popup does not disappear

@@ -1,6 +1,7 @@
 {:deps {org.clojure/clojure {:mvn/version "1.10.1"}
         cljfx {:mvn/version "1.7.3"}
         cljfx/css {:mvn/version "1.1.0"}
+        org.apache.commons/commons-lang3 {:mvn/version "3.10"}
         com.vladsch.flexmark/flexmark {:mvn/version "0.62.0"}
         com.vladsch.flexmark/flexmark-ext-wikilink {:mvn/version "0.62.0"}
         com.vladsch.flexmark/flexmark-ext-autolink {:mvn/version "0.62.0"}}

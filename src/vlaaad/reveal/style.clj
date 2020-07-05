@@ -19,6 +19,8 @@
 (def error-color "#f15856")
 (def scalar-color "#649fe9")
 (def keyword-color "#a55cfc")
+(def search-color "#aec1d0")
+(def search-shade-color (str search-color "55"))
 
 (def style
   (css/register ::main
@@ -36,17 +38,19 @@
                            :-fx-font-size font-size
                            ":hover" {:-fx-text-fill symbol-color}
                            "-selected" {:-fx-background-color selection-color
-                                        :-fx-text-fill symbol-color}}
-                  "-text-field" {:-fx-font-family font-family
-                                 :-fx-text-fill symbol-color
-                                 :-fx-font-size font-size
-                                 :-fx-background-color background-color
-                                 :-fx-highlight-fill selection-color
-                                 :-fx-highlight-text-fill symbol-color
-                                 :-fx-padding [7 7]
-                                 ":focused" {:-fx-border-color selection-color
-                                             :-fx-border-width [0 0 2 0]
-                                             :-fx-padding [7 7 5 7]}}}
+                                        :-fx-text-fill symbol-color}}}
+        "-text-field" {:-fx-font-family font-family
+                       :-fx-text-fill symbol-color
+                       :-fx-font-size font-size
+                       :-fx-background-color background-color
+                       :-fx-highlight-fill selection-color
+                       :-fx-highlight-text-fill symbol-color
+                       :-fx-padding [7 7]
+                       ":focused" {:-fx-border-color selection-color
+                                   :-fx-border-width [0 0 2 0]
+                                   :-fx-padding [7 7 5 7]}}
+        "-search" {:-fx-background-color popup-color
+                   :-fx-padding 5}
         "-summary" {:-fx-font-family font-family
                     :-fx-font-size font-size}
         "-table"
