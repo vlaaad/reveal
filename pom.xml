@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>vlaaad</groupId>
   <artifactId>reveal</artifactId>
-  <version>0.1.0-ea22</version>
+  <version>0.0.1-ea23</version>
   <name>reveal</name>
   <dependencies>
     <dependency>
@@ -17,9 +17,14 @@
       <version>1.7.3</version>
     </dependency>
     <dependency>
-      <groupId>cljfx</groupId>
-      <artifactId>css</artifactId>
-      <version>1.1.0</version>
+      <groupId>com.vladsch.flexmark</groupId>
+      <artifactId>flexmark-ext-autolink</artifactId>
+      <version>0.62.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.10</version>
     </dependency>
     <dependency>
       <groupId>com.vladsch.flexmark</groupId>
@@ -27,13 +32,13 @@
       <version>0.62.0</version>
     </dependency>
     <dependency>
-      <groupId>com.vladsch.flexmark</groupId>
-      <artifactId>flexmark-ext-wikilink</artifactId>
-      <version>0.62.0</version>
+      <groupId>cljfx</groupId>
+      <artifactId>css</artifactId>
+      <version>1.1.0</version>
     </dependency>
     <dependency>
       <groupId>com.vladsch.flexmark</groupId>
-      <artifactId>flexmark-ext-autolink</artifactId>
+      <artifactId>flexmark-ext-wikilink</artifactId>
       <version>0.62.0</version>
     </dependency>
   </dependencies>
@@ -48,6 +53,6 @@
   </repositories>
   <scm>
     <url>https://github.com/vlaaad/reveal</url>
-    <tag>0.1.0-ea22</tag>
+    <tag>0.0.1-ea23</tag>
   </scm>
 </project>
