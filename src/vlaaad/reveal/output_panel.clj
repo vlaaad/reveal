@@ -15,7 +15,8 @@
            [javafx.event Event]
            [javafx.scene Node]
            [javafx.beans.value ChangeListener]
-           [org.apache.commons.lang3 StringUtils]))
+           [org.apache.commons.lang3 StringUtils]
+           [java.util.concurrent Semaphore]))
 
 (defmethod event/handle ::on-scroll [*state {:keys [id ^ScrollEvent fx/event]}]
   (swap! *state update-in [id :layout] layout/scroll-by (.getDeltaX event) (.getDeltaY event)))
@@ -278,10 +279,6 @@
 (defmethod event/handle ::on-search-text-changed [*state {:keys [id fx/event]}]
   (swap! *state assoc-in [id :search :term] event))
 
-;; TODO: text search mvp:
-;; - scan restarts when lines are cleared
-;; - scan resumes once new lines are added
-
 (defn- search-view-impl [{:keys [term id]}]
   {:fx/type :stack-pane
    :style-class "reveal-search"
@@ -387,21 +384,36 @@
             :highlight nil
             :results (sorted-set))))
 
+(defn- can-search? [{:keys [layout search]}]
+  (or (pos? (:start search))
+      (< (:end search) (count (:lines layout)))))
+
 (defn- search! [pid {:keys [id term]} {:keys [*state]}]
   (swap-if-exists! *state id init-search pid)
   (when (seq term)
     (let [*running (atom true)
+          s (Semaphore. 0)
           f (event/daemon-future
               (loop []
                 (let [old-state @*state
-                      {:keys [layout search] :as this} (get old-state id)]
-                  (when (and @*running
-                             (= pid (:pid search))
-                             (or (pos? (:start search))
-                                 (< (:end search) (count (:lines layout)))))
-                    (compare-and-set! *state old-state (assoc old-state id (perform-search this)))
-                    (recur)))))]
+                      this (get old-state id)]
+                  (when (and @*running (= pid (:pid (:search this))))
+                    (if (can-search? this)
+                      (compare-and-set! *state old-state (assoc old-state id (perform-search this)))
+                      (.acquire s))
+                    (recur)))))
+          watch-key [`search! pid]]
+      (add-watch *state watch-key (fn [_ _ old new]
+                                    (let [old-this (get old id)
+                                          new-this (get new id)]
+                                      (when (and (= pid
+                                                    (:pid (:search old-this))
+                                                    (:pid (:search new-this)))
+                                                 (can-search? new-this)
+                                                 (not (can-search? old-this)))
+                                        (.release s)))))
       #(do
+         (remove-watch *state watch-key)
          (reset! *running false)
          (future-cancel f)))))
 

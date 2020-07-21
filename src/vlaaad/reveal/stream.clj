@@ -10,7 +10,7 @@
            [java.util.regex Pattern]
            [java.io File]
            [java.net URL URI]
-           [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar ArrayList]
+           [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar]
            [clojure.core Eduction]
            [java.text SimpleDateFormat DateFormat]
            [java.time Instant]))
@@ -177,6 +177,7 @@
                   (case ch
                     \newline ((=> (flush-builder builder style) separator) rf acc)
                     \tab (do (.append builder "    ") acc)
+                    ;; todo except if followed by newline...
                     \return ((flush+util builder style "\\r") rf acc)
                     \formfeed ((flush+util builder style "\\f") rf acc)
                     \backspace ((flush+util builder style "\\b") rf acc)
