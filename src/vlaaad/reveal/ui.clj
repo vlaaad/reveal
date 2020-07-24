@@ -160,45 +160,89 @@
                  :desc {:fx/type fx/ext-get-ref
                         :ref focused-view-id}}]}))
 
-(defn- view [{:keys [queue showing view-order views focused-view-index]}]
+(defmethod event/handle ::confirm-exit [*state {:keys [^Event fx/event]}]
+  (.consume event)
+  (swap! *state assoc :confirm-exit-showing true))
+
+(defmethod event/handle ::cancel-quit [*state _]
+  (swap! *state dissoc :confirm-exit-showing))
+
+(defmethod event/handle ::quit [*state _]
+  ((:dispose (swap! *state dissoc :confirm-exit-showing))))
+
+(defn- confirm-exit-dialog [_]
+  {:fx/type :stage
+   :showing true
+   :owner {:fx/type fx/ext-get-ref :ref ::stage}
+   :on-close-request {::event/type ::cancel-quit}
+   :modality :window-modal
+   :title "Quit Reveal?"
+   :scene {:fx/type :scene
+           :stylesheets [(:cljfx.css/url style/style)]
+           :accelerators {[:escape] {::event/type ::cancel-quit}}
+           :root {:fx/type :v-box
+                  :style-class "reveal-ui"
+                  :spacing style/default-padding
+                  :padding style/default-padding
+                  :children [{:fx/type :label
+                              :text "Are you sure you want to quit Reveal?"}
+                             {:fx/type :h-box
+                              :spacing 5
+                              :alignment :center-right
+                              :children [{:fx/type :button
+                                          :on-action {::event/type ::cancel-quit}
+                                          :text "Cancel"}
+                                         {:fx/type ext-focused-by-default
+                                          :desc {:fx/type :button
+                                                 :on-action {::event/type ::quit}
+                                                 :text "Quit"}}]}]}}})
+
+(defn- view [{:keys [queue showing view-order views focused-view-index confirm-exit-showing]}]
   {:fx/type fx/ext-let-refs
    :refs (into {} (map (juxt key #(-> % val :desc)) views))
-   :desc
-   {:fx/type :stage
-    :title "Reveal"
-    ;; todo ask if user wants to quit repl (default) or exit jvm
-    :on-close-request #(.consume ^Event %)
-    :showing showing
-    :width 400
-    :height 500
-    :icons ["logo-16.png" "logo-32.png" "logo-64.png" "logo-256.png" "logo-512.png"]
-    :on-focused-changed {::event/type ::on-window-focused-changed}
-    :scene {:fx/type :scene
-            :stylesheets [(:cljfx.css/url style/style)]
-            :root {:fx/type :grid-pane
-                   :style-class "reveal-ui"
-                   :column-constraints [{:fx/type :column-constraints
-                                         :hgrow :always}]
-                   :row-constraints (if focused-view-index
-                                      [{:fx/type :row-constraints
-                                        :percent-height 50}
-                                       {:fx/type :row-constraints
-                                        :percent-height 50}]
-                                      [{:fx/type :row-constraints
-                                        :percent-height 100}])
-                   :children
-                   (cond-> [{:fx/type view/queue
-                             :grid-pane/row 0
-                             :grid-pane/column 0
-                             :queue queue
-                             :id :output}]
-                           focused-view-index
-                           (conj {:fx/type tabs-view
-                                  :grid-pane/row 1
-                                  :grid-pane/column 0
-                                  :views views
-                                  :view-order view-order
-                                  :focused-view-index focused-view-index}))}}}})
+   :desc {:fx/type fx/ext-let-refs
+          :refs {::stage {:fx/type :stage
+                          :title "Reveal"
+                          :on-close-request {::event/type ::confirm-exit}
+                          :showing showing
+                          :width 400
+                          :height 500
+                          :icons ["vlaaad/reveal/logo-16.png"
+                                  "vlaaad/reveal/logo-32.png"
+                                  "vlaaad/reveal/logo-64.png"
+                                  "vlaaad/reveal/logo-256.png"
+                                  "vlaaad/reveal/logo-512.png"]
+                          :on-focused-changed {::event/type ::on-window-focused-changed}
+                          :scene {:fx/type :scene
+                                  :stylesheets [(:cljfx.css/url style/style)]
+                                  :root {:fx/type :grid-pane
+                                         :style-class "reveal-ui"
+                                         :column-constraints [{:fx/type :column-constraints
+                                                               :hgrow :always}]
+                                         :row-constraints (if focused-view-index
+                                                            [{:fx/type :row-constraints
+                                                              :percent-height 50}
+                                                             {:fx/type :row-constraints
+                                                              :percent-height 50}]
+                                                            [{:fx/type :row-constraints
+                                                              :percent-height 100}])
+                                         :children
+                                         (cond-> [{:fx/type view/queue
+                                                   :grid-pane/row 0
+                                                   :grid-pane/column 0
+                                                   :queue queue
+                                                   :id :output}]
+                                                 focused-view-index
+                                                 (conj {:fx/type tabs-view
+                                                        :grid-pane/row 1
+                                                        :grid-pane/column 0
+                                                        :views views
+                                                        :view-order view-order
+                                                        :focused-view-index focused-view-index}))}}}}
+          :desc {:fx/type fx/ext-let-refs
+                 :refs (when confirm-exit-showing
+                         {::confirm-exit {:fx/type confirm-exit-dialog}})
+                 :desc {:fx/type fx/ext-get-ref :ref ::stage}}}})
 
 (defn oneduce
   ([xf x]
@@ -231,16 +275,24 @@
 (defn make []
   (let [*running! (agent true)
         value-queue (ArrayBlockingQueue. 1024)
-        *state (atom {:queue value-queue :views {} :view-order [] :showing true})
+        *state (atom {:queue value-queue
+                      :views {}
+                      :view-order []
+                      :showing true
+                      :dispose (constantly nil)})
         event-handler (event/->MapEventHandler *state)
         renderer (fx/create-renderer
                    :opts {:fx.opt/map-event-handler event-handler}
-                   :middleware (fx/wrap-map-desc #'view))]
+                   :middleware (fx/wrap-map-desc #'view))
+        dispose! #(do
+                    (fx/unmount-renderer *state renderer)
+                    (send-via event/daemon-executor *running! stop-queue value-queue))]
     (fx/mount-renderer *state renderer)
+    (swap! *state assoc :dispose dispose!)
     (fn
       ([]
-       (fx/unmount-renderer *state renderer)
-       (send-via event/daemon-executor *running! stop-queue value-queue))
+       (dispose!)
+       nil)
       ([x]
        (send-via event/daemon-executor *running! put-on-queue value-queue x)
        x))))

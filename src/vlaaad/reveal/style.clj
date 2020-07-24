@@ -2,7 +2,6 @@
   (:require [cljfx.css :as css]
             [vlaaad.reveal.font :as font]))
 
-(def cell-height 25)
 (def scroll-bar-size 10)
 (def util-color "#888")
 (def symbol-color "#aec1d0")
@@ -21,14 +20,15 @@
 (def keyword-color "#a55cfc")
 (def search-color "#aec1d0")
 (def search-shade-color (str search-color "55"))
+(def default-padding 5)
 
 (def style
   (css/register ::main
     {".reveal"
        {"-ui" {:-fx-background-color background-color}
         "-popup" {:-fx-background-color popup-color
-                  :-fx-spacing 5
-                  :-fx-padding 5
+                  :-fx-spacing default-padding
+                  :-fx-padding default-padding
                   "-scroll-pane" {:-fx-hbar-policy :never
                                   :-fx-min-height 0}
                   "-item" {:-fx-font-family font-family
@@ -98,6 +98,17 @@
      ".label" {:-fx-text-fill symbol-color
                :-fx-font-family font-family
                :-fx-font-size font-size}
+     ".button" {:-fx-text-fill util-color
+                :-fx-font-family font-family
+                :-fx-font-size font-size
+                :-fx-background-color :transparent
+                :-fx-background-radius 0
+                :-fx-border-width 1
+                :-fx-border-color unfocused-selection-color
+                ":hover" {:-fx-text-fill symbol-color}
+                ":focused" {:-fx-background-color selection-color
+                            :-fx-text-fill symbol-color
+                            :-fx-border-color :transparent}}
      ".cell" {:-fx-text-fill symbol-color
               :-fx-background-color :transparent}
      ;; scroll bars

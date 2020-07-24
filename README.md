@@ -1,4 +1,4 @@
-# ![logo](src/logo-32.png) Reveal: Read Eval Visualize Loop for Clojure
+# ![logo](src/vlaaad/reveal/logo-32.png) Reveal: Read Eval Visualize Loop for Clojure
 
 ![demo](doc/demo.gif)
 
@@ -112,6 +112,8 @@ alive.
   - for full experience we should fork `System/out` and `System/err`, and re-bind roots of `*out*` and `*err*` — is it 
     a good idea?
 - multiple accordions
+- more actions:
+  - view files ending with `.html` as web pages
 - improve datafy/nav support
 - remember window position and size
 - popup might appear in weird locations
