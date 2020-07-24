@@ -16,6 +16,7 @@
 (def smaller-font-size (int (* font-size 0.85)))
 (def string-color "#22aeaa")
 (def error-color "#f15856")
+(def success-color "#64aa22")
 (def scalar-color "#649fe9")
 (def keyword-color "#a55cfc")
 (def search-color "#aec1d0")

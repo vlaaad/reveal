@@ -50,3 +50,7 @@
            :instant (Instant/ofEpochMilli 0)
            :local-time (LocalTime/ofNanoOfDay 0)
            :local-date-time (LocalDateTime/ofEpochSecond 0 0 ZoneOffset/UTC)}})
+
+(comment
+  (->> (range 10000)
+       (map #(hash-map :index % :string (str %)))))

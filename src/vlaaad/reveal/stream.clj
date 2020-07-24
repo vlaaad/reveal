@@ -8,7 +8,7 @@
                          IBlockingDeref TaggedLiteral Reduced ReaderConditional
                          IPersistentCollection BigInt]
            [java.util.regex Pattern]
-           [java.io File]
+           [java.io File FileNotFoundException]
            [java.net URL URI]
            [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar]
            [clojure.core Eduction]
@@ -834,15 +834,16 @@
      (catch ClassNotFoundException _#)))
 
 (when-class "java.sql.Timestamp"
-  (def ^:private utc-timestamp-format
-    (proxy [ThreadLocal] []
-      (initialValue []
-        (doto (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss")
-          (.setTimeZone (TimeZone/getTimeZone "GMT"))))))
+  (load "stream/sql_timestamp"))
 
-  (defmethod emit java.sql.Timestamp [^java.sql.Timestamp timestamp]
-    (horizontal
-      (raw-string "#inst" {:fill style/object-color})
-      separator
-      (stream (str (.format ^DateFormat (.get ^ThreadLocal utc-timestamp-format) timestamp)
-                   (format ".%09d-00:00" (.getNanos timestamp)))))))
+(defmacro ^:private when-ns [ns-sym & body]
+  `(try
+     (require '~ns-sym)
+     ~@body
+     (catch FileNotFoundException _#)))
+
+(when-ns lambdaisland.deep-diff.diff
+  (load "stream/deep_diff"))
+
+(when-ns lambdaisland.deep-diff2.diff-impl
+  (load "stream/deep_diff2"))
