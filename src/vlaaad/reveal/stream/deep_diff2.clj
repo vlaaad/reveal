@@ -2,18 +2,28 @@
 
 (defmethod emit lambdaisland.deep_diff2.diff_impl.Mismatch [{:keys [- +]}]
   (horizontal
-    (raw-string "-" {:fill style/error-color})
-    (stream -)
+    (override-style
+      (horizontal
+        (raw-string "-")
+        (stream -))
+      assoc :fill style/error-color)
     separator
-    (raw-string "+" {:fill style/success-color})
-    (stream +)))
+    (override-style
+      (horizontal
+        (raw-string "+")
+        (stream +))
+      assoc :fill style/success-color)))
 
 (defmethod emit lambdaisland.deep_diff2.diff_impl.Insertion [{:keys [+]}]
-  (horizontal
-    (raw-string "+" {:fill style/success-color})
-    (stream +)))
+  (override-style
+    (horizontal
+      (raw-string "+")
+      (stream +))
+    assoc :fill style/success-color))
 
 (defmethod emit lambdaisland.deep_diff2.diff_impl.Deletion [{:keys [-]}]
-  (horizontal
-    (raw-string "-" {:fill style/error-color})
-    (stream -)))
+  (override-style
+    (horizontal
+      (raw-string "-")
+      (stream -))
+    assoc :fill style/error-color))

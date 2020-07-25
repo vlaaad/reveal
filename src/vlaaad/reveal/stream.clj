@@ -265,6 +265,16 @@
 (defn sequential [xs]
   (block :vertical (delimited-items xs)))
 
+(defn override-style [sf f & args]
+  (fn [rf acc]
+    (let [rf (fn
+               ([acc] (rf acc))
+               ([acc input]
+                (rf acc (case (:op input)
+                          ::string (apply update input :style f args)
+                          input))))]
+      (sf rf acc))))
+
 (defn- emit-xf [rf]
   (fn
     ([] (rf))

@@ -18,7 +18,7 @@
 (def error-color "#f15856")
 (def success-color "#64aa22")
 (def scalar-color "#649fe9")
-(def keyword-color "#a55cfc")
+(def keyword-color "#ab6cf7")
 (def search-color "#aec1d0")
 (def search-shade-color (str search-color "55"))
 (def default-padding 5)
