@@ -71,20 +71,27 @@ with 0 arguments to close the window and dispose it.
 #### As a repl in a shell
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea24"}}}' -m vlaaad.reveal.repl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"}}}' -m vlaaad.reveal repl
 ```
 
 #### As a repl in a shell with prepl backend
 
+Example of a remote prepl:
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea24"}}}' -m vlaaad.reveal.prepl
+clj -J-Dclojure.server.prepl="{:port 5555 :accept clojure.core.server/io-prepl}"
+```
+
+Connect to it with reveal:
+```sh
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"}}}' \
+-m vlaaad.reveal remote-prepl :port 5555
 ```
 
 #### As a nrepl middleware in a shell
 
 ```sh
 clj \
--Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea24"} nrepl {:mvn/version "0.7.0"}}}' \
+-Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"} nrepl {:mvn/version "0.7.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
 
@@ -93,7 +100,7 @@ clj \
 If you don't want to use Reveal as a repl, but only want to send to it values for 
 inspection, you can add a dependency on Reveal and then evaluate this:
 ```clj
-(add-tap ((requiring-resolve 'vlaaad.reveal.ui/make)))
+(add-tap ((requiring-resolve 'vlaaad.reveal/ui)))
 ```
 
 It will open a window that will receive all `tap>`-ed values while the JVM process is 
