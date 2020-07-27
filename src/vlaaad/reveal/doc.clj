@@ -184,6 +184,14 @@
                      (stream/raw-string "(macro)" {:fill style/util-color})]))]
           (when-let [arglists (:arglists m)]
             (map stream/stream arglists))
+          (when-let [deprecated (:deprecated m)]
+            [(stream/raw-string "")
+             (if (string? deprecated)
+               (stream/horizontal
+                 (stream/raw-string "Deprecated." {:fill style/string-color})
+                 stream/separator
+                 (parse deprecated (:ns m)))
+               (stream/raw-string "Deprecated." {:fill style/string-color}))])
           (when-let [doc (:doc m)]
             [(stream/raw-string "")
              (parse doc (:ns m))

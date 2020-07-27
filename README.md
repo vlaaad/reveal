@@ -101,7 +101,7 @@ alive.
 
 ## To do
 - structural navigation
-- text search (triggered either just by typing or with a shortcut):
+- text search:
   - should be reversible: escape scrolls to the place of search start if there is
     a highlight
 - contextual eval:

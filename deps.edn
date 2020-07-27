@@ -5,8 +5,8 @@
         com.vladsch.flexmark/flexmark {:mvn/version "0.62.0"}
         com.vladsch.flexmark/flexmark-ext-wikilink {:mvn/version "0.62.0"}
         com.vladsch.flexmark/flexmark-ext-autolink {:mvn/version "0.62.0"}}
- :aliases {:prepl {:main-opts ["-m" "vlaaad.reveal.prepl"]}
-           :repl {:main-opts ["-m" "vlaaad.reveal.repl"]}
+ :aliases {:repl {:main-opts ["-m" "vlaaad.reveal" "repl"]}
+           :prepl {:main-opts ["-m" "vlaaad.reveal" "prepl"]}
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "0.6.0"}}
                    :main-opts ["-m" "nrepl.cmdline" "--middleware" "[vlaaad.reveal.nrepl/middleware]"]}
            :dev {:extra-paths ["dev"]

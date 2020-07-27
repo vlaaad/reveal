@@ -5,11 +5,11 @@
             [vlaaad.reveal.stream :as stream]
             [clojure.string :as str]))
 
-(defn stream-read [form ui]
+(defn- stream-read [form ui]
   (ui (stream/as form
         (stream/raw-string (pr-str form) {:fill style/util-color}))))
 
-(defn wrap-read [ui read]
+(defn- wrap-read [ui read]
   (fn [request-prompt request-exit]
     (let [ret (read request-prompt request-exit)]
       (condp = ret
@@ -18,7 +18,7 @@
         request-prompt request-prompt
         (doto ret (stream-read ui))))))
 
-(defn wrap-print [ui print]
+(defn- wrap-print [ui print]
   (fn [x]
     (ui
       (stream/just
@@ -28,14 +28,14 @@
           (stream/stream x))))
     (print x)))
 
-(defn wrap-caught [ui caught]
+(defn- wrap-caught [ui caught]
   (fn [ex]
     (ui (stream/as ex
           (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
                              {:fill style/error-color})))
     (caught ex)))
 
-(defn make-tap [ui]
+(defn- make-tap [ui]
   (fn [x]
     (ui (stream/just
           (stream/horizontal
@@ -54,7 +54,7 @@
          (flush)))
     nil))
 
-(defn wrap-eval [ui eval]
+(defn- wrap-eval [ui eval]
   (let [out (make-print ui *out* style/string-color)
         err (make-print ui *err* style/error-color)]
     (fn [form]
@@ -64,14 +64,14 @@
           (flush)
           ret)))))
 
-(defn init []
+(defn- init []
   (apply require m/repl-requires))
 
-(defn repl [& {:as args}]
+(defn repl [repl-args]
   (let [ui (ui/make)
         tap (make-tap ui)
         version (str "Clojure " (clojure-version))
-        repl-args (-> args
+        repl-args (-> repl-args
                       (update :init #(or % init))
                       (update :read #(wrap-read ui (or % m/repl-read)))
                       (update :eval #(wrap-eval ui (or % eval)))
@@ -81,9 +81,11 @@
           (stream/raw-string version {:fill style/util-color})))
     (println version)
     (add-tap tap)
-    (apply m/repl (mapcat identity repl-args))
-    (remove-tap tap)
-    (ui)))
+    (try
+      (apply m/repl (mapcat identity repl-args))
+      (finally
+        (remove-tap tap)
+        (ui)))))
 
-(defn -main [& args]
-  (repl))
+(defn ^{:deprecated "Use [[vlaaad.reveal/-main]]"} -main [& _]
+  (repl {}))

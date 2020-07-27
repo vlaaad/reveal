@@ -29,7 +29,22 @@
                :body (s/+ any?))
   :ret ::id)
 
-(defmacro def [id bindings & body]
+(defmacro def
+  "Define action for execution in the context of some selected value
+
+  When user requests a context menu on a selected value, all actions are
+  evaluated. If action body returns 0-arg fn, the action is shown in the
+  context menu, and the function will be invoked when user selects the action
+  for execution. Any other evaluation results, including thrown exceptions, are
+  ignored.
+
+  `id` is a ns-qualified keyword identifying this action
+  `bindings` is a bindings vector that can have either 1 or 2 args, where first
+  argument is a selected value and second is an annotation supplied by reveal
+  output streaming process
+  `body` is an action body that has access to `bindings`, should return 0-arg
+  function for action to be available in the context menu"
+  [id bindings & body]
   (let [fn-bindings (case (count bindings)
                       1 (conj bindings (gensym "_"))
                       2 bindings)]
