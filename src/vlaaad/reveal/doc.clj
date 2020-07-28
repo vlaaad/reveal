@@ -166,11 +166,6 @@
   (binding [*doc-ns* (the-ns ns)]
     (->sf (.parse parser str))))
 
-(stream/just (parse "1 2 [[123]]" 'cljfx.api))
-
-(clojure.spec.alpha/form :vlaaad.reveal.layout/cursor)
-(clojure.spec.alpha/form 'vlaaad.reveal.action/def)
-
 (defn- for-var [var]
   (let [m (meta var)]
     (stream/just
