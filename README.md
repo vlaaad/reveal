@@ -72,7 +72,7 @@ with 0 arguments to close the window and dispose it.
 #### As a repl in a shell
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"}}}' -m vlaaad.reveal repl
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea26"}}}' -m vlaaad.reveal repl
 ```
 
 #### As a client repl in a shell with prepl backend
@@ -84,7 +84,7 @@ clj -J-Dclojure.server.prepl="{:port 5555 :accept clojure.core.server/io-prepl}"
 
 Connect to it with Reveal:
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"}}}' \
+clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea26"}}}' \
 -m vlaaad.reveal remote-prepl :port 5555
 ```
 
@@ -92,7 +92,7 @@ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"}}}' \
 
 ```sh
 clj \
--Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"} nrepl/nrepl {:mvn/version "0.7.0"}}}' \
+-Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea26"} nrepl/nrepl {:mvn/version "0.7.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
 
