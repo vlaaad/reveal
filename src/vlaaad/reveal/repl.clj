@@ -86,6 +86,3 @@
       (finally
         (remove-tap tap)
         (ui)))))
-
-(defn ^{:deprecated "Use [[vlaaad.reveal/-main]]"} -main [& _]
-  (repl {}))

@@ -47,7 +47,7 @@ mouse button click. Selecting action to run is done either with arrow keys and
 
 Multiple action results are shown as separate tabs in popup panel, and switching between 
 those tabs is done either using mouse or using <kbd>Ctrl ←</kbd> / <kbd>Ctrl →</kbd> when 
-focus is on a results panel.
+focus is on results panel.
 
 ## Installation and requirements
 
@@ -60,9 +60,10 @@ The minimum required Clojure version is `1.10`.
 If you are using nrepl, just add `vlaaad.reveal.nrepl/middleware` to the middleware list. 
 The minimum nrepl version is `0.6.0`.
 
-If you are using socket repl, just run main in `vlaaad.reveal.repl` namespace.
+If you are using socket repl, just run main in `vlaaad.reveal` namespace with `repl` argument.
+Starting Reveal repl from the repl is done similarly: by calling `(vlaaad.reveal/repl)` 
 
-If you don't want to use it as a repl, just call `(vlaaad.reveal.ui/make)` and it will 
+If you don't want to use it as a repl, call `(vlaaad.reveal.ui/make)` and it will 
 open a window and return a function: call it with 1 argument to submit a value, call it 
 with 0 arguments to close the window and dispose it.
 
@@ -74,14 +75,14 @@ with 0 arguments to close the window and dispose it.
 clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"}}}' -m vlaaad.reveal repl
 ```
 
-#### As a repl in a shell with prepl backend
+#### As a client repl in a shell with prepl backend
 
-Example of a remote prepl:
+Example of a remote prepl to connect to (doesn't need Reveal on the classpath):
 ```sh
 clj -J-Dclojure.server.prepl="{:port 5555 :accept clojure.core.server/io-prepl}"
 ```
 
-Connect to it with reveal:
+Connect to it with Reveal:
 ```sh
 clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"}}}' \
 -m vlaaad.reveal remote-prepl :port 5555
@@ -91,7 +92,7 @@ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"}}}' \
 
 ```sh
 clj \
--Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"} nrepl {:mvn/version "0.7.0"}}}' \
+-Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea25"} nrepl/nrepl {:mvn/version "0.7.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
 
@@ -125,5 +126,4 @@ alive.
 - remember window position and size
 - popup might appear in weird locations
 - *very* long lines have poor performance
-- `vlaaad.reveal/-main`
 - sometimes popup does not disappear

@@ -2,36 +2,9 @@
   (:require [clojure.core.server :as server]
             [clojure.main :as m]
             [vlaaad.reveal.stream :as stream]
-            [vlaaad.reveal.writer-output-stream :as writer-output-stream]
             [vlaaad.reveal.ui :as ui]
             [vlaaad.reveal.style :as style]
-            [clojure.string :as str])
-  (:import [java.io PrintStream]))
-
-(defn- line-print-stream [line-fn]
-  (let [sb (StringBuilder.)]
-    (-> #(doseq [^char ch %]
-           (if (= \newline ch)
-             (let [str (.toString sb)]
-               (.delete sb 0 (.length sb))
-               (line-fn str))
-             (.append sb ch)))
-        (PrintWriter-on nil)
-        (writer-output-stream/make)
-        (PrintStream. true "UTF-8"))))
-
-(defn- wrap-err-out [f ui]
-  (fn []
-    (let [out System/out
-          err System/err]
-      (System/setOut (line-print-stream #(do
-                                           (.println out %)
-                                           (-> % stream/system-out ui))))
-      (System/setErr (line-print-stream #(do (.println err %)
-                                             (-> % stream/system-err ui))))
-      (f)
-      (System/setOut out)
-      (System/setErr err))))
+            [clojure.string :as str]))
 
 (defn- prepl-output [x]
   (stream/as x
@@ -57,41 +30,44 @@
                (stream/stream (:val x)))
         (stream/emit x)))))
 
-(defn prepl [{:keys [backend streams]
-              :or {backend server/prepl
-                   streams true}}]
-  (let [out *out*
-        err *err*
-        ui (ui/make)
-        repl (-> #(backend *in* (fn [x]
-                                  (ui (prepl-output x))
-                                  (binding [*out* out]
-                                    (if (:exception x)
-                                      (binding [*out* err]
-                                        (println (m/ex-str (m/ex-triage (:val x))))
-                                        (flush))
-                                      (do
-                                        (case (:tag x)
-                                          :out (println (:val x))
-                                          :err (binding [*out* err]
-                                                 (println (:val x)))
-                                          (:tap :ret) (prn (:val x))
-                                          (prn x))
-                                        (flush)))
-                                    (print (str (:ns x *ns*) "=> "))
-                                    (flush))))
-                 (cond-> streams (wrap-err-out ui)))
-        v (str "Clojure " (clojure-version))]
-    (ui (stream/as *clojure-version*
-          (stream/raw-string v {:fill style/util-color})))
-    (println v)
-    (print (str (.name *ns*) "=> "))
-    (flush)
-    (try
-      (repl)
-      (finally
-        (ui)))
-    nil))
+(defn- wrap-out-fn [ui out-fn]
+  (fn [x]
+    (ui (prepl-output x))
+    (out-fn x)))
 
-(defn ^{:deprecated "Use [[vlaaad.reveal/-main]]"} -main [& _]
-  (prepl {}))
+(defn prepl [in-reader out-fn & {:keys [stdin]}]
+  (let [ui (ui/make)]
+    (try
+      (server/prepl in-reader (wrap-out-fn ui out-fn) :stdin stdin)
+      (finally (ui)))))
+
+(defn remote-prepl [host port in-reader out-fn & {:as prepl-args}]
+  (let [ui (ui/make)
+        prepl-args (update prepl-args :valf (fn [valf]
+                                              (or valf
+                                                  #(binding [*default-data-reader-fn* tagged-literal]
+                                                     (read-string %)))))]
+    (try
+      (apply server/remote-prepl host port in-reader (wrap-out-fn ui out-fn) (mapcat identity prepl-args))
+      (finally (ui)))))
+
+(defn io-prepl [& {:keys [valf] :or {valf pr-str}}]
+  (let [ui (ui/make)
+        out *out*
+        lock (Object.)]
+    (try
+      (server/prepl
+        *in*
+        (fn [x]
+          (ui (prepl-output x))
+          (binding [*out* out *flush-on-newline* true *print-readably* true]
+            (locking lock
+              (prn (if (#{:ret :tap} (:tag x))
+                     (try
+                       (assoc x :val (valf (:val x)))
+                       (catch Throwable ex
+                         (assoc x :val (assoc (Throwable->map ex) :phase :print-eval-result)
+                                  :exception true)))
+                     x))))))
+      (finally (ui)))
+    nil))
