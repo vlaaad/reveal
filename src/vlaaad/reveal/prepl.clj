@@ -41,33 +41,46 @@
       (server/prepl in-reader (wrap-out-fn ui out-fn) :stdin stdin)
       (finally (ui)))))
 
-(defn remote-prepl [host port in-reader out-fn & {:as prepl-args}]
-  (let [ui (ui/make)
-        prepl-args (update prepl-args :valf (fn [valf]
-                                              (or valf
-                                                  #(binding [*default-data-reader-fn* tagged-literal]
-                                                     (read-string %)))))]
-    (try
-      (apply server/remote-prepl host port in-reader (wrap-out-fn ui out-fn) (mapcat identity prepl-args))
-      (finally (ui)))))
+(defn remote-prepl
+  ([] (remote-prepl {}))
+  ([k v & kvs] (remote-prepl (apply hash-map k v kvs)))
+  ([{:keys [host port in-reader out-fn title]
+     :or {in-reader *in*
+          out-fn prn}
+     :as prepl-args}]
+   {:pre [(some? port)]}
+   (let [ui (ui/make :title (or title (str "remote-prepl on " (when host (str host ":")) port)))
+         prepl-args (update prepl-args :valf (fn [valf]
+                                               (or valf
+                                                   #(binding [*default-data-reader-fn* tagged-literal]
+                                                      (read-string %)))))]
+     (try
+       (apply server/remote-prepl host port in-reader (wrap-out-fn ui out-fn)
+              (mapcat identity (dissoc prepl-args :host :port :in-reader :out-fn :title)))
+       (finally (ui))))))
 
-(defn io-prepl [& {:keys [valf] :or {valf pr-str}}]
-  (let [ui (ui/make)
-        out *out*
-        lock (Object.)]
-    (try
-      (server/prepl
-        *in*
-        (fn [x]
-          (ui (prepl-output x))
-          (binding [*out* out *flush-on-newline* true *print-readably* true]
-            (locking lock
-              (prn (if (#{:ret :tap} (:tag x))
-                     (try
-                       (assoc x :val (valf (:val x)))
-                       (catch Throwable ex
-                         (assoc x :val (assoc (Throwable->map ex) :phase :print-eval-result)
-                                  :exception true)))
-                     x))))))
-      (finally (ui)))
-    nil))
+(defn io-prepl
+  ([] (io-prepl {}))
+  ([k v & kvs] (io-prepl (apply hash-map k v kvs)))
+  ([{:keys [valf title]
+     :or {valf pr-str
+          title "io-prepl"}}]
+   (let [ui (ui/make :title title)
+         out *out*
+         lock (Object.)]
+     (try
+       (server/prepl
+         *in*
+         (fn [x]
+           (ui (prepl-output x))
+           (binding [*out* out *flush-on-newline* true *print-readably* true]
+             (locking lock
+               (prn (if (#{:ret :tap} (:tag x))
+                      (try
+                        (assoc x :val (valf (:val x)))
+                        (catch Throwable ex
+                          (assoc x :val (assoc (Throwable->map ex) :phase :print-eval-result)
+                                   :exception true)))
+                      x))))))
+       (finally (ui)))
+     nil)))

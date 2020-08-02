@@ -67,11 +67,12 @@
 (defn- init []
   (apply require m/repl-requires))
 
-(defn repl [repl-args]
-  (let [ui (ui/make)
+(defn repl [args]
+  (let [ui (ui/make :title (:title args "repl"))
         tap (make-tap ui)
         version (str "Clojure " (clojure-version))
-        repl-args (-> repl-args
+        repl-args (-> args
+                      (dissoc :title)
                       (update :init #(or % init))
                       (update :read #(wrap-read ui (or % m/repl-read)))
                       (update :eval #(wrap-eval ui (or % eval)))

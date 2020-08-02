@@ -191,6 +191,9 @@
       KeyCode/SPACE
       (cond-> this cursor (show-popup event))
 
+      KeyCode/ENTER
+      (cond-> this cursor (show-popup event))
+
       KeyCode/SLASH
       (show-search this)
 

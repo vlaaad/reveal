@@ -41,13 +41,17 @@ It does not depend on any particular IDE or text editor, it works in-process ins
 started, it will open a window where evaluation results will appear. The window supports 
 both mouse and keyboard navigation. 
 
-Context menu on selected value is opened either by pressing <kbd>Space</kbd> or by right 
-mouse button click. Selecting action to run is done either with arrow keys and 
-<kbd>Enter</kbd> or with a left mouse button click.
+The main way to interact with values is using the context menu. You can press 
+<kbd>Space</kbd>, <kbd>Enter</kbd> or right mouse button to open it. In the 
+context menu, you can:
+- write an expression to eval on selection by typing it and pressing <kbd>Enter</kbd>;
+- select a built-in action using arrow keys, and execute it by pressing <kbd>Enter</kbd>
+  or left mouse button.
 
-Multiple action results are shown as separate tabs in popup panel, and switching between 
-those tabs is done either using mouse or using <kbd>Ctrl ←</kbd> / <kbd>Ctrl →</kbd> when 
-focus is on results panel.
+Reveal displays action results in the results panel. Use <kbd>Ctrl ←</kbd> / <kbd>Ctrl →</kbd>
+to switch between different tabs in the results panel. Use <kbd>Tab</kbd> to switch focus
+between main output panel and results panel. Press <kbd>Tab</kbd> to switch focus between
+output and results panels.
 
 ## Installation and requirements
 
@@ -57,11 +61,11 @@ Add a dev dependency on the latest version:
 
 The minimum required Clojure version is `1.10`.
 
-If you are using nrepl, just add `vlaaad.reveal.nrepl/middleware` to the middleware list. 
+If you are using nrepl, add `vlaaad.reveal.nrepl/middleware` to the middleware list. 
 The minimum nrepl version is `0.6.0`.
 
-If you are using socket repl, just run main in `vlaaad.reveal` namespace with `repl` argument.
-Starting Reveal repl from the repl is done similarly: by calling `(vlaaad.reveal/repl)` 
+If you are using socket repl, run main in `vlaaad.reveal` namespace with `repl` argument.
+Starting Reveal repl from the repl is done similarly: by invoking `(vlaaad.reveal/repl)`. 
 
 If you don't want to use it as a repl, call `(vlaaad.reveal.ui/make)` and it will 
 open a window and return a function: call it with 1 argument to submit a value, call it 

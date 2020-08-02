@@ -162,9 +162,18 @@
         (stream/raw-string (.getChildChars this) {:fill style/string-color}))
       (stream/raw-string (.getClosingMarker this) {:fill style/util-color}))))
 
-(defn parse [^String str ns]
-  (binding [*doc-ns* (the-ns ns)]
-    (->sf (.parse parser str))))
+(defn parse [docstring ns]
+  (let [lines (str/split-lines docstring)
+        indented-lines (->> lines
+                            next
+                            (remove str/blank?)
+                            (map #(count (take-while #{\space} %))))
+        indent (if (seq indented-lines) (apply min indented-lines) 0)
+        re-indent (re-pattern (str "^\\s{" indent "}"))]
+    (binding [*doc-ns* (the-ns ns)]
+      (->sf (.parse parser ^String (->> lines
+                                        (map #(str/replace % re-indent ""))
+                                        (str/join "\n")))))))
 
 (defn- for-var [var]
   (let [m (meta var)]

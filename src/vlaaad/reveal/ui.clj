@@ -197,12 +197,12 @@
                                                  :on-action {::event/type ::quit}
                                                  :text "Quit"}}]}]}}})
 
-(defn- view [{:keys [queue showing view-order views focused-view-index confirm-exit-showing]}]
+(defn- view [{:keys [title queue showing view-order views focused-view-index confirm-exit-showing]}]
   {:fx/type fx/ext-let-refs
    :refs (into {} (map (juxt key #(-> % val :desc)) views))
    :desc {:fx/type fx/ext-let-refs
           :refs {::stage {:fx/type :stage
-                          :title "Reveal"
+                          :title title
                           :on-close-request {::event/type ::confirm-exit}
                           :showing showing
                           :width 400
@@ -272,27 +272,31 @@
     (.put queue ({nil ::view/nil} x x)))
   running)
 
-(defn make []
-  (let [*running! (agent true)
-        value-queue (ArrayBlockingQueue. 1024)
-        *state (atom {:queue value-queue
-                      :views {}
-                      :view-order []
-                      :showing true
-                      :dispose (constantly nil)})
-        event-handler (event/->MapEventHandler *state)
-        renderer (fx/create-renderer
-                   :opts {:fx.opt/map-event-handler event-handler}
-                   :middleware (fx/wrap-map-desc #'view))
-        dispose! #(do
-                    (fx/unmount-renderer *state renderer)
-                    (send-via event/daemon-executor *running! stop-queue value-queue))]
-    (fx/mount-renderer *state renderer)
-    (swap! *state assoc :dispose dispose!)
-    (fn
-      ([]
-       (dispose!)
-       nil)
-      ([x]
-       (send-via event/daemon-executor *running! put-on-queue value-queue x)
-       x))))
+(defn make
+  ([] (make {}))
+  ([k v & kvs] (make (apply hash-map k v kvs)))
+  ([{:keys [title]}]
+   (let [*running! (agent true)
+         value-queue (ArrayBlockingQueue. 1024)
+         *state (atom {:queue value-queue
+                       :views {}
+                       :view-order []
+                       :title (cond-> "Reveal" title (str ": " title))
+                       :showing true
+                       :dispose (constantly nil)})
+         event-handler (event/->MapEventHandler *state)
+         renderer (fx/create-renderer
+                    :opts {:fx.opt/map-event-handler event-handler}
+                    :middleware (fx/wrap-map-desc #'view))
+         dispose! #(do
+                     (fx/unmount-renderer *state renderer)
+                     (send-via event/daemon-executor *running! stop-queue value-queue))]
+     (fx/mount-renderer *state renderer)
+     (swap! *state assoc :dispose dispose!)
+     (fn
+       ([]
+        (dispose!)
+        nil)
+       ([x]
+        (send-via event/daemon-executor *running! put-on-queue value-queue x)
+        x)))))
