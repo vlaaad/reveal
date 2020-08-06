@@ -236,7 +236,7 @@
 
 (defn- draw-scroll-bar [^GraphicsContext ctx active {:keys [x y width height]}]
   (doto ctx
-    (.setFill (fx.coerce/color (if active "#fff6" "#eee3")))
+    (.setFill (fx.coerce/color (if active style/scroll-bar-color style/inactive-scroll-bar-color)))
     (.fillRoundRect x y width height scroll-bar-breadth scroll-bar-breadth)))
 
 (defn draw [^GraphicsContext ctx layout]
