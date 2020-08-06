@@ -76,26 +76,26 @@ with 0 arguments to close the window and dispose it.
 #### As a repl in a shell
 
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea26"}}}' -m vlaaad.reveal repl
+$ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea26"}}}' -m vlaaad.reveal repl
 ```
 
 #### As a client repl in a shell with prepl backend
 
 Example of a remote prepl to connect to (doesn't need Reveal on the classpath):
 ```sh
-clj -J-Dclojure.server.prepl="{:port 5555 :accept clojure.core.server/io-prepl}"
+$ clj -J-Dclojure.server.prepl="{:port 5555 :accept clojure.core.server/io-prepl}"
 ```
 
 Connect to it with Reveal:
 ```sh
-clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"}}}' \
+$ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"}}}' \
 -m vlaaad.reveal remote-prepl :port 5555
 ```
 
 #### As a nrepl middleware in a shell
 
 ```sh
-clj \
+$ clj \
 -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"} nrepl/nrepl {:mvn/version "0.7.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
@@ -110,6 +110,23 @@ inspection, you can add a dependency on Reveal and then evaluate this:
 
 It will open a window that will receive all `tap>`-ed values while the JVM process is 
 alive.
+
+## UI preferences
+
+You can configure reveal looks with `vlaaad.reveal.prefs` java property that should be
+an edn map. Supported keys (all optional):
+- `:theme` - `:light` or `:dark`;
+- `:font-family` - system font name (like `"Consolas"`) or url (like
+  `"https://ff.static.1001fonts.net/u/b/ubuntu.mono.ttf"` or `"file:/path/to/font.ttf""`),
+  reveal only supports monospaced fonts;
+- `:font-size` - number.
+
+Example:
+```sh
+$ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"}}}' \
+-J-Dvlaaad.reveal.prefs='{:font-family "Consolas" :font-size 15}' \
+-m vlaaad.reveal repl
+```
 
 ## To do
 - structural navigation
