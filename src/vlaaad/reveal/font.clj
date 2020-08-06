@@ -26,13 +26,16 @@
                    (.getDeclaredMethod "impl_getNativeFont" (into-array Class [])))]
       #(.invoke meth % (into-array Object [])))))
 
+(defn- load-default [^double size]
+  (Font/loadFont (io/input-stream (io/resource "vlaaad/reveal/FantasqueSansMono-Regular.ttf")) size))
+
 (def ^Font font
-  (let [[kind id] (:font-family prefs/prefs [:default "vlaaad/reveal/FantasqueSansMono-Regular.ttf"])
+  (let [[kind id] (:font-family prefs/prefs [:default])
         size (double (:font-size prefs/prefs 14.5))]
     (case kind
-      :default (Font/loadFont (io/input-stream (io/resource id)) size)
+      :default (load-default size)
       :system-font (Font/font id size)
-      :url-string (Font/loadFont ^String id size))))
+      :url-string (or (Font/loadFont ^String id size) (load-default size)))))
 
 (let [metrics (.getFontMetrics (.getFontLoader (Toolkit/getToolkit)) font)]
   (def ^double ^:const line-height (Math/ceil (.getLineHeight metrics)))
