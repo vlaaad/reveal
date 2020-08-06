@@ -1,7 +1,6 @@
 (ns vlaaad.reveal.stream
   (:refer-clojure :exclude [newline])
-  (:require [vlaaad.reveal.font :as font]
-            [vlaaad.reveal.style :as style]
+  (:require [vlaaad.reveal.style :as style]
             [clojure.main :as m])
   (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn
                          ISeq MultiFn IRef Var Volatile Namespace IRecord Delay
@@ -396,13 +395,10 @@
 
 (defn- blank-segment [n]
   {:text (apply str (repeat n \space))
-   :width (* n font/char-width)
    :style {:selectable false}})
 
 (defn- string-segment [string-op]
-  (-> string-op
-      (dissoc :op)
-      (assoc :width (* font/char-width (count (:text string-op))))))
+  (dissoc string-op :op))
 
 (defn- segment-length [segment]
   (count (:text segment)))

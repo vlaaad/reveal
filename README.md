@@ -67,8 +67,8 @@ The minimum nrepl version is `0.6.0`.
 If you are using socket repl, run main in `vlaaad.reveal` namespace with `repl` argument.
 Starting Reveal repl from the repl is done similarly: by invoking `(vlaaad.reveal/repl)`. 
 
-If you don't want to use it as a repl, call `(vlaaad.reveal.ui/make)` and it will 
-open a window and return a function: call it with 1 argument to submit a value, call it 
+If you don't want to use it as a repl, calling `(vlaaad.reveal/ui)` will open 
+a window and return a function: call it with 1 argument to submit a value, call it 
 with 0 arguments to close the window and dispose it.
 
 ## Try it out
@@ -123,6 +123,7 @@ alive.
 - fork out/err in repl/nrepl as well:
   - for full experience we should fork `System/out` and `System/err`, and re-bind roots of `*out*` and `*err*` — is it 
     a good idea?
+- option to dispose javafx on quitting the repl - useful for entry points
 - multiple accordions
 - more actions:
   - view files ending with `.html` as web pages
@@ -130,4 +131,3 @@ alive.
 - remember window position and size
 - popup might appear in weird locations
 - *very* long lines have poor performance
-- sometimes popup does not disappear

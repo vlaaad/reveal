@@ -3,7 +3,6 @@
             [cljfx.coerce :as fx.coerce]
             [vlaaad.reveal.cursor :as cursor]
             [vlaaad.reveal.style :as style]
-            [clojure.string :as str]
             [vlaaad.reveal.lines :as lines]
             [clojure.spec.alpha :as s])
   (:import [javafx.scene.canvas GraphicsContext]
@@ -23,8 +22,6 @@
   (s/with-gen (s/and number? (complement neg?) finite?)
               #(s/gen (s/double-in :min 0 :max 100000 :NaN? false :infinite? false))))
 
-(s/def ::width ::size-dimension)
-
 (s/def :vlaaad.reveal.layout.style/fill any?)
 (s/def :vlaaad.reveal.layout.style/selectable boolean?)
 
@@ -33,7 +30,7 @@
                    :vlaaad.reveal.layout.style/selectable]))
 
 (s/def ::segment
-  (s/keys :req-un [::text ::width ::style]))
+  (s/keys :req-un [::text ::style]))
 
 (s/def ::segments
   (s/coll-of ::segment :kind vector?))
@@ -167,8 +164,11 @@
     (let [visible-ratio (min 1.0 (/ canvas-size document-size))]
       (max min-scroll-tab-size (* canvas-size visible-ratio)))))
 
+(defn- segment-width [segment]
+  (* font/char-width (.length ^String (:text segment))))
+
 (defn region-width [region]
-  (transduce (map :width) + (:segments region)))
+  (transduce (map segment-width) + (:segments region)))
 
 (defn make
   ([]
@@ -282,7 +282,7 @@
                       (comp
                         (take start-col)
                         (mapcat :segments)
-                        (map :width))
+                        (map segment-width))
                       +
                       scroll-x
                       line)
@@ -291,7 +291,7 @@
                             (drop start-col)
                             (take (inc (- end-col start-col)))
                             (mapcat :segments)
-                            (map :width))
+                            (map segment-width))
                           +
                           0
                           line)
@@ -301,9 +301,9 @@
     (dotimes [i drawn-line-count]
       (transduce (mapcat :segments)
                  (completing
-                   (fn [x {:keys [text width style]}]
+                   (fn [x {:keys [text style] :as segment}]
                      (if (< x canvas-width)
-                       (let [end (+ x width)]
+                       (let [end (+ x (segment-width segment))]
                          (if (<= end 0)
                            end
                            (do
@@ -312,8 +312,8 @@
                                                (get style/style fill fill)
                                                "#000")))
                              (.setFont ctx font/font)
-                             (.fillText ctx text x (-> (* i font/line-height)
-                                                       (+ font/ascent)
+                             (.fillText ctx text x (-> (* (inc i) font/line-height)
+                                                       (- font/descent)
                                                        (- scroll-y-remainder)))
                              end)))
                        (reduced nil))))
