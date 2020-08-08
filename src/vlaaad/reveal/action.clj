@@ -1,8 +1,5 @@
 (ns vlaaad.reveal.action
-  (:require [clojure.core.protocols :as p]
-            [clojure.datafy]
-            [clojure.set :as set]
-            [clojure.reflect :as reflect]
+  (:require [clojure.datafy :as d]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.style :as style]
             [clojure.spec.alpha :as s]
@@ -71,21 +68,19 @@
        (sort-by :label)
        (into [])))
 
-(vlaaad.reveal.action/def ::nav [x ann]
-  ;; todo what if datafication is a different coll?values
-  ;; todo: some stuff might have custom datafies, need to suggest them too
-  (let [coll (p/datafy (:vlaaad.reveal.nav/coll ann))
-        c (class coll)]
-    (when (or (instance? (:on-interface p/Navigable) coll)
-              (contains? (meta coll) `p/nav)
-              (seq (set/intersection (disj (supers c) Object)
-                                     (set (keys (:impls p/Navigable))))))
-      (let [{:vlaaad.reveal.nav/keys [key val]
-             :or {key ::not-found
-                  val ::not-found}} ann]
-        (cond
-          (not= key ::not-found) #(p/nav coll key x)
-          (not= val ::not-found) #(p/nav coll x val))))))
+(vlaaad.reveal.action/def ::datafy [x]
+  (let [d (d/datafy x)]
+    (when-not (= d x)
+      (constantly d))))
+
+(vlaaad.reveal.action/def ::nav [x {:vlaaad.reveal.nav/keys [coll key val]
+                                    :or {key ::not-found
+                                         val ::not-found}}]
+  (let [datafied-coll (d/datafy coll)]
+    (when (= datafied-coll coll)
+      (cond
+        (not= key ::not-found) #(d/nav datafied-coll key x)
+        (not= val ::not-found) #(d/nav datafied-coll x val)))))
 
 (vlaaad.reveal.action/def ::view:value [x ann]
   (when (::stream/hidden ann)
@@ -142,10 +137,6 @@
                                        (stream/stream value))))))))]
         (stream/just
           (stream/sequential sorted))))))
-
-(vlaaad.reveal.action/def ::reflect [v]
-  (when (class? v)
-    #(reflect/reflect v)))
 
 (vlaaad.reveal.action/def ::deref [v]
   (when (instance? IDeref v)
