@@ -18,9 +18,8 @@ references to objects themselves, making value inspection as easy as bringing up
 menu.
 
 If I want to be able to understand the values I'm looking at, the tool to do it needs to
-treat these values as sacred. Where datafy-and-nav based tools like REBL pretend that 
-atoms are single-element vectors, Reveal never obscures evaluation results, even the 
-metadata.
+treat these values as sacred. Where datafy-and-nav based tools like REBL pretend atoms are
+single-element vectors, Reveal never obscures evaluation results, even the metadata.
 
 Not being limited to just text, Reveal uses judicious syntax highlighting and sometimes 
 simplified string representations for data to make it more approachable yet keep it 
@@ -88,7 +87,7 @@ $ clj -J-Dclojure.server.prepl="{:port 5555 :accept clojure.core.server/io-prepl
 
 Connect to it with Reveal:
 ```sh
-$ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"}}}' \
+$ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea29"}}}' \
 -m vlaaad.reveal remote-prepl :port 5555
 ```
 
@@ -96,7 +95,7 @@ $ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"}}}' \
 
 ```sh
 $ clj \
--Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"} nrepl/nrepl {:mvn/version "0.7.0"}}}' \
+-Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea29"} nrepl/nrepl {:mvn/version "0.7.0"}}}' \
 -m nrepl.cmdline --middleware '[vlaaad.reveal.nrepl/middleware]'
 ```
 
@@ -123,7 +122,7 @@ an edn map. Supported keys (all optional):
 
 Example:
 ```sh
-$ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"}}}' \
+$ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea29"}}}' \
 -J-Dvlaaad.reveal.prefs='{:font-family "Consolas" :font-size 15}' \
 -m vlaaad.reveal repl
 ```
@@ -133,6 +132,7 @@ $ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"}}}' \
 - text search:
   - should be reversible: escape scrolls to the place of search start if there is
     a highlight
+  - could show number of matches and index of current match
 - contextual eval:
   - alt+up/down for history (persist history? per what?)
   - auto-insert closing brackets
@@ -144,7 +144,6 @@ $ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea28"}}}' \
 - multiple accordions
 - more actions:
   - view files ending with `.html` as web pages
-- improve datafy/nav support
 - remember window position and size
 - popup might appear in weird locations
 - *very* long lines have poor performance
