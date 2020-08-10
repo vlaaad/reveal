@@ -271,8 +271,11 @@
              (seqable? v))
     #(as {:fx/type table :seqable v})))
 
-(vlaaad.reveal.action/def ::open-web-page [v]
-  (when (or (instance? URI v)
+(vlaaad.reveal.action/def ::browse:internal [v]
+  (when (or (and (instance? URI v)
+                 (or (#{"http" "https"} (.getScheme ^URI v))
+                     (and (= "file" (.getScheme ^URI v))
+                          (.endsWith (.getPath ^URI v) ".html"))))
             (instance? URL v)
             (and (string? v) (re-matches #"^https?://.+" v)))
     #(as {:fx/type :web-view

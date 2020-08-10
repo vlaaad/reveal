@@ -96,6 +96,7 @@
                        (keep
                          (fn [^PropertyDescriptor descriptor]
                            (when-let [read-meth (.getReadMethod descriptor)]
+                             (.setAccessible read-meth true)
                              [(.getName descriptor)
                               (.invoke read-meth x (object-array 0))
                               descriptor]))))
@@ -146,7 +147,7 @@
   (when-let [m (meta v)]
     (constantly m)))
 
-(vlaaad.reveal.action/def ::browse [v]
+(vlaaad.reveal.action/def ::browse:external [v]
   ;; todo don't open result panel
   (cond
     (instance? URI v)
@@ -155,8 +156,8 @@
     (instance? URL v)
     #(deref (future (.browse (Desktop/getDesktop) (.toURI ^URL v))))
 
-    (instance? File v)
-    #(deref (future (.browse (Desktop/getDesktop) (.toURI ^File v))))))
+    (and (instance? File v) (.exists ^File v))
+    #(deref (future (.browse (Desktop/getDesktop) (.normalize (.toURI ^File v)))))))
 
 (vlaaad.reveal.action/def ::vec [v]
   (when (and v (.isArray (class v)))
