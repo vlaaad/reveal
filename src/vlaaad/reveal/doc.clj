@@ -247,7 +247,8 @@
 
     (simple-symbol? x)
     (when-let [ns (find-ns x)]
-      #(for-ns ns))
+      (when (:doc (meta x))
+        #(for-ns ns)))
 
     (qualified-symbol? x)
     (when-let [var (resolve x)]
