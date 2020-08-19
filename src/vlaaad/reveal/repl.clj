@@ -47,8 +47,7 @@
   (PrintWriter-on
     #(do
        (ui (stream/as %
-             (stream/raw-string (str/trim-newline %)
-                                {:fill fill})))
+             (stream/raw-string (str/replace % #"\r?\n$" "") {:fill fill})))
        (binding [*out* out]
          (print %)
          (flush)))

@@ -147,3 +147,4 @@ $ clj -Sdeps '{:deps {vlaaad/reveal {:mvn/version "0.1.0-ea29"}}}' \
 - remember window position and size
 - popup might appear in weird locations
 - *very* long lines have poor performance
+- bigger font size may break result header scrolling

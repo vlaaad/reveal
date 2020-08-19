@@ -157,7 +157,10 @@
     #(deref (future (.browse (Desktop/getDesktop) (.toURI ^URL v))))
 
     (and (instance? File v) (.exists ^File v))
-    #(deref (future (.browse (Desktop/getDesktop) (.normalize (.toURI ^File v)))))))
+    #(deref (future (.browse (Desktop/getDesktop) (.normalize (.toURI ^File v)))))
+
+    (and (string? v) (re-matches #"^https?://.+" v))
+    #(deref (future (.browse (Desktop/getDesktop) (URI. v))))))
 
 (vlaaad.reveal.action/def ::vec [v]
   (when (and v (.isArray (class v)))

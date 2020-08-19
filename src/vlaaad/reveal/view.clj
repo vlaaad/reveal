@@ -284,35 +284,37 @@
 (defn- request-source-focus! [^Event e]
   (.requestFocus ^Node (.getSource e)))
 
-(defn- tagged->values [tagged]
-  (cond-> tagged (map? tagged) vals))
+(defn- labeled->values [labeled]
+  (cond-> labeled (map? labeled) vals))
 
-(defn- tagged->tag+values [tagged]
-  (if (map? tagged)
-    tagged
-    (map-indexed vector tagged)))
+(defn- labeled->label+values [labeled]
+  (cond
+    (map? labeled) labeled
+    (set? labeled) (map vector labeled labeled)
+    :else (map-indexed vector labeled)))
 
-(defn- tagged?
-  "Check if every value in a coll of specified size has uniquely identifying tag"
+(defn- labeled?
+  "Check if every value in a coll of specified size has uniquely identifying label"
   [x pred & {:keys [min max]
              :or {min 1 max 32}}]
   (and (or (map? x)
+           (set? x)
            (sequential? x))
        (<= min (bounded-count (inc max) x) max)
-       (every? pred (tagged->values x))))
+       (every? pred (labeled->values x))))
 
 (defn pie-chart [{:keys [data]}]
   {:fx/type :pie-chart
    :style-class "reveal-chart"
    :on-mouse-pressed request-source-focus!
    :animated false
-   :data (for [[k v] (tagged->tag+values data)]
+   :data (for [[k v] (labeled->label+values data)]
            {:fx/type :pie-chart-data
             :name (stream/str-summary k)
             :pie-value v})})
 
 (action/def ::view:pie-chart [x]
-  (when (tagged? x number? :min 2)
+  (when (labeled? x number? :min 2)
     #(as {:fx/type pie-chart :data x})))
 
 (def ^:private ext-with-value-on-node
@@ -332,8 +334,9 @@
 
 (defn- numbered? [x]
   (or (number? x)
-      (and (sequential? x)
-           (number? (first x)))))
+      (and (vector? x)
+           (= 2 (count x))
+           (number? (x 0)))))
 
 (defn- numbered->number [numbered]
   (cond-> numbered (not (number? numbered)) first))
@@ -347,10 +350,10 @@
           :animated false
           :x-axis {:fx/type :category-axis :label "key"}
           :y-axis {:fx/type :number-axis :label "value"}
-          :data (for [[series v] (tagged->tag+values data)]
+          :data (for [[series v] (labeled->label+values data)]
                   {:fx/type :xy-chart-series
                    :name (stream/str-summary series)
-                   :data (for [[key value] (tagged->tag+values v)]
+                   :data (for [[key value] (labeled->label+values v)]
                            {:fx/type :xy-chart-data
                             :x-value (stream/->str key)
                             :y-value (numbered->number value)
@@ -362,10 +365,10 @@
 
 (action/def ::view:bar-chart [x]
   (when-let [data (cond
-                    (tagged? x numbered?)
+                    (labeled? x numbered?)
                     {x x}
 
-                    (tagged? x #(tagged? % numbered?))
+                    (labeled? x #(labeled? % numbered?))
                     x)]
     #(as {:fx/type bar-chart
           :data data})))
@@ -390,11 +393,13 @@
                                        (comp (map second) (map count))
                                        max
                                        0
-                                       (tagged->tag+values data)))
+                                       (labeled->label+values data)))
                    :tick-unit 10
                    :minor-tick-count 10}
-          :y-axis {:fx/type :number-axis :label "value"}
-          :data (for [[series numbers] (tagged->tag+values data)]
+          :y-axis {:fx/type :number-axis
+                   :label "value"
+                   :force-zero-in-range false}
+          :data (for [[series numbers] (labeled->label+values data)]
                   {:fx/type :xy-chart-series
                    :name (stream/str-summary series)
                    :data (->> numbers
@@ -414,7 +419,7 @@
                     (numbereds? x)
                     {x x}
 
-                    (tagged? x numbereds?)
+                    (labeled? x numbereds?)
                     x)]
     #(as {:fx/type line-chart :data data})))
 
@@ -426,8 +431,9 @@
 
 (defn- scattered? [x]
   (or (coordinate? x)
-      (and (sequential? x)
-           (coordinate? (first x)))))
+      (and (vector? x)
+           (= 2 (count x))
+           (coordinate? (x 0)))))
 
 (defn- scattered->coordinate [x]
   (let [f (first x)]
@@ -447,7 +453,7 @@
           :animated false
           :x-axis {:fx/type :number-axis :label "x" :force-zero-in-range false}
           :y-axis {:fx/type :number-axis :label "y" :force-zero-in-range false}
-          :data (for [[series places] (tagged->tag+values data)]
+          :data (for [[series places] (labeled->label+values data)]
                   {:fx/type :xy-chart-series
                    :name (stream/str-summary series)
                    :data (for [value places
@@ -463,7 +469,7 @@
 
 (action/def ::view:scatter-chart [x]
   (when-let [data (cond
-                    (tagged? x scattereds?)
+                    (labeled? x scattereds?)
                     x
 
                     (scattereds? x)
