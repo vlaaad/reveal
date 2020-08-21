@@ -20,33 +20,37 @@
         (ui
           (cond
             (not= value ::not-found)
-            (stream/as {:request request :message message}
-              (stream/vertical
-                (stream/raw-string code {:fill style/util-color})
-                (stream/horizontal
-                  (stream/raw-string "=>" {:fill style/util-color})
-                  stream/separator
-                  (stream/stream value))))
+            (stream/just
+              (stream/as {:request request :message message}
+                (stream/vertical
+                  (stream/raw-string code {:fill style/util-color})
+                  (stream/horizontal
+                    (stream/raw-string "=>" {:fill style/util-color})
+                    stream/separator
+                    (stream/stream value)))))
 
             (not= out ::not-found)
-            (stream/as {:request request :message message}
-              (stream/system-out (str/trim-newline out)))
+            (stream/just
+              (stream/as {:request request :message message}
+                (stream/raw-string (str/trim-newline out) {:fill style/string-color})))
 
             (not= err ::not-found)
-            (stream/as {:request request :message message}
-              (stream/system-err (str/trim-newline err)))
+            (stream/just
+              (stream/as {:request request :message message}
+                (stream/raw-string (str/trim-newline err) {:fill style/error-color})))
 
             (not= throwable ::not-found)
-            (stream/as {:request request :message message}
-              (stream/vertical
-                (stream/raw-string code {:fill style/util-color})
-                (stream/horizontal
-                  (stream/raw-string "=>" {:fill style/util-color})
-                  stream/separator
-                  (stream/as throwable
-                    (stream/raw-string
-                      (.getSimpleName (class throwable))
-                      {:fill style/error-color})))))
+            (stream/just
+              (stream/as {:request request :message message}
+                (stream/vertical
+                  (stream/raw-string code {:fill style/util-color})
+                  (stream/horizontal
+                    (stream/raw-string "=>" {:fill style/util-color})
+                    stream/separator
+                    (stream/as throwable
+                      (stream/raw-string
+                        (.getSimpleName (class throwable))
+                        {:fill style/error-color}))))))
 
             :else
             {:request request :message message}))))))

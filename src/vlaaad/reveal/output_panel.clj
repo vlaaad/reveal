@@ -64,7 +64,7 @@
         (cond-> (pos? (count values))
                 (assoc :popup {:bounds (.localToScreen target (layout/cursor->canvas-bounds layout))
                                :window (.getWindow (.getScene target))
-                               :value (peek values)})))))
+                               :annotated-value (peek values)})))))
 
 (defn- show-search [this]
   (assoc this :search {:term "" :results (sorted-set)}))

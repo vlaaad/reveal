@@ -7,28 +7,29 @@
             [clojure.string :as str]))
 
 (defn- prepl-output [x]
-  (stream/as x
-    (if (:exception x)
-      (cond-> (stream/raw-string (-> x :val m/ex-triage m/ex-str) {:fill style/error-color})
-              (:form x)
-              (as-> err-output
-                    (stream/vertical
-                      (stream/raw-string (:form x) {:fill style/util-color})
-                      err-output)))
-      (case (:tag x)
-        :ret (stream/vertical
-               (stream/raw-string (:form x) {:fill style/util-color})
-               (stream/horizontal
-                 (stream/raw-string "=>" {:fill style/util-color})
+  (stream/just
+    (stream/as x
+      (if (:exception x)
+        (cond-> (stream/raw-string (-> x :val m/ex-triage m/ex-str) {:fill style/error-color})
+                (:form x)
+                (as-> err-output
+                      (stream/vertical
+                        (stream/raw-string (:form x) {:fill style/util-color})
+                        err-output)))
+        (case (:tag x)
+          :ret (stream/vertical
+                 (stream/raw-string (:form x) {:fill style/util-color})
+                 (stream/horizontal
+                   (stream/raw-string "=>" {:fill style/util-color})
+                   stream/separator
+                   (stream/stream (:val x))))
+          :out (stream/raw-string (str/trim-newline (:val x)) {:fill style/string-color})
+          :err (stream/raw-string (str/trim-newline (:val x)) {:fill style/error-color})
+          :tap (stream/horizontal
+                 (stream/raw-string "tap>" {:fill style/util-color})
                  stream/separator
-                 (stream/stream (:val x))))
-        :out (stream/raw-string (str/trim-newline (:val x)) {:fill style/string-color})
-        :err (stream/raw-string (str/trim-newline (:val x)) {:fill style/error-color})
-        :tap (stream/horizontal
-               (stream/raw-string "tap>" {:fill style/util-color})
-               stream/separator
-               (stream/stream (:val x)))
-        (stream/emit x)))))
+                 (stream/stream (:val x)))
+          (stream/stream x))))))
 
 (defn- wrap-out-fn [ui out-fn]
   (fn [x]

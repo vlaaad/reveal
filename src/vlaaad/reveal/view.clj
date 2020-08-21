@@ -222,7 +222,8 @@
                                                    (PseudoClass/getPseudoClass "selected"))
                                     %)))]
         {:bounds (.localToScreen cell (.getBoundsInLocal cell))
-         :value (.getCellData (.getTableColumn pos) (.getRow pos))}))))
+         :annotated-value (stream/->AnnotatedValue (.getCellData (.getTableColumn pos) (.getRow pos))
+                                                   {::stream/hidden true})}))))
 
 ;; todo table view does not like repeated items, should use indices!
 
@@ -329,7 +330,7 @@
 (defn- select-chart-node! [^Event event]
   (let [^Node node (.getTarget event)]
     (when-let [value (::value (.getProperties node))]
-      {:value value
+      {:annotated-value (stream/->AnnotatedValue value {::stream/hidden true})
        :bounds (.localToScreen node (.getBoundsInLocal node))})))
 
 (defn- numbered? [x]

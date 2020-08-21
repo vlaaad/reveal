@@ -1,6 +1,5 @@
 (ns vlaaad.reveal.popup
   (:require [vlaaad.reveal.event :as event]
-            [vlaaad.reveal.stream :as stream]
             [cljfx.fx.popup :as fx.popup]
             [vlaaad.reveal.search :as search]
             [cljfx.composite :as fx.composite]
@@ -85,8 +84,9 @@
   (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
                         :action action}))
 
-(defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel value]}]
-  (let [this (get @*state id)]
+(defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel annotated-value]}]
+  (let [this (get @*state id)
+        value (:value annotated-value)]
     (condp = (.getCode event)
       KeyCode/ESCAPE
       (if (empty? (:text this))
@@ -110,7 +110,7 @@
                                                            {'*v value}
                                                            form))
                                            :invoke (fn []
-                                                     ((eval fn-form) (stream/value value)))}})
+                                                     ((eval fn-form) value))}})
             (event/handle *state on-cancel))
           (catch Exception _)))
 
@@ -165,7 +165,7 @@
                                     (some-> node focus-when-on-scene!)))
                                 (fx.lifecycle/get-ref identity))}))
 
-(defn- view-impl [{:keys [value
+(defn- view-impl [{:keys [annotated-value
                           ^Bounds bounds
                           window
                           id
@@ -268,7 +268,7 @@
                                                               :id id}
                                          :on-key-pressed {::event/type ::on-text-key-pressed
                                                           :id id
-                                                          :value value
+                                                          :annotated-value annotated-value
                                                           :on-cancel on-cancel}
                                          :on-text-changed {::event/type ::on-text-changed
                                                            :fx/sync true
@@ -324,18 +324,18 @@
 (defmethod event/handle ::dispose-popup [*state {:keys [id]}]
   (swap! *state dissoc id))
 
-(defn- init-popup! [id value handler]
-  (handler {::event/type ::init-popup :id id :actions (action/collect value)})
+(defn- init-popup! [id annotated-value handler]
+  (handler {::event/type ::init-popup :id id :actions (action/collect annotated-value)})
   #(handler {::event/type ::dispose-popup :id id}))
 
-(defn view [{:keys [value bounds window id on-cancel]
+(defn view [{:keys [annotated-value bounds window id on-cancel]
              :or {id ::rfx/undefined}}]
   {:fx/type rfx/ext-with-process
    :id id
-   :args value
+   :args annotated-value
    :start init-popup!
    :desc {:fx/type view-impl
-          :value value
+          :annotated-value annotated-value
           :on-cancel on-cancel
           :bounds bounds
           :window window}})
@@ -349,14 +349,15 @@
 (defmethod event/handle ::on-popup-node-event [*state {:keys [id select ^Event fx/event]}]
   (when (or (instance? ContextMenuEvent event)
             (and (instance? KeyEvent event)
-                 (= KeyCode/SPACE (.getCode ^KeyEvent event))
+                 (or (= KeyCode/SPACE (.getCode ^KeyEvent event))
+                     (= KeyCode/ENTER (.getCode ^KeyEvent event)))
                  (= KeyEvent/KEY_PRESSED (.getEventType event))))
     (let [node ^Node (.getSource event)]
       (if select
-        (when-let [{:keys [bounds value]} (select event)]
+        (when-let [{:keys [bounds annotated-value]} (select event)]
           (.consume event)
           (swap! *state update id assoc
-                 :value value
+                 :annotated-value annotated-value
                  :bounds bounds
                  :window (.getWindow (.getScene node))))
         (do
@@ -366,7 +367,7 @@
                  :window (.getWindow (.getScene node))))))))
 
 (defmethod event/handle ::close [*state {:keys [id]}]
-  (swap! *state update id dissoc :bounds :window :value))
+  (swap! *state update id dissoc :bounds :window :annotated-value))
 
 (defn- init-ext! [id _ handler]
   (handler {::event/type ::init-ext :id id})
@@ -383,7 +384,7 @@
                    (.hide popup)))
                fx.lifecycle/dynamic))))
 
-(defn- ext-impl [{:keys [desc value id bounds window select]}]
+(defn- ext-impl [{:keys [desc annotated-value id bounds window select]}]
   {:fx/type ext-with-popup-on-node-props
    :props (cond-> {:event-filter {::event/type ::on-popup-node-event
                                   :id id
@@ -391,7 +392,7 @@
                    :focus-traversable true}
                   bounds
                   (assoc :popup {:fx/type view
-                                 :value (stream/annotate value {::stream/hidden true})
+                                 :annotated-value annotated-value
                                  :bounds bounds
                                  :window window
                                  :id [id :popup]

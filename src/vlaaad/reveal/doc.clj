@@ -171,9 +171,10 @@
         indent (if (seq indented-lines) (apply min indented-lines) 0)
         re-indent (re-pattern (str "^\\s{" indent "}"))]
     (binding [*doc-ns* (the-ns ns)]
-      (->sf (.parse parser ^String (->> lines
-                                        (map #(str/replace % re-indent ""))
-                                        (str/join "\n")))))))
+      (stream/just
+        (->sf (.parse parser ^String (->> lines
+                                          (map #(str/replace % re-indent ""))
+                                          (str/join "\n"))))))))
 
 (defn- for-var [var]
   (let [m (meta var)]

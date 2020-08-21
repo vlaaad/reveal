@@ -6,8 +6,9 @@
             [clojure.string :as str]))
 
 (defn- stream-read [form ui]
-  (ui (stream/as form
-        (stream/raw-string (pr-str form) {:fill style/util-color}))))
+  (ui (stream/just
+        (stream/as form
+          (stream/raw-string (pr-str form) {:fill style/util-color})))))
 
 (defn- wrap-read [ui read]
   (fn [request-prompt request-exit]
@@ -30,9 +31,10 @@
 
 (defn- wrap-caught [ui caught]
   (fn [ex]
-    (ui (stream/as ex
-          (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
-                             {:fill style/error-color})))
+    (ui (stream/just
+          (stream/as ex
+            (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
+                               {:fill style/error-color}))))
     (caught ex)))
 
 (defn- make-tap [ui]
@@ -46,8 +48,9 @@
 (defn- make-print [ui out fill]
   (PrintWriter-on
     #(do
-       (ui (stream/as %
-             (stream/raw-string (str/replace % #"\r?\n$" "") {:fill fill})))
+       (ui (stream/just
+             (stream/as %
+               (stream/raw-string (str/replace % #"\r?\n$" "") {:fill fill}))))
        (binding [*out* out]
          (print %)
          (flush)))
@@ -77,8 +80,9 @@
                       (update :eval #(wrap-eval ui (or % eval)))
                       (update :print #(wrap-print ui (or % prn)))
                       (update :caught #(wrap-caught ui (or % m/repl-caught))))]
-    (ui (stream/as *clojure-version*
-          (stream/raw-string version {:fill style/util-color})))
+    (ui (stream/just
+          (stream/as *clojure-version*
+            (stream/raw-string version {:fill style/util-color}))))
     (println version)
     (add-tap tap)
     (try

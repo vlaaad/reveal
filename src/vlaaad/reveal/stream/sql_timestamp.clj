@@ -8,7 +8,7 @@
       (doto (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss")
         (.setTimeZone (TimeZone/getTimeZone "GMT"))))))
 
-(defmethod emit Timestamp [^Timestamp timestamp]
+(defs Timestamp [^Timestamp timestamp]
   (horizontal
     (raw-string "#inst" {:fill style/object-color})
     separator

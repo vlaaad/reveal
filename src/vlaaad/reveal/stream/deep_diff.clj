@@ -1,6 +1,6 @@
 (in-ns 'vlaaad.reveal.stream)
 
-(defmethod emit lambdaisland.deep_diff.diff.Mismatch [{:keys [- +]}]
+(defs lambdaisland.deep_diff.diff.Mismatch [{:keys [- +]}]
   (horizontal
     (override-style
       (horizontal
@@ -14,14 +14,14 @@
         (stream +))
       assoc :fill style/success-color)))
 
-(defmethod emit lambdaisland.deep_diff.diff.Insertion [{:keys [+]}]
+(defs lambdaisland.deep_diff.diff.Insertion [{:keys [+]}]
   (override-style
     (horizontal
       (raw-string "+")
       (stream +))
     assoc :fill style/success-color))
 
-(defmethod emit lambdaisland.deep_diff.diff.Deletion [{:keys [-]}]
+(defs lambdaisland.deep_diff.diff.Deletion [{:keys [-]}]
   (override-style
     (horizontal
       (raw-string "-")

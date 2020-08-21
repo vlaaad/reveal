@@ -16,33 +16,7 @@
 
 (set! *warn-on-reflection* true)
 
-(defprotocol Value
-  (value [this]))
-
-(extend-protocol Value
-  Object
-  (value [x] x)
-  nil
-  (value [x] x))
-
-(defprotocol Annotation
-  :extend-via-metadata true
-  (annotation [this]))
-
-(extend-protocol Annotation
-  Object
-  (annotation [_] nil)
-  nil
-  (annotation [_] nil))
-
-(deftype AnnotatedValue [value annotation]
-  Value
-  (value [_] value)
-  Annotation
-  (annotation [_] annotation))
-
-(defn annotate [val ann]
-  (AnnotatedValue. (value val) (into (or (annotation val) {}) ann)))
+(defrecord AnnotatedValue [value annotation])
 
 ;; region emitter ops
 
@@ -71,8 +45,8 @@
   (fn [rf acc]
     (rf acc op)))
 
-(defn- with-value [sf x]
-  (=> (op {:op ::push-value :value x})
+(defn- with-value [x ann sf]
+  (=> (op {:op ::push-value :value (->AnnotatedValue x ann)})
       sf
       (op {:op ::pop-value})))
 
@@ -90,30 +64,20 @@
       (op {:op ::pop-block})))
 
 ;; endregion
-
-(defmulti emit (fn emit-dispatch [x]
-                 (or (::type (meta x))
-                     (class x))))
-
-(defmethod emit ::sf [sf] sf)
+(defmulti stream-dispatch (fn stream-dispatch [x _]
+                            (or (::type (meta x)) (class x))))
 
 (defn stream
-  "Streams value using default emitting"
-  [x]
-  (cond-> (emit (value x))
-          (not (::hidden (annotation x)))
-          (with-value x)))
+  ([x] (stream-dispatch x nil))
+  ([x ann] (stream-dispatch x ann)))
 
-(defn just
-  "Streams sf"
-  [sf]
-  (with-meta sf {::type ::sf
-                 `annotation (constantly {::hidden true})}))
+(defn as [x sf]
+  (with-value x {::hidden true} sf))
 
-(defn as
-  "Streams value using custom sf"
-  [x sf]
-  (just (with-value sf (annotate x {::hidden true}))))
+(defmethod stream-dispatch ::just [sf _] sf)
+
+(defn just [sf]
+  (with-meta sf {::type ::just}))
 
 (defn- flush-builder [^StringBuilder builder style]
   (fn [rf acc]
@@ -233,11 +197,11 @@
         (map (fn [e]
                (let [k (key e)
                      v (val e)]
-                 (horizontal (stream (annotate k {:vlaaad.reveal.nav/val v
-                                                  :vlaaad.reveal.nav/coll m}))
+                 (horizontal (stream k {:vlaaad.reveal.nav/val v
+                                        :vlaaad.reveal.nav/coll m})
                              separator
-                             (stream (annotate v {:vlaaad.reveal.nav/key k
-                                                  :vlaaad.reveal.nav/coll m}))))))
+                             (stream v {:vlaaad.reveal.nav/key k
+                                        :vlaaad.reveal.nav/coll m})))))
         (interpose separator))
       m)))
 
@@ -247,12 +211,12 @@
       (if (set? coll)
         (map
           (fn [x]
-            (stream (annotate x {:vlaaad.reveal.nav/key x
-                                 :vlaaad.reveal.nav/coll coll}))))
+            (stream x {:vlaaad.reveal.nav/key x
+                       :vlaaad.reveal.nav/coll coll})))
         (map-indexed
           (fn [i x]
-            (stream (annotate x {:vlaaad.reveal.nav/key i
-                                 :vlaaad.reveal.nav/coll coll})))))
+            (stream x {:vlaaad.reveal.nav/key i
+                       :vlaaad.reveal.nav/coll coll}))))
       (interpose separator))
     coll))
 
@@ -498,7 +462,14 @@
     (as hash
       (raw-string (format "0x%x" hash) {:fill style/scalar-color}))))
 
-(defmethod emit :default [x]
+(defmacro defs [dispatch-val bindings sf]
+  (let [[x ann] (cond-> bindings (= 1 (count bindings)) (conj (gensym "ann")))]
+    `(defmethod stream-dispatch ~dispatch-val [x# ann#]
+       (let [~x x#
+             ~ann ann#]
+         (with-value x# ann# ~sf)))))
+
+(defs :default [x]
   (horizontal
     (raw-string "#object[" {:fill style/object-color})
     (let [c (class x)]
@@ -513,16 +484,16 @@
 
 ;; scalars
 
-(defmethod emit nil [x]
+(defs nil [x]
   (raw-string (pr-str x) {:fill style/scalar-color}))
 
-(defmethod emit Boolean [x]
+(defs Boolean [x]
   (raw-string (pr-str x) {:fill style/scalar-color}))
 
-(defmethod emit String [s]
+(defs String [s]
   (raw-string (pr-str s) {:fill style/string-color}))
 
-(defmethod emit Character [ch]
+(defs Character [ch]
   (raw-string (pr-str ch) {:fill style/string-color}))
 
 (def escape-layout-chars
@@ -532,20 +503,20 @@
    \formfeed "\\f"
    \backspace "\\b"})
 
-(defmethod emit Keyword [k]
+(defs Keyword [k]
   (escaped-string k {:fill style/keyword-color}
                   escape-layout-chars {:fill style/scalar-color}))
 
-(defmethod emit Symbol [sym]
+(defs Symbol [sym]
   (escaped-string sym {:fill style/symbol-color}
                   escape-layout-chars {:fill style/scalar-color}))
 
 ;; numbers
 
-(defmethod emit Number [n]
+(defs Number [n]
   (raw-string n {:fill style/scalar-color}))
 
-(defmethod emit Float [n]
+(defs Float [n]
   (raw-string
     (cond
       (= Float/POSITIVE_INFINITY n) "##Inf"
@@ -554,7 +525,7 @@
       :else (str n))
     {:fill style/scalar-color}))
 
-(defmethod emit Double [n]
+(defs Double [n]
   (raw-string
     (cond
       (= Double/POSITIVE_INFINITY n) "##Inf"
@@ -563,77 +534,77 @@
       :else (str n))
     {:fill style/scalar-color}))
 
-(defmethod emit BigDecimal [n]
+(defs BigDecimal [n]
   (raw-string (str n "M") {:fill style/scalar-color}))
 
-(defmethod emit BigInt [n]
+(defs BigInt [n]
   (raw-string (str n "N") {:fill style/scalar-color}))
 
 ;; maps
 
-(defmethod emit IPersistentMap [m]
+(defs IPersistentMap [m]
   (horizontal
     (raw-string "{" {:fill style/object-color})
     (entries m)
     (raw-string "}" {:fill style/object-color})))
 
-(defmethod emit IRecord [m]
+(defs IRecord [m]
   (horizontal
     (raw-string (str "#" (.getName (class m)) "{") {:fill style/object-color})
     (entries m)
     (raw-string "}" {:fill style/object-color})))
 
-(defmethod emit Map [m]
+(defs Map [m]
   (horizontal
     (raw-string "{" {:fill style/object-color})
     (entries m)
     (raw-string "}" {:fill style/object-color})))
 
-(prefer-method emit IRecord IPersistentMap)
-(prefer-method emit IRecord Map)
-(prefer-method emit IPersistentCollection Map)
+(prefer-method stream-dispatch IRecord IPersistentMap)
+(prefer-method stream-dispatch IRecord Map)
+(prefer-method stream-dispatch IPersistentCollection Map)
 
 ;; lists
 
-(defmethod emit IPersistentVector [v]
+(defs IPersistentVector [v]
   (horizontal
     (raw-string "[" {:fill style/object-color})
     (items v)
     (raw-string "]" {:fill style/object-color})))
 
-(defmethod emit List [xs]
+(defs List [xs]
   (horizontal
     (raw-string "(" {:fill style/object-color})
     (sequential xs)
     (raw-string ")" {:fill style/object-color})))
 
-(defmethod emit RandomAccess [xs]
+(defs RandomAccess [xs]
   (horizontal
     (raw-string "[" {:fill style/object-color})
     (items xs)
     (raw-string "]" {:fill style/object-color})))
 
-(defmethod emit ISeq [xs]
+(defs ISeq [xs]
   (horizontal
     (raw-string "(" {:fill style/object-color})
     (sequential xs)
     (raw-string ")" {:fill style/object-color})))
 
-(prefer-method emit IPersistentCollection RandomAccess)
-(prefer-method emit IPersistentCollection Collection)
-(prefer-method emit RandomAccess List)
-(prefer-method emit ISeq IPersistentCollection)
-(prefer-method emit ISeq Collection)
+(prefer-method stream-dispatch IPersistentCollection RandomAccess)
+(prefer-method stream-dispatch IPersistentCollection Collection)
+(prefer-method stream-dispatch RandomAccess List)
+(prefer-method stream-dispatch ISeq IPersistentCollection)
+(prefer-method stream-dispatch ISeq Collection)
 
 ;; sets
 
-(defmethod emit IPersistentSet [s]
+(defs IPersistentSet [s]
   (horizontal
     (raw-string "#{" {:fill style/object-color})
     (items s)
     (raw-string "}" {:fill style/object-color})))
 
-(defmethod emit Set [s]
+(defs Set [s]
   (horizontal
     (raw-string "#{" {:fill style/object-color})
     (items s)
@@ -641,12 +612,12 @@
 
 ;; exceptions
 
-(defmethod emit Throwable [t]
+(defs Throwable [t]
   (horizontal
     (raw-string "#reveal/error" {:fill style/object-color})
     (stream (Throwable->map t))))
 
-(defmethod emit StackTraceElement [^StackTraceElement el]
+(defs StackTraceElement [^StackTraceElement el]
   (horizontal
     (raw-string "[" {:fill style/object-color})
     (stream (symbol (.getClassName el)))
@@ -667,7 +638,7 @@
     (catch Exception _
       #(.-dispatchFn ^MultiFn %))))
 
-(defmethod emit MultiFn [^MultiFn f]
+(defs MultiFn [^MultiFn f]
   (horizontal
     (raw-string "#reveal/multi-fn[" {:fill style/object-color})
     (stream (describe-multi f))
@@ -675,30 +646,30 @@
     (identity-hash-code f)
     (raw-string "]" {:fill style/object-color})))
 
-(defmethod emit Fn [f]
+(defs Fn [f]
   (escaped-string (Compiler/demunge (.getName (class f))) {:fill style/object-color}
                   escape-layout-chars {:fill style/scalar-color}))
 
-(defmethod emit Pattern [re]
+(defs Pattern [re]
   (horizontal
     (raw-string "#" {:fill style/object-color})
     (raw-string (str \" re \") {:fill style/string-color})))
 
-(defmethod emit Var [var]
+(defs Var [var]
   (raw-string (pr-str var) {:fill style/object-color}))
 
-(defmethod emit Namespace [^Namespace ns]
+(defs Namespace [^Namespace ns]
   (raw-string (name (.getName ns)) {:fill style/object-color}))
 
-(defmethod emit Class [^Class class]
+(defs Class [^Class class]
   (raw-string (.getName class) {:fill style/object-color}))
 
-(defmethod emit Enum [^Enum enum]
+(defs Enum [^Enum enum]
   (raw-string
     (str (.getName (.getDeclaringClass enum)) "/" (.name enum))
     {:fill style/scalar-color}))
 
-(defmethod emit IRef [*ref]
+(defs IRef [*ref]
   (horizontal
     (raw-string (str "#reveal/" (.toLowerCase (.getSimpleName (class *ref))) "[") {:fill style/object-color})
     (stream @*ref)
@@ -706,13 +677,13 @@
     (identity-hash-code *ref)
     (raw-string "]" {:fill style/object-color})))
 
-(defmethod emit File [file]
+(defs File [file]
   (horizontal
     (raw-string "#reveal/file" {:fill style/object-color})
     separator
     (stream (str file))))
 
-(defmethod emit Delay [*delay]
+(defs Delay [*delay]
   (horizontal
     (raw-string "#reveal/delay[" {:fill style/object-color})
     (if (realized? *delay)
@@ -722,13 +693,13 @@
     (identity-hash-code *delay)
     (raw-string "]" {:fill style/object-color})))
 
-(defmethod emit Reduced [*reduced]
+(defs Reduced [*reduced]
   (horizontal
     (raw-string "#reveal/reduced" {:fill style/object-color})
     separator
     (stream @*reduced)))
 
-(defmethod emit IBlockingDeref [*blocking-deref]
+(defs IBlockingDeref [*blocking-deref]
   (let [class-name (.getName (class *blocking-deref))]
     (cond
       (.startsWith class-name "clojure.core$promise$reify")
@@ -754,7 +725,7 @@
       :else
       (raw-string (pr-str *blocking-deref) {:fill style/object-color}))))
 
-(defmethod emit Volatile [*ref]
+(defs Volatile [*ref]
   (horizontal
     (raw-string "#reveal/volatile[" {:fill style/object-color})
     (stream @*ref)
@@ -762,45 +733,37 @@
     (identity-hash-code *ref)
     (raw-string "]" {:fill style/object-color})))
 
-(defmethod emit TaggedLiteral [x]
+(defs TaggedLiteral [x]
   (horizontal
     (raw-string "#" {:fill style/object-color})
     (stream (:tag x))
     separator
     (stream (:form x))))
 
-(defmethod emit ReaderConditional [^ReaderConditional x]
+(defs ReaderConditional [^ReaderConditional x]
   (horizontal
     (raw-string (str "#?" (when (.-splicing x) "@")) {:fill style/object-color})
     (stream (.-form x))))
 
-(defmethod emit URL [x]
+(defs URL [x]
   (horizontal
     (raw-string "#reveal/url" {:fill style/object-color})
     separator
     (stream (str x))))
 
-(defmethod emit URI [x]
+(defs URI [x]
   (horizontal
     (raw-string "#reveal/uri" {:fill style/object-color})
     separator
     (stream (str x))))
 
-(defmethod emit UUID [x]
+(defs UUID [x]
   (horizontal
     (raw-string "#uuid" {:fill style/object-color})
     separator
     (stream (str x))))
 
-(defn system-out [line]
-  (as line
-    (raw-string line {:fill style/string-color})))
-
-(defn system-err [line]
-  (as line
-    (raw-string line {:fill style/error-color})))
-
-(defmethod emit Eduction [eduction]
+(defs Eduction [eduction]
   (horizontal
     (raw-string "(" {:fill style/object-color})
     (sequential eduction)
@@ -812,14 +775,14 @@
       (doto (SimpleDateFormat. "yyyy-MM-dd'T'HH:mm:ss.SSS-00:00")
         (.setTimeZone (TimeZone/getTimeZone "GMT"))))))
 
-(defmethod emit Date [^Date date]
+(defs Date [^Date date]
   (let [^DateFormat format (.get utc-date-format)]
     (horizontal
       (raw-string "#inst" {:fill style/object-color})
       separator
       (stream (.format format date)))))
 
-(defmethod emit Calendar [^Calendar calendar]
+(defs Calendar [^Calendar calendar]
   (let [calendar-str (format "%1$tFT%1$tT.%1$tL%1$tz" calendar)
         minutes-index (- (.length calendar-str) 2)]
     (horizontal
@@ -827,7 +790,7 @@
       separator
       (stream (str (subs calendar-str 0 minutes-index) ":" (subs calendar-str minutes-index))))))
 
-(defmethod emit Instant [instant]
+(defs Instant [instant]
   (horizontal
     (raw-string "#inst" {:fill style/object-color})
     separator
