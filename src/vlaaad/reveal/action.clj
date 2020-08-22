@@ -26,7 +26,7 @@
                :body (s/+ any?))
   :ret ::id)
 
-(defmacro def
+(defmacro defaction
   "Define action for execution in the context of some selected value
 
   When user requests a context menu on a selected value, all actions are
@@ -68,25 +68,25 @@
          (sort-by :label)
          (into []))))
 
-(vlaaad.reveal.action/def ::datafy [x]
+(defaction ::datafy [x]
   (let [d (d/datafy x)]
     (when-not (= d x)
       (constantly d))))
 
-(vlaaad.reveal.action/def ::nav [x {:vlaaad.reveal.nav/keys [coll key val]
-                                    :or {key ::not-found
-                                         val ::not-found}}]
+(defaction ::nav [x {:vlaaad.reveal.nav/keys [coll key val]
+                     :or {key ::not-found
+                          val ::not-found}}]
   (let [datafied-coll (d/datafy coll)]
     (when (= datafied-coll coll)
       (cond
         (not= key ::not-found) #(d/nav datafied-coll key x)
         (not= val ::not-found) #(d/nav datafied-coll x val)))))
 
-(vlaaad.reveal.action/def ::view:value [x ann]
+(defaction ::view:value [x ann]
   (when (::stream/hidden ann)
     (constantly x)))
 
-(vlaaad.reveal.action/def ::java-bean [x]
+(defaction ::java-bean [x]
   (when (some? x)
     (fn []
       (let [props (->> x
@@ -139,15 +139,15 @@
         (stream/just
           (stream/sequential sorted))))))
 
-(vlaaad.reveal.action/def ::deref [v]
+(defaction ::deref [v]
   (when (instance? IDeref v)
     #(deref v)))
 
-(vlaaad.reveal.action/def ::meta [v]
+(defaction ::meta [v]
   (when-let [m (meta v)]
     (constantly m)))
 
-(vlaaad.reveal.action/def ::browse:external [v]
+(defaction ::browse:external [v]
   ;; todo don't open result panel
   (cond
     (instance? URI v)
@@ -162,6 +162,6 @@
     (and (string? v) (re-matches #"^https?://.+" v))
     #(deref (future (.browse (Desktop/getDesktop) (URI. v))))))
 
-(vlaaad.reveal.action/def ::vec [v]
+(defaction ::vec [v]
   (when (and v (.isArray (class v)))
     #(vec v)))

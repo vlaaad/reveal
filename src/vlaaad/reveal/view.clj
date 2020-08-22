@@ -119,7 +119,7 @@
 (defn as [desc]
   (reify Viewable (make [_] desc)))
 
-(action/def ::watch:latest [v]
+(action/defaction ::watch:latest [v]
   (when (instance? IRef v)
     #(as {:fx/type ref-watcher :ref v})))
 
@@ -160,7 +160,7 @@
    :args ref
    :desc {:fx/type output-panel/view}})
 
-(action/def ::watch:all [v]
+(action/defaction ::watch:all [v]
   (when (instance? IRef v)
     #(as {:fx/type ref-logger :ref v})))
 
@@ -266,13 +266,13 @@
                    :columns columns
                    :items (vec xs)}}}))
 
-(action/def ::view:table [v]
+(action/defaction ::view:table [v]
   (when (and (some? v)
              (not (string? v))
              (seqable? v))
     #(as {:fx/type table :seqable v})))
 
-(vlaaad.reveal.action/def ::browse:internal [v]
+(action/defaction ::browse:internal [v]
   (when (or (and (instance? URI v)
                  (or (#{"http" "https"} (.getScheme ^URI v))
                      (and (= "file" (.getScheme ^URI v))
@@ -314,7 +314,7 @@
             :name (stream/str-summary k)
             :pie-value v})})
 
-(action/def ::view:pie-chart [x]
+(action/defaction ::view:pie-chart [x]
   (when (labeled? x number? :min 2)
     #(as {:fx/type pie-chart :data x})))
 
@@ -364,7 +364,7 @@
                                                     :series series}}
                                    :desc {:fx/type :region}}})})}})
 
-(action/def ::view:bar-chart [x]
+(action/defaction ::view:bar-chart [x]
   (when-let [data (cond
                     (labeled? x numbered?)
                     {x x}
@@ -415,7 +415,7 @@
                                                            :series series}}
                                           :desc {:fx/type :region}}})))})}})
 
-(action/def ::view:line-chart [x]
+(action/defaction ::view:line-chart [x]
   (when-let [data (cond
                     (numbereds? x)
                     {x x}
@@ -468,7 +468,7 @@
                                                     :series series}}
                                    :desc {:fx/type :region}}})})}})
 
-(action/def ::view:scatter-chart [x]
+(action/defaction ::view:scatter-chart [x]
   (when-let [data (cond
                     (labeled? x scattereds?)
                     x
@@ -477,7 +477,7 @@
                     {x x})]
     #(as {:fx/type scatter-chart :data data})))
 
-(vlaaad.reveal.action/def ::view:color [v]
+(action/defaction ::view:color [v]
   (when-let [color (cond
                      (instance? Color v) v
                      (string? v) (Color/valueOf v)

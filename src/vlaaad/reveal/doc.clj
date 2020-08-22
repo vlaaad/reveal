@@ -235,7 +235,7 @@
                           (re-matches #"^([^/]*?/([^/]*?|/))(--\d\d\d\d)?$"))]
     (resolve (symbol str))))
 
-(action/def ::doc [x]
+(action/defaction ::doc [x]
   (cond
     (and (var? x) (:name (meta x)) (:ns (meta x)))
     #(for-var x)
@@ -285,7 +285,7 @@
           (stream/as form
             (stream/raw-string text {:fill style/string-color})))))))
 
-(action/def ::source [x]
+(action/defaction ::source [x]
   (cond
     (var? x)
     (when-let [url (var->source-url x)]
