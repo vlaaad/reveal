@@ -258,22 +258,28 @@
     #(update % id hide-search)
     identity))
 
-(defn- focus-on-output! [^Event event]
+(defn- focus! [^Node node]
+  (.requestFocus node))
+
+(defn- search-event->output [^Event event]
   (->> ^Node (.getTarget event)
        ;; fixme: this is a horrible hack
        .getParent
        .getParent
        .getChildrenUnmodifiable
-       ^Node (some #(when (instance? Canvas %) %))
-       .requestFocus))
+       ^Node (some #(when (instance? Canvas %) %))))
 
 (defmethod event/handle ::on-search-event-filter [{:keys [id fx/event]}]
   (if (and (instance? KeyEvent event)
            (= KeyEvent/KEY_PRESSED (.getEventType ^KeyEvent event)))
     (let [^KeyEvent event event]
       (condp = (.getCode event)
-        KeyCode/ESCAPE (do (focus-on-output! event) (.consume event) #(update % id hide-search))
-        KeyCode/ENTER (do (fx/run-later (focus-on-output! event)) #(update % id select-highlight))
+        KeyCode/ESCAPE (do (focus! (search-event->output event))
+                           (.consume event)
+                           #(update % id hide-search))
+        KeyCode/ENTER (do (let [output (search-event->output event)]
+                            (fx/run-later (focus! output)))
+                          #(update % id select-highlight))
         KeyCode/TAB (do (.consume event) identity)
         KeyCode/UP (do (.consume event) #(update % id jump-to-prev-match))
         KeyCode/DOWN (do (.consume event) #(update % id jump-to-next-match))
