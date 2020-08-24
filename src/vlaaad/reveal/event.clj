@@ -16,12 +16,12 @@
 (defmacro daemon-future [& body]
   `(daemon-future-call (^{:once true} fn* [] ~@body)))
 
-(defmulti handle "[*state event]" (fn [*state e] (::type e)))
+(defmulti handle ::type)
 
-(defmethod handle :default [_ e]
-  (prn e))
+(defmethod handle :default [e] (prn e))
 
 (defrecord MapEventHandler [*state]
   IFn
   (invoke [_ e]
-    (handle *state e)))
+    (swap! *state (handle e))
+    nil))

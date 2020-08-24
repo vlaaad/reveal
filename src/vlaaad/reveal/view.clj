@@ -27,11 +27,11 @@
    (let [rf (xf (completing #(f %2)))]
      (rf (rf nil x)))))
 
-(defmethod event/handle ::dispose-state [*state {:keys [id]}]
-  (swap! *state dissoc id))
+(defmethod event/handle ::dispose-state [{:keys [id]}]
+  #(dissoc % id))
 
-(defmethod event/handle ::create-view-state [*state {:keys [id state]}]
-  (swap! *state assoc id (assoc state :id id)))
+(defmethod event/handle ::create-view-state [{:keys [id state]}]
+  #(assoc % id (assoc state :id id)))
 
 (defn- process-queue [id ^BlockingQueue queue handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make)})

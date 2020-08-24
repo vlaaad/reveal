@@ -16,40 +16,45 @@
            [java.util UUID]
            [javafx.scene.control ScrollPane]))
 
-(defmethod event/handle ::on-view-event [*state {:keys [index ^Event fx/event]}]
-  (when (and (instance? KeyEvent event)
-             (= KeyEvent/KEY_PRESSED (.getEventType event)))
+(defmethod event/handle ::on-view-event [{:keys [index ^Event fx/event]}]
+  (if (and (instance? KeyEvent event)
+           (= KeyEvent/KEY_PRESSED (.getEventType event)))
     (let [^KeyEvent event event
           code (.getCode event)]
       (cond
         (and (= KeyCode/LEFT code) (.isShortcutDown event))
         (do
           (.consume event)
-          (swap! *state update :focused-view-index #(max 0 (dec %))))
+          (fn [state]
+            (update state :focused-view-index #(max 0 (dec %)))))
 
         (and (= KeyCode/RIGHT code) (.isShortcutDown event))
         (do
           (.consume event)
-          (swap! *state (fn [state]
-                          (update state :focused-view-index #(min (inc %) (dec (count (:view-order state))))))))
+          (fn [state]
+            (update state :focused-view-index #(min (inc %) (dec (count (:view-order state)))))))
 
         (and (= KeyCode/ESCAPE code)
              (not (::consumes-escape (.getProperties ^Node (.getTarget event)))))
         (do
           (.consume event)
-          (swap! *state (fn [state]
-                          (let [id (get-in state [:view-order index])
-                                view-order (:view-order state)
-                                new-view-order (into (subvec view-order 0 index)
-                                                     (subvec view-order (inc index)))]
-                            (-> state
-                                (dissoc id)
-                                (assoc :view-order new-view-order)
-                                (as-> $ (if (empty? new-view-order)
-                                          (dissoc $ :focused-view-index)
-                                          (assoc $ :focused-view-index
-                                                   (min index (dec (count new-view-order))))))
-                                (update :views dissoc id))))))))))
+          (fn [state]
+            (let [id (get-in state [:view-order index])
+                  view-order (:view-order state)
+                  new-view-order (into (subvec view-order 0 index)
+                                       (subvec view-order (inc index)))]
+              (-> state
+                  (dissoc id)
+                  (assoc :view-order new-view-order)
+                  (as-> $ (if (empty? new-view-order)
+                            (dissoc $ :focused-view-index)
+                            (assoc $ :focused-view-index
+                                     (min index (dec (count new-view-order))))))
+                  (update :views dissoc id)))))
+
+        :else
+        identity))
+    identity))
 
 (defn- descendant-seq [^Node node]
   (cons node (when (instance? Parent node)
@@ -80,11 +85,11 @@
    :on-advanced switch-focus!
    :desc desc})
 
-(defmethod event/handle ::on-window-focused-changed [*state {:keys [fx/event]}]
-  (swap! *state assoc :window-focused event))
+(defmethod event/handle ::on-window-focused-changed [{:keys [fx/event]}]
+  #(assoc % :window-focused event))
 
-(defmethod event/handle ::focus-on-tab [*state {:keys [index]}]
-  (swap! *state assoc :focused-view-index index))
+(defmethod event/handle ::focus-on-tab [{:keys [index]}]
+  #(assoc % :focused-view-index index))
 
 (def ^:private scroll-pane
   (fx.composite/lifecycle
@@ -160,17 +165,18 @@
                  :desc {:fx/type fx/ext-get-ref
                         :ref focused-view-id}}]}))
 
-(defmethod event/handle ::confirm-exit [*state {:keys [^Event fx/event]}]
+(defmethod event/handle ::confirm-exit [{:keys [^Event fx/event]}]
   (.consume event)
-  (swap! *state assoc :confirm-exit-showing true))
+  #(assoc % :confirm-exit-showing true))
 
-(defmethod event/handle ::cancel-quit [*state _]
-  (swap! *state dissoc :confirm-exit-showing))
+(defmethod event/handle ::cancel-quit [_]
+  #(dissoc % :confirm-exit-showing))
 
-(defmethod event/handle ::quit [*state _]
-  ((:dispose (swap! *state dissoc :confirm-exit-showing))))
+(defmethod event/handle ::quit [{:keys [dispose]}]
+  (dispose)
+  #(dissoc % :confirm-exit-showing))
 
-(defn- confirm-exit-dialog [_]
+(defn- confirm-exit-dialog [{:keys [dispose]}]
   {:fx/type :stage
    :showing true
    :owner {:fx/type fx/ext-get-ref :ref ::stage}
@@ -194,10 +200,11 @@
                                           :text "Cancel"}
                                          {:fx/type ext-focused-by-default
                                           :desc {:fx/type :button
-                                                 :on-action {::event/type ::quit}
+                                                 :on-action {::event/type ::quit
+                                                             :dispose dispose}
                                                  :text "Quit"}}]}]}}})
 
-(defn- view [{:keys [title queue showing view-order views focused-view-index confirm-exit-showing]}]
+(defn- view [{:keys [title queue showing view-order views focused-view-index confirm-exit-showing dispose]}]
   {:fx/type fx/ext-let-refs
    :refs (into {} (map (juxt key #(-> % val :desc)) views))
    :desc {:fx/type fx/ext-let-refs
@@ -241,7 +248,8 @@
                                                         :focused-view-index focused-view-index}))}}}}
           :desc {:fx/type fx/ext-let-refs
                  :refs (when confirm-exit-showing
-                         {::confirm-exit {:fx/type confirm-exit-dialog}})
+                         {::confirm-exit {:fx/type confirm-exit-dialog
+                                          :dispose dispose}})
                  :desc {:fx/type fx/ext-get-ref :ref ::stage}}}})
 
 (defn oneduce
@@ -251,17 +259,17 @@
    (let [rf (xf (completing #(f %2)))]
      (rf (rf nil x)))))
 
-(defmethod event/handle ::execute-action [*state {:keys [action]}]
+(defmethod event/handle ::execute-action [{:keys [action]}]
   (let [id (UUID/randomUUID)
         f (future ((:invoke action)))]
-    (swap! *state (fn [state]
-                    (let [view-order (:view-order state)]
-                      (-> state
-                          (assoc :focused-view-index (count view-order)
-                                 :view-order (conj view-order id))
-                          (assoc-in [:views id] {:action action
-                                                 :desc {:fx/type view/blocking-deref
-                                                        :blocking-deref f}})))))))
+    (fn [state]
+      (let [view-order (:view-order state)]
+        (-> state
+            (assoc :focused-view-index (count view-order)
+                   :view-order (conj view-order id))
+            (assoc-in [:views id] {:action action
+                                   :desc {:fx/type view/blocking-deref
+                                          :blocking-deref f}}))))))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)

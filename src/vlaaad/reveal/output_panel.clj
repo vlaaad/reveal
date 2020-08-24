@@ -18,14 +18,14 @@
            [org.apache.commons.lang3 StringUtils]
            [java.util.concurrent Semaphore]))
 
-(defmethod event/handle ::on-scroll [*state {:keys [id ^ScrollEvent fx/event]}]
-  (swap! *state update-in [id :layout] layout/scroll-by (.getDeltaX event) (.getDeltaY event)))
+(defmethod event/handle ::on-scroll [{:keys [id ^ScrollEvent fx/event]}]
+  #(update-in % [id :layout] layout/scroll-by (.getDeltaX event) (.getDeltaY event)))
 
-(defmethod event/handle ::on-width-changed [*state {:keys [id fx/event]}]
-  (swap! *state update-in [id :layout] layout/set-canvas-width event))
+(defmethod event/handle ::on-width-changed [{:keys [id fx/event]}]
+  #(update-in % [id :layout] layout/set-canvas-width event))
 
-(defmethod event/handle ::on-height-changed [*state {:keys [id fx/event]}]
-  (swap! *state update-in [id :layout] layout/set-canvas-height event))
+(defmethod event/handle ::on-height-changed [{:keys [id fx/event]}]
+  #(update-in % [id :layout] layout/set-canvas-height event))
 
 (defn add-lines [this lines]
   (update this :layout layout/add-lines lines))
@@ -41,17 +41,19 @@
                       :highlight nil
                       :results (sorted-set)))))
 
-(defmethod event/handle ::on-mouse-released [*state {:keys [id]}]
-  (swap! *state update-in [id :layout] layout/stop-gesture))
+(defmethod event/handle ::on-mouse-released [{:keys [id]}]
+  #(update-in % [id :layout] layout/stop-gesture))
 
-(defn- swap-if-exists! [*state id f & args]
-  (swap! *state #(if (contains? % id) (apply update % id f args) %)))
+(defn- update-if-exists [state id f & args]
+  (if (contains? state id)
+    (apply update state id f args)
+    state))
 
-(defmethod event/handle ::on-focus-changed [*state {:keys [id fx/event]}]
-  (swap-if-exists! *state id update :layout layout/set-focused event))
+(defmethod event/handle ::on-focus-changed [{:keys [id fx/event]}]
+  #(update-if-exists % id update :layout layout/set-focused event))
 
-(defmethod event/handle ::on-mouse-dragged [*state {:keys [id fx/event]}]
-  (swap! *state update-in [id :layout] layout/perform-drag event))
+(defmethod event/handle ::on-mouse-dragged [{:keys [id fx/event]}]
+  #(update-in % [id :layout] layout/perform-drag event))
 
 (defn- show-popup [this ^Event event]
   (let [layout (layout/ensure-cursor-visible (:layout this))
@@ -85,9 +87,9 @@
     :else
     (update this :layout layout/start-gesture event)))
 
-(defmethod event/handle ::on-mouse-pressed [*state {:keys [id fx/event]}]
+(defmethod event/handle ::on-mouse-pressed [{:keys [id fx/event]}]
   (.requestFocus ^Canvas (.getTarget event))
-  (swap! *state update id handle-mouse-pressed event))
+  #(update % id handle-mouse-pressed event))
 
 (defn- copy-selection! [layout]
   (fx/on-fx-thread
@@ -202,11 +204,11 @@
 
       this)))
 
-(defmethod event/handle ::on-key-pressed [*state {:keys [id fx/event]}]
-  (swap! *state update id handle-key-pressed event))
+(defmethod event/handle ::on-key-pressed [{:keys [id fx/event]}]
+  #(update % id handle-key-pressed event))
 
-(defmethod event/handle ::hide-popup [*state {:keys [id]}]
-  (swap! *state update id dissoc :popup))
+(defmethod event/handle ::hide-popup [{:keys [id]}]
+  #(update % id dissoc :popup))
 
 (defn init-text-field-created! [^Node node]
   (.put (.getProperties node) :vlaaad.reveal.ui/consumes-escape true)
@@ -251,9 +253,10 @@
                     (first (subseq (:results search) > highlight)))]
     (cond-> this highlight (set-highlight highlight))))
 
-(defmethod event/handle ::on-search-focus-changed [*state {:keys [id fx/event]}]
-  (when-not event
-    (swap! *state update id hide-search)))
+(defmethod event/handle ::on-search-focus-changed [{:keys [id fx/event]}]
+  (if-not event
+    #(update % id hide-search)
+    identity))
 
 (defn- focus-on-output! [^Event event]
   (->> ^Node (.getTarget event)
@@ -264,23 +267,21 @@
        ^Node (some #(when (instance? Canvas %) %))
        .requestFocus))
 
-(defmethod event/handle ::on-search-event-filter [*state {:keys [id fx/event]}]
-  (when (and (instance? KeyEvent event)
-             (= KeyEvent/KEY_PRESSED (.getEventType ^KeyEvent event)))
+(defmethod event/handle ::on-search-event-filter [{:keys [id fx/event]}]
+  (if (and (instance? KeyEvent event)
+           (= KeyEvent/KEY_PRESSED (.getEventType ^KeyEvent event)))
     (let [^KeyEvent event event]
-      (swap! *state update id
-             (condp = (.getCode event)
-               KeyCode/ESCAPE (do (focus-on-output! event) (.consume event) hide-search)
-               KeyCode/TAB (do (.consume event) identity)
-               KeyCode/UP (do (.consume event) jump-to-prev-match)
-               KeyCode/DOWN (do (.consume event) jump-to-next-match)
-               KeyCode/ENTER select-highlight
-               identity))
-      (when (= KeyCode/ENTER (.getCode event))
-        (focus-on-output! event)))))
+      (condp = (.getCode event)
+        KeyCode/ESCAPE (do (focus-on-output! event) (.consume event) #(update % id hide-search))
+        KeyCode/ENTER (do (fx/run-later (focus-on-output! event)) #(update % id select-highlight))
+        KeyCode/TAB (do (.consume event) identity)
+        KeyCode/UP (do (.consume event) #(update % id jump-to-prev-match))
+        KeyCode/DOWN (do (.consume event) #(update % id jump-to-next-match))
+        identity))
+    identity))
 
-(defmethod event/handle ::on-search-text-changed [*state {:keys [id fx/event]}]
-  (swap! *state assoc-in [id :search :term] event))
+(defmethod event/handle ::on-search-text-changed [{:keys [id fx/event]}]
+  #(assoc-in % [id :search :term] event))
 
 (defn- search-view-impl [{:keys [term id]}]
   {:fx/type :stack-pane
@@ -392,7 +393,7 @@
       (< (:end search) (count (:lines layout)))))
 
 (defn- search! [pid {:keys [id term]} {:keys [*state]}]
-  (swap-if-exists! *state id init-search pid)
+  (swap! *state update-if-exists id init-search pid)
   (when (seq term)
     (let [*running (atom true)
           s (Semaphore. 0)
@@ -470,8 +471,8 @@
   ([layout]
    {:layout (layout/make layout)}))
 
-(defmethod event/handle ::on-add-lines [*state {:keys [id fx/event]}]
-  (swap-if-exists! *state id add-lines event))
+(defmethod event/handle ::on-add-lines [{:keys [id fx/event]}]
+  #(update-if-exists % id add-lines event))
 
-(defmethod event/handle ::on-clear-lines [*state {:keys [id]}]
-  (swap-if-exists! *state id clear-lines))
+(defmethod event/handle ::on-clear-lines [{:keys [id]}]
+  #(update-if-exists % id clear-lines))

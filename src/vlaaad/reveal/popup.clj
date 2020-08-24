@@ -57,77 +57,72 @@
                                        (search/select text :label)))
       (dissoc :selected-index)))
 
-(defmethod event/handle ::on-action-key-pressed [*state {:keys [id ^KeyEvent fx/event action on-cancel]}]
+(defmethod event/handle ::on-action-key-pressed [{:keys [id ^KeyEvent fx/event action on-cancel]}]
   (condp = (.getCode event)
-    KeyCode/ESCAPE
-    (event/handle *state on-cancel)
+    KeyCode/ESCAPE (event/handle on-cancel)
+    KeyCode/ENTER (comp
+                    (event/handle on-cancel)
+                    (event/handle {::event/type :vlaaad.reveal.ui/execute-action
+                                   :action action}))
+    KeyCode/UP #(update % id move-selected-index dec)
+    KeyCode/DOWN #(update % id move-selected-index inc)
+    identity))
 
-    KeyCode/ENTER
-    (do
-      (event/handle *state on-cancel)
-      (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
-                            :action action}))
+(defmethod event/handle ::on-action-pressed [{:keys [id action]}]
+  #(update % id select-action action))
 
-    KeyCode/UP
-    (swap! *state update id move-selected-index dec)
+(defmethod event/handle ::on-action-clicked [{:keys [action on-cancel]}]
+  (comp
+    (event/handle {::event/type :vlaaad.reveal.ui/execute-action
+                   :action action})
+    (event/handle on-cancel)))
 
-    KeyCode/DOWN
-    (swap! *state update id move-selected-index inc)
-
-    nil))
-
-(defmethod event/handle ::on-action-pressed [*state {:keys [id action]}]
-  (swap! *state update id select-action action))
-
-(defmethod event/handle ::on-action-clicked [*state {:keys [action on-cancel]}]
-  (event/handle *state on-cancel)
-  (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
-                        :action action}))
-
-(defmethod event/handle ::on-text-key-pressed [*state {:keys [id ^KeyEvent fx/event on-cancel annotated-value]}]
-  (let [this (get @*state id)
-        value (:value annotated-value)]
+(defmethod event/handle ::on-text-key-pressed [{:keys [text id ^KeyEvent fx/event on-cancel annotated-value]}]
+  (let [value (:value annotated-value)]
     (condp = (.getCode event)
       KeyCode/ESCAPE
-      (if (empty? (:text this))
-        (event/handle *state on-cancel)
-        (swap! *state update id set-text ""))
+      (if (empty? text)
+        (event/handle on-cancel)
+        #(update % id set-text ""))
 
       KeyCode/ENTER
-      (when-not (str/blank? (:text this))
+      (if-not (str/blank? text)
         (try
-          (let [form (read-string (:text this))
+          (let [form (read-string text)
                 fn-form `(fn [~'*v]
                            ~(cond
                               (= '*v form) form
                               (ident? form) (list form '*v)
                               :else form))]
-            (event/handle *state {::event/type :vlaaad.reveal.ui/execute-action
-                                  :action {:form (cond
-                                                   (= '*v form) (list 'identity value)
-                                                   (ident? form) (list form value)
-                                                   :else (walk/prewalk-replace
-                                                           {'*v value}
-                                                           form))
-                                           :invoke (fn []
-                                                     ((eval fn-form) value))}})
-            (event/handle *state on-cancel))
-          (catch Exception _)))
+            (comp
+              (event/handle {::event/type :vlaaad.reveal.ui/execute-action
+                             :action {:form (cond
+                                              (= '*v form) (list 'identity value)
+                                              (ident? form) (list form value)
+                                              :else (walk/prewalk-replace
+                                                      {'*v value}
+                                                      form))
+                                      :invoke (fn []
+                                                ((eval fn-form) value))}})
+              (event/handle on-cancel)))
+          (catch Exception _ identity))
+        identity)
 
       KeyCode/UP
-      (swap! *state update id move-selected-index dec)
+      #(update % id move-selected-index dec)
 
       KeyCode/DOWN
-      (swap! *state update id move-selected-index inc)
+      #(update % id move-selected-index inc)
 
-      nil)))
+      identity)))
 
-(defmethod event/handle ::on-text-changed [*state {:keys [id fx/event]}]
-  (swap! *state update id set-text event))
+(defmethod event/handle ::on-text-changed [{:keys [id fx/event]}]
+  #(update % id set-text event))
 
-(defmethod event/handle ::on-text-focused [*state {:keys [id fx/event]}]
-  (when event
-    (swap! *state update id dissoc :selected-index)))
+(defmethod event/handle ::on-text-focused [{:keys [id fx/event]}]
+  (if event
+    #(update % id dissoc :selected-index)
+    identity))
 
 (def ^:private lifecycle
   (fx.lifecycle/wrap-on-delete
@@ -267,6 +262,7 @@
                                          :on-focused-changed {::event/type ::on-text-focused
                                                               :id id}
                                          :on-key-pressed {::event/type ::on-text-key-pressed
+                                                          :text text
                                                           :id id
                                                           :annotated-value annotated-value
                                                           :on-cancel on-cancel}
@@ -318,11 +314,11 @@
                                    arrow-width 0
                                    (* arrow-width 0.5) arrow-height]})))}]}))
 
-(defmethod event/handle ::init-popup [*state {:keys [id actions]}]
-  (swap! *state assoc id {:actions actions :id id}))
+(defmethod event/handle ::init-popup [{:keys [id actions]}]
+  #(assoc % id {:actions actions :id id}))
 
-(defmethod event/handle ::dispose-popup [*state {:keys [id]}]
-  (swap! *state dissoc id))
+(defmethod event/handle ::dispose-popup [{:keys [id]}]
+  #(dissoc % id))
 
 (defn- init-popup! [id annotated-value handler]
   (handler {::event/type ::init-popup :id id :actions (action/collect annotated-value)})
@@ -340,34 +336,36 @@
           :bounds bounds
           :window window}})
 
-(defmethod event/handle ::init-ext [*state {:keys [id]}]
-  (swap! *state assoc id {:id id}))
+(defmethod event/handle ::init-ext [{:keys [id]}]
+  #(assoc % id {:id id}))
 
-(defmethod event/handle ::dispose-ext [*state {:keys [id]}]
-  (swap! *state dissoc id))
+(defmethod event/handle ::dispose-ext [{:keys [id]}]
+  #(dissoc % id))
 
-(defmethod event/handle ::on-popup-node-event [*state {:keys [id select ^Event fx/event]}]
-  (when (or (instance? ContextMenuEvent event)
-            (and (instance? KeyEvent event)
-                 (or (= KeyCode/SPACE (.getCode ^KeyEvent event))
-                     (= KeyCode/ENTER (.getCode ^KeyEvent event)))
-                 (= KeyEvent/KEY_PRESSED (.getEventType event))))
+(defmethod event/handle ::on-popup-node-event [{:keys [id select ^Event fx/event]}]
+  (if (or (instance? ContextMenuEvent event)
+          (and (instance? KeyEvent event)
+               (or (= KeyCode/SPACE (.getCode ^KeyEvent event))
+                   (= KeyCode/ENTER (.getCode ^KeyEvent event)))
+               (= KeyEvent/KEY_PRESSED (.getEventType event))))
     (let [node ^Node (.getSource event)]
       (if select
-        (when-let [{:keys [bounds annotated-value]} (select event)]
-          (.consume event)
-          (swap! *state update id assoc
-                 :annotated-value annotated-value
-                 :bounds bounds
-                 :window (.getWindow (.getScene node))))
+        (if-let [{:keys [bounds annotated-value]} (select event)]
+          (do (.consume event)
+              #(update % id assoc
+                       :annotated-value annotated-value
+                       :bounds bounds
+                       :window (.getWindow (.getScene node))))
+          identity)
         (do
           (.consume event)
-          (swap! *state update id assoc
-                 :bounds (.localToScreen node (.getBoundsInLocal node))
-                 :window (.getWindow (.getScene node))))))))
+          #(update % id assoc
+                   :bounds (.localToScreen node (.getBoundsInLocal node))
+                   :window (.getWindow (.getScene node))))))
+    identity))
 
-(defmethod event/handle ::close [*state {:keys [id]}]
-  (swap! *state update id dissoc :bounds :window :annotated-value))
+(defmethod event/handle ::close [{:keys [id]}]
+  #(update % id dissoc :bounds :window :annotated-value))
 
 (defn- init-ext! [id _ handler]
   (handler {::event/type ::init-ext :id id})
