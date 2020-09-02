@@ -268,8 +268,8 @@
             (assoc :focused-view-index (count view-order)
                    :view-order (conj view-order id))
             (assoc-in [:views id] {:action action
-                                   :desc {:fx/type view/blocking-deref
-                                          :blocking-deref f}}))))))
+                                   :desc {:fx/type view/derefable
+                                          :derefable f}}))))))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)

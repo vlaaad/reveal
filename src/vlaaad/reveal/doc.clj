@@ -171,14 +171,14 @@
         indent (if (seq indented-lines) (apply min indented-lines) 0)
         re-indent (re-pattern (str "^\\s{" indent "}"))]
     (binding [*doc-ns* (the-ns ns)]
-      (stream/just
+      (stream/as-is
         (->sf (.parse parser ^String (->> lines
                                           (map #(str/replace % re-indent ""))
                                           (str/join "\n"))))))))
 
 (defn- for-var [var]
   (let [m (meta var)]
-    (stream/just
+    (stream/as-is
       (apply
         stream/vertical
         (concat
@@ -212,14 +212,14 @@
              (stream/stream (s/describe spec))]))))))
 
 (defn- for-ns [ns]
-  (stream/just
+  (stream/as-is
     (stream/vertical
       (stream/stream ns)
       (stream/raw-string "")
       (parse (:doc (meta ns)) ns))))
 
 (defn- for-spec [k]
-  (stream/just
+  (stream/as-is
     (stream/vertical
       (stream/stream k)
       (stream/raw-string "")
@@ -281,7 +281,7 @@
             form (if (= :unknown *read-eval*)
                    (throw (IllegalStateException. "Unable to read source while *read-eval* is :unknown."))
                    (read read-opts (PushbackReader. pushback-reader)))]
-        (stream/just
+        (stream/as-is
           (stream/as form
             (stream/raw-string text {:fill style/string-color})))))))
 

@@ -33,7 +33,7 @@
 (defmethod event/handle ::create-view-state [{:keys [id state]}]
   #(assoc % id (assoc state :id id)))
 
-(defn- process-queue [id ^BlockingQueue queue handler]
+(defn- process-queue! [id ^BlockingQueue queue handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
   (let [*running (volatile! true)
         add-lines! #(handler {::event/type ::output-panel/on-add-lines :id id :fx/event %})
@@ -53,14 +53,14 @@
               :or {id ::rfx/undefined}}]
   {:fx/type rfx/ext-with-process
    :id id
-   :start process-queue
+   :start process-queue!
    :args queue
    :desc {:fx/type output-panel/view}})
 
 (defprotocol Viewable
   (make [this] "Returns cljfx description for the viewable"))
 
-(defn- process-value [id value handler]
+(defn- process-value! [id value handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make {:autoscroll false})})
   (let [*running (volatile! true)
         add-lines! #(handler {::event/type ::output-panel/on-add-lines :id id :fx/event %})
@@ -75,11 +75,11 @@
 
 (defn value [{:keys [value]}]
   {:fx/type rfx/ext-with-process
-   :start process-value
+   :start process-value!
    :args value
    :desc {:fx/type output-panel/view}})
 
-(defn- watch [id *ref handler]
+(defn- watch! [id *ref handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make {:autoscroll false})})
   (let [*running (volatile! true)
         out-queue (ArrayBlockingQueue. 1024)
@@ -110,20 +110,24 @@
        (future-cancel f)
        (handler {::event/type ::dispose-state :id id}))))
 
-(defn ref-watcher [{:keys [ref]}]
+(defn ref-watch-latest [{:keys [ref]}]
   {:fx/type rfx/ext-with-process
-   :start watch
+   :start watch!
    :args ref
    :desc {:fx/type output-panel/view}})
 
-(defn as [desc]
+(defn as-is [desc]
   (reify Viewable (make [_] desc)))
+
+(action/defaction ::view [v]
+  (when (instance? (:on-interface Viewable) v)
+    (constantly v)))
 
 (action/defaction ::watch:latest [v]
   (when (instance? IRef v)
-    #(as {:fx/type ref-watcher :ref v})))
+    #(as-is {:fx/type ref-watch-latest :ref v})))
 
-(defn- log [id *ref handler]
+(defn- log! [id *ref handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
   (let [*running (volatile! true)
         out-queue (ArrayBlockingQueue. 1024)
@@ -141,7 +145,7 @@
                   #(handler {::event/type ::output-panel/on-add-lines
                              :fx/event %
                              :id id})
-                  (stream/just
+                  (stream/as-is
                     (stream/horizontal
                       (stream/raw-string (format "%4d: " (vswap! *counter inc))
                                          {:fill style/util-color})
@@ -154,17 +158,17 @@
        (future-cancel f)
        (handler {::event/type ::dispose-state :id id}))))
 
-(defn ref-logger [{:keys [ref]}]
+(defn ref-watch-all [{:keys [ref]}]
   {:fx/type rfx/ext-with-process
-   :start log
+   :start log!
    :args ref
    :desc {:fx/type output-panel/view}})
 
 (action/defaction ::watch:all [v]
   (when (instance? IRef v)
-    #(as {:fx/type ref-logger :ref v})))
+    #(as-is {:fx/type ref-watch-all :ref v})))
 
-(defn- deref-process [id blocking-deref handler]
+(defn- deref! [id blocking-deref handler]
   (handler {::event/type ::create-view-state :id id :state {:state ::waiting}})
   (let [f (event/daemon-future
             (try
@@ -187,10 +191,10 @@
     ::value (make (:value props))
     ::exception (make (:exception props))))
 
-(defn blocking-deref [{:keys [blocking-deref]}]
+(defn derefable [{:keys [derefable]}]
   {:fx/type rfx/ext-with-process
-   :start deref-process
-   :args blocking-deref
+   :start deref!
+   :args derefable
    :desc {:fx/type blocking-deref-view}})
 
 (extend-protocol Viewable
@@ -225,52 +229,48 @@
          :annotated-value (stream/->AnnotatedValue (.getCellData (.getTableColumn pos) (.getRow pos))
                                                    {::stream/hidden true})}))))
 
-;; todo table view does not like repeated items, should use indices!
-
-(defn table [{:keys [seqable]}]
-  (let [xs (seq seqable)
-        head (first xs)
-        columns (->> (cond
-                       (map? head)
-                       (for [k (keys head)]
-                         {:header k :cell #(get % k)})
-
-                       (map-entry? head)
-                       [{:header 'key :cell key} {:header 'val :cell val}]
-
-                       (indexed? head)
-                       (for [i (range (count head))]
-                         {:header i :cell #(nth % i)})
-
-                       :else
-                       [{:header 'item :cell identity}])
-                     (map (fn [{:keys [cell header]}]
-                            {:fx/type :table-column
-                             :style-class "reveal-table-column"
-                             :min-width 40
-                             :graphic {:fx/type summary
-                                       :value header}
-                             :cell-factory {:fx/cell-type :table-cell
-                                            :describe describe-cell}
-                             :cell-value-factory (fn [x]
-                                                   (try
-                                                     (cell x)
-                                                     (catch Throwable e
-                                                       e)))})))]
+(defn table [{:keys [items columns]}]
+  (let [xs (vec items)]
     {:fx/type fx/ext-on-instance-lifecycle
      :on-created initialize-table!
      :desc {:fx/type popup/ext
             :select select-bounds-and-value!
             :desc {:fx/type :table-view
                    :style-class "reveal-table"
-                   :columns columns
-                   :items (vec xs)}}}))
+                   :columns (for [{:keys [header fn]
+                                   :or {header ::not-found}} columns]
+                              {:fx/type :table-column
+                               :style-class "reveal-table-column"
+                               :min-width 40
+                               :graphic {:fx/type summary
+                                         :value (if (= header ::not-found) fn header)}
+                               :cell-factory {:fx/cell-type :table-cell
+                                              :describe describe-cell}
+                               :cell-value-factory #(try (fn (xs %)) (catch Throwable e e))})
+                   :items (vec (range (count xs)))}}}))
 
 (action/defaction ::view:table [v]
   (when (and (some? v)
              (not (string? v))
              (seqable? v))
-    #(as {:fx/type table :seqable v})))
+    (fn []
+      (let [head (first v)]
+        (as-is {:fx/type table
+                :items v
+                :columns (cond
+                           (map? head)
+                           (for [k (keys head)]
+                             {:header k :fn #(get % k)})
+
+                           (map-entry? head)
+                           [{:header 'key :fn key} {:header 'val :fn val}]
+
+                           (indexed? head)
+                           (for [i (range (count head))]
+                             {:header i :fn #(nth % i)})
+
+                           :else
+                           [{:header 'item :fn identity}])})))))
 
 (action/defaction ::browse:internal [v]
   (when (or (and (instance? URI v)
@@ -279,8 +279,8 @@
                           (.endsWith (.getPath ^URI v) ".html"))))
             (instance? URL v)
             (and (string? v) (re-matches #"^https?://.+" v)))
-    #(as {:fx/type :web-view
-          :url (str v)})))
+    #(as-is {:fx/type :web-view
+             :url (str v)})))
 
 (defn- request-source-focus! [^Event e]
   (.requestFocus ^Node (.getSource e)))
@@ -316,7 +316,7 @@
 
 (action/defaction ::view:pie-chart [x]
   (when (labeled? x number? :min 2)
-    #(as {:fx/type pie-chart :data x})))
+    #(as-is {:fx/type pie-chart :data x})))
 
 (def ^:private ext-with-value-on-node
   (fx/make-ext-with-props
@@ -371,8 +371,8 @@
 
                     (labeled? x #(labeled? % numbered?))
                     x)]
-    #(as {:fx/type bar-chart
-          :data data})))
+    #(as-is {:fx/type bar-chart
+             :data data})))
 
 (defn- numbereds? [x]
   (and (sequential? x)
@@ -422,7 +422,7 @@
 
                     (labeled? x numbereds?)
                     x)]
-    #(as {:fx/type line-chart :data data})))
+    #(as-is {:fx/type line-chart :data data})))
 
 (defn- coordinate? [x]
   (and (sequential? x)
@@ -475,12 +475,37 @@
 
                     (scattereds? x)
                     {x x})]
-    #(as {:fx/type scatter-chart :data data})))
+    #(as-is {:fx/type scatter-chart :data data})))
 
 (action/defaction ::view:color [v]
   (when-let [color (cond
                      (instance? Color v) v
                      (string? v) (Color/valueOf v)
                      (keyword? v) (Color/valueOf (name v)))]
-    #(as {:fx/type :region
-          :background {:fills [{:fill color}]}})))
+    #(as-is {:fx/type :region
+             :background {:fills [{:fill color}]}})))
+
+(deftype Observable [*ref f]
+  IRef
+  (deref [_] (f @*ref))
+  (addWatch [this key callback]
+    (add-watch *ref [this key] #(callback key this (f %3) (f %4))))
+  (removeWatch [this key]
+    (remove-watch *ref [this key])))
+
+(defn- observe! [id [ref fn] handler]
+  (handler {::event/type ::create-view-state :id id :state {:desc (fn @ref)}})
+  (let [watch-key (gensym "vlaaad.reveal.view/observable")]
+    (add-watch ref watch-key #(handler {::event/type ::create-view-state :id id :state {:desc (fn %4)}}))
+    #(do
+       (remove-watch ref watch-key)
+       (handler {::event/type ::dispose-state :id id}))))
+
+(defn- desc-view [m]
+  (:desc m))
+
+(defn observable-view [{:keys [ref fn]}]
+  {:fx/type rfx/ext-with-process
+   :start observe!
+   :args [ref fn]
+   :desc {:fx/type desc-view}})

@@ -6,7 +6,7 @@
             [clojure.string :as str]))
 
 (defn- stream-read [form ui]
-  (ui (stream/just
+  (ui (stream/as-is
         (stream/as form
           (stream/raw-string (pr-str form) {:fill style/util-color})))))
 
@@ -22,7 +22,7 @@
 (defn- wrap-print [ui print]
   (fn [x]
     (ui
-      (stream/just
+      (stream/as-is
         (stream/horizontal
           (stream/raw-string "=>" {:fill style/util-color})
           stream/separator
@@ -31,7 +31,7 @@
 
 (defn- wrap-caught [ui caught]
   (fn [ex]
-    (ui (stream/just
+    (ui (stream/as-is
           (stream/as ex
             (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
                                {:fill style/error-color}))))
@@ -39,7 +39,7 @@
 
 (defn- make-tap [ui]
   (fn [x]
-    (ui (stream/just
+    (ui (stream/as-is
           (stream/horizontal
             (stream/raw-string "tap>" {:fill style/util-color})
             stream/separator
@@ -48,7 +48,7 @@
 (defn- make-print [ui out fill]
   (PrintWriter-on
     #(do
-       (ui (stream/just
+       (ui (stream/as-is
              (stream/as %
                (stream/raw-string (str/replace % #"\r?\n$" "") {:fill fill}))))
        (binding [*out* out]
@@ -80,7 +80,7 @@
                       (update :eval #(wrap-eval ui (or % eval)))
                       (update :print #(wrap-print ui (or % prn)))
                       (update :caught #(wrap-caught ui (or % m/repl-caught))))]
-    (ui (stream/just
+    (ui (stream/as-is
           (stream/as *clojure-version*
             (stream/raw-string version {:fill style/util-color}))))
     (println version)

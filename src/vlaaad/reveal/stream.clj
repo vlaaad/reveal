@@ -45,7 +45,7 @@
   (fn [rf acc]
     (rf acc op)))
 
-(defn- with-value [x ann sf]
+(defn with-value [x ann sf]
   (=> (op {:op ::push-value :value (->AnnotatedValue x ann)})
       sf
       (op {:op ::pop-value})))
@@ -76,7 +76,7 @@
 
 (defmethod stream-dispatch ::just [sf _] sf)
 
-(defn just [sf]
+(defn as-is [sf]
   (with-meta sf {::type ::just}))
 
 (defn- flush-builder [^StringBuilder builder style]
@@ -220,13 +220,16 @@
       (interpose separator))
     coll))
 
+(defn vertically [xs]
+  (block :vertical (delimited-items xs)))
+
+(defn horizontally [xs]
+  (block :horizontal (delimited-items xs)))
+
 (defn items [coll]
   (if (some coll? coll)
-    (block :vertical (delimited-items coll))
-    (block :horizontal (delimited-items coll))))
-
-(defn sequential [xs]
-  (block :vertical (delimited-items xs)))
+    (vertically coll)
+    (horizontally coll)))
 
 (defn override-style [sf f & args]
   (fn [rf acc]
@@ -575,7 +578,7 @@
 (defstream List [xs]
   (horizontal
     (raw-string "(" {:fill style/object-color})
-    (sequential xs)
+    (vertically xs)
     (raw-string ")" {:fill style/object-color})))
 
 (defstream RandomAccess [xs]
@@ -587,7 +590,7 @@
 (defstream ISeq [xs]
   (horizontal
     (raw-string "(" {:fill style/object-color})
-    (sequential xs)
+    (vertically xs)
     (raw-string ")" {:fill style/object-color})))
 
 (prefer-method stream-dispatch IPersistentCollection RandomAccess)
@@ -766,7 +769,7 @@
 (defstream Eduction [eduction]
   (horizontal
     (raw-string "(" {:fill style/object-color})
-    (sequential eduction)
+    (vertically eduction)
     (raw-string ")" {:fill style/object-color})))
 
 (def ^:private ^ThreadLocal utc-date-format

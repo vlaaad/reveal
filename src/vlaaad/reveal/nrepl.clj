@@ -20,7 +20,7 @@
         (ui
           (cond
             (not= value ::not-found)
-            (stream/just
+            (stream/as-is
               (stream/as {:request request :message message}
                 (stream/vertical
                   (stream/raw-string code {:fill style/util-color})
@@ -30,17 +30,17 @@
                     (stream/stream value)))))
 
             (not= out ::not-found)
-            (stream/just
+            (stream/as-is
               (stream/as {:request request :message message}
                 (stream/raw-string (str/trim-newline out) {:fill style/string-color})))
 
             (not= err ::not-found)
-            (stream/just
+            (stream/as-is
               (stream/as {:request request :message message}
                 (stream/raw-string (str/trim-newline err) {:fill style/error-color})))
 
             (not= throwable ::not-found)
-            (stream/just
+            (stream/as-is
               (stream/as {:request request :message message}
                 (stream/vertical
                   (stream/raw-string code {:fill style/util-color})

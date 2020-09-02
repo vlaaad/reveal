@@ -26,22 +26,7 @@
                :body (s/+ any?))
   :ret ::id)
 
-(defmacro defaction
-  "Define action for execution in the context of some selected value
-
-  When user requests a context menu on a selected value, all actions are
-  evaluated. If action body returns 0-arg fn, the action is shown in the
-  context menu, and the function will be invoked when user selects the action
-  for execution. Any other evaluation results, including thrown exceptions, are
-  ignored.
-
-  `id` is a ns-qualified keyword identifying this action
-  `bindings` is a bindings vector that can have either 1 or 2 args, where first
-  argument is a selected value and second is an annotation supplied by reveal
-  output streaming process
-  `body` is an action body that has access to `bindings`, should return 0-arg
-  function for action to be available in the context menu"
-  [id bindings & body]
+(defmacro defaction [id bindings & body]
   (let [fn-bindings (case (count bindings)
                       1 (conj bindings (gensym "_"))
                       2 bindings)]
@@ -56,7 +41,7 @@
                      (let [label (name id)]
                        {:id id
                         :label label
-                        :form (stream/just
+                        :form (stream/as-is
                                 (stream/horizontal
                                   (stream/raw-string "(" {:fill style/util-color})
                                   (stream/raw-string label {:fill style/symbol-color})
@@ -120,7 +105,7 @@
                         (sort-by ffirst)
                         (map (fn [[[name value] xs]]
                                (let [kinds (mapv last xs)]
-                                 (stream/just
+                                 (stream/as-is
                                    (stream/vertical
                                      (apply
                                        stream/horizontal
@@ -136,8 +121,8 @@
                                      (stream/horizontal
                                        (stream/raw-string "  " {:selectable false})
                                        (stream/stream value))))))))]
-        (stream/just
-          (stream/sequential sorted))))))
+        (stream/as-is
+          (stream/vertically sorted))))))
 
 (defaction ::deref [v]
   (when (instance? IDeref v)

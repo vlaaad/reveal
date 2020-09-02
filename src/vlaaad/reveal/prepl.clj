@@ -7,7 +7,7 @@
             [clojure.string :as str]))
 
 (defn- prepl-output [x]
-  (stream/just
+  (stream/as-is
     (stream/as x
       (if (:exception x)
         (cond-> (stream/raw-string (-> x :val m/ex-triage m/ex-str) {:fill style/error-color})
