@@ -12,14 +12,9 @@ clj -Spom
 invoke git commit -am "Release $version"
 invoke git tag $version
 invoke git push
-invoke git push origin
+invoke git push origin $version
 clj -A:depstar "$version.jar"
-$env:CLOJARS_USERNAME=(Read-Host -Prompt "Username")
-$env:CLOJARS_PASSWORD=(Read-Host -Prompt "Token" -AsSecureString | ConvertFrom-SecureString)
-clj -e clj -A:deploy "$version.jar"
+clj -A:build -m deploy "$version.jar" (Read-Host -Prompt "Username") (Read-Host -Prompt "Token" -AsSecureString | ConvertFrom-SecureString -AsPlainText)
 rm "$version.jar"
-
-
-
 
 
