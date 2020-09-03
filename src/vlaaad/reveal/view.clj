@@ -10,7 +10,8 @@
             [cljfx.api :as fx]
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
-            [cljfx.lifecycle :as fx.lifecycle])
+            [cljfx.lifecycle :as fx.lifecycle]
+            [cljfx.component :as fx.component])
   (:import [clojure.lang IRef]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
            [javafx.scene.control TableView TablePosition]
@@ -510,3 +511,30 @@
    :start observe!
    :args [ref fn]
    :desc {:fx/type desc-view}})
+
+(def ext-try
+  (reify fx.lifecycle/Lifecycle
+    (create [_ {:keys [desc]} opts]
+      (try
+        (with-meta
+          {:child (fx.lifecycle/create fx.lifecycle/dynamic desc opts)}
+          {`fx.component/instance #(-> % :child fx.component/instance)})
+        (catch Exception e
+          (with-meta
+            {:exception e
+             :child (fx.lifecycle/create fx.lifecycle/dynamic {:fx/type value :value e} opts)}
+            {`fx.component/instance #(-> % :child fx.component/instance)}))))
+    (advance [_ component {:keys [desc]} opts]
+      (if-let [e (:exception component)]
+        (update component :child
+                #(fx.lifecycle/advance fx.lifecycle/dynamic % {:fx/type value :value e} opts))
+        (try
+          (update component :child
+                  #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
+          (catch Exception e
+            (assoc component :exception e
+                             :child (fx.lifecycle/create fx.lifecycle/dynamic
+                                                         {:fx/type value :value e}
+                                                         opts))))))
+    (delete [_ component opts]
+      (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
