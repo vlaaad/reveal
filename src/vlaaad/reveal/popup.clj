@@ -12,7 +12,8 @@
             [cljfx.prop :as fx.prop]
             [clojure.walk :as walk]
             [vlaaad.reveal.action :as action]
-            [cljfx.fx.node :as fx.node])
+            [cljfx.fx.node :as fx.node]
+            [vlaaad.reveal.stream :as stream])
   (:import [javafx.geometry Bounds Rectangle2D]
            [javafx.stage Screen Popup Window]
            [com.sun.javafx.event RedirectedEvent]
@@ -350,10 +351,11 @@
                (= KeyEvent/KEY_PRESSED (.getEventType event))))
     (let [node ^Node (.getSource event)]
       (if select
-        (if-let [{:keys [bounds annotated-value]} (select event)]
+        (if-let [{:keys [bounds annotation value]} (select event)]
           (do (.consume event)
               #(update % id assoc
-                       :annotated-value annotated-value
+                       :value value
+                       :annotation annotation
                        :bounds bounds
                        :window (.getWindow (.getScene node))))
           identity)
@@ -382,19 +384,19 @@
                    (.hide popup)))
                fx.lifecycle/dynamic))))
 
-(defn- ext-impl [{:keys [desc annotated-value id bounds window select]}]
+(defn- ext-impl [{:keys [desc annotation value id bounds window select]}]
   {:fx/type ext-with-popup-on-node-props
    :props (cond-> {:event-filter {::event/type ::on-popup-node-event
                                   :id id
                                   :select select}
                    :focus-traversable true}
-                  bounds
-                  (assoc :popup {:fx/type view
-                                 :annotated-value annotated-value
-                                 :bounds bounds
-                                 :window window
-                                 :id [id :popup]
-                                 :on-cancel {::event/type ::close :id id}}))
+            bounds
+            (assoc :popup {:fx/type view
+                           :annotated-value (stream/->AnnotatedValue value annotation)
+                           :bounds bounds
+                           :window window
+                           :id [id :popup]
+                           :on-cancel {::event/type ::close :id id}}))
    :desc desc})
 
 (defn ext [props]

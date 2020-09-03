@@ -226,8 +226,8 @@
                                                    (PseudoClass/getPseudoClass "selected"))
                                     %)))]
         {:bounds (.localToScreen cell (.getBoundsInLocal cell))
-         :annotated-value (stream/->AnnotatedValue (.getCellData (.getTableColumn pos) (.getRow pos))
-                                                   {::stream/hidden true})}))))
+         :value (.getCellData (.getTableColumn pos) (.getRow pos))
+         :annotation {::stream/hidden true}}))))
 
 (defn table [{:keys [items columns]}]
   (let [xs (vec items)]
@@ -330,7 +330,8 @@
 (defn- select-chart-node! [^Event event]
   (let [^Node node (.getTarget event)]
     (when-let [value (::value (.getProperties node))]
-      {:annotated-value (stream/->AnnotatedValue value {::stream/hidden true})
+      {:value value
+       :annotation {::stream/hidden true}
        :bounds (.localToScreen node (.getBoundsInLocal node))})))
 
 (defn- numbered? [x]

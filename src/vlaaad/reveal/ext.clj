@@ -4,7 +4,8 @@
             [clojure.core.specs.alpha :as specs]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.style :as style]
-            [vlaaad.reveal.view :as view]))
+            [vlaaad.reveal.view :as view]
+            [vlaaad.reveal.popup :as popup]))
 
 ;; region streaming
 
@@ -250,5 +251,31 @@
                                              (* 0.5 (+ (rand) (rand)))))}}
   ```"
   view/scatter-chart)
+
+(def popup-view
+  "Cljfx component fn that wraps another component with Reveal popup
+
+  Expected keys:
+  - `:desc` (required) - description of a node that will show a popup on context
+    menu request
+  - either:
+    - `:value` (required) and `:annotation` (optional) that will be passed to
+      action evaluator for populating the popup
+    - `:select` - a function from JavaFX event that triggered a context menu to
+      map that represents where and what is selected. Returning nil will not
+      trigger a popup. Returned map's expected keys:
+      - `:bounds` (required) - JavaFX screen Bounds of a node that will show the
+        popup
+      - `:value` (required) and `:annotation` (optional) that will be passed to
+        action evaluator for populating the popup
+
+  Example:
+  ```
+  {:fx/type popup-view
+   :value (the-ns 'clojure.core)
+   :annotation {:vlaaad.reveal.stream/hidden true} ;; for view:value action
+   :desc {:fx/type :label :text \"The clojure.core library\"}}
+  ```"
+  popup/ext)
 
 ;; endregion
