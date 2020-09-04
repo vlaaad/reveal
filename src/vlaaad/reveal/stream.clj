@@ -53,6 +53,9 @@
 (def separator
   (op {:op ::separator}))
 
+(def ^:private newline
+  (op {:op ::newline}))
+
 (defn- string [str style]
   (op {:op ::string
        :text str
@@ -103,7 +106,7 @@
             (recur
               (inc i)
               (case ch
-                \newline ((=> (flush-builder builder style) separator) rf acc)
+                \newline ((=> (flush-builder builder style) newline) rf acc)
                 \tab (do (.append builder "    ") acc)
                 \return ((flush+util builder style "\\r") rf acc)
                 \formfeed ((flush+util builder style "\\f") rf acc)
@@ -138,7 +141,7 @@
                          (flush-builder builder escape-style))
                      rf acc))
                   (case ch
-                    \newline ((=> (flush-builder builder style) separator) rf acc)
+                    \newline ((=> (flush-builder builder style) newline) rf acc)
                     \tab (do (.append builder "    ") acc)
                     ;; todo except if followed by newline...
                     \return ((flush+util builder style "\\r") rf acc)
@@ -164,7 +167,7 @@
   (block :horizontal (apply => sfs)))
 
 (defn vertical [& sfs]
-  (block :vertical (apply => (interpose separator sfs))))
+  (block :vertical (apply => (interpose newline sfs))))
 
 #_(defn- returning-xf [rf]
     (fn
@@ -202,10 +205,10 @@
                              separator
                              (stream v {:vlaaad.reveal.nav/key k
                                         :vlaaad.reveal.nav/coll m})))))
-        (interpose separator))
+        (interpose newline))
       m)))
 
-(defn- delimited-items [coll]
+(defn- delimited-items [coll sep]
   (streamduce
     (comp
       (if (set? coll)
@@ -217,14 +220,14 @@
           (fn [i x]
             (stream x {:vlaaad.reveal.nav/key i
                        :vlaaad.reveal.nav/coll coll}))))
-      (interpose separator))
+      (interpose sep))
     coll))
 
 (defn vertically [xs]
-  (block :vertical (delimited-items xs)))
+  (block :vertical (delimited-items xs newline)))
 
 (defn horizontally [xs]
-  (block :horizontal (delimited-items xs)))
+  (block :horizontal (delimited-items xs separator)))
 
 (defn items [coll]
   (if (some coll? coll)
@@ -267,9 +270,9 @@
                ::string {:fx/type :text
                          :text (:text %)
                          :fill (:fill (:style %) :black)}
-               ::separator {:fx/type :text
-                            :text " "
-                            :fill style/util-color}
+               (::separator ::newline) {:fx/type :text
+                                         :text " "
+                                         :fill style/util-color}
                nil)))
     (fn
       ([acc] {:fx/type :text-flow
@@ -313,7 +316,7 @@
        emit-xf
        (keep #(case (:op %)
                 ::string (:text %)
-                ::separator " "
+                (::separator ::newline) " "
                 nil)))
      (fn
        ([{:keys [^StringBuilder builder]}]
@@ -350,7 +353,7 @@
       emit-xf
       (keep #(case (:op %)
                ::string (:text %)
-               ::separator " "
+               (::separator ::newline) " "
                nil)))
     (fn
       ([^StringBuilder builder]
@@ -439,6 +442,14 @@
                (do (vreset! *state (assoc state :blocks (pop blocks)))
                    acc)))
 
+           ::newline
+           (let [blocks (:blocks state)
+                 block (peek blocks)]
+             (do (vswap! *state assoc :line (-> []
+                                                (add-segment (:values state) (blank-segment (:indent block 0)))
+                                                add-separator))
+                 (rf acc (:line state))))
+
            ::separator
            (let [blocks (:blocks state)
                  block (peek blocks)]
@@ -448,10 +459,8 @@
                                                     (add-segment (:values state) (blank-segment 1))
                                                     add-separator))
                    acc)
-               (do (vswap! *state assoc :line (-> []
-                                                  (add-segment (:values state) (blank-segment (:indent block 0)))
-                                                  add-separator))
-                   (rf acc (:line state)))))
+               (do (vswap! *state update :line add-segment (:values state) (blank-segment 0))
+                   acc)))
 
            ::string
            (do (vswap! *state update :line add-segment (:values state) (string-segment input))

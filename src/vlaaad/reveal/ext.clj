@@ -68,8 +68,6 @@
 (defn vertical
   "Returns streaming function that aligns multiple sfs vertically
 
-  Automatically inserts separators between sfs
-
   Example:
   111111
   11
@@ -79,9 +77,10 @@
   (apply stream/vertical sfs))
 
 (def separator
-  "Streaming function that adds a non-selectable space in horizontal blocks
+  "Streaming function that separates values in vertical and horizontal blocks
 
-  Not needed in vertical blocks since they already insert separators"
+  In horizontal blocks it's a non-selectable space, in vertical blocks it's
+  an empty line"
   stream/separator)
 
 (defn entries

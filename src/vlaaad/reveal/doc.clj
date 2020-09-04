@@ -190,7 +190,7 @@
           (when-let [arglists (:arglists m)]
             (map stream/stream arglists))
           (when-let [deprecated (:deprecated m)]
-            [(stream/raw-string "")
+            [stream/separator
              (if (string? deprecated)
                (stream/horizontal
                  (stream/raw-string "Deprecated." {:fill style/string-color})
@@ -198,9 +198,9 @@
                  (parse deprecated (:ns m)))
                (stream/raw-string "Deprecated." {:fill style/string-color}))])
           (when-let [doc (:doc m)]
-            [(stream/raw-string "")
+            [stream/separator
              (parse doc (:ns m))
-             (stream/raw-string "")])
+             stream/separator])
           (when-let [forms (:forms m)]
             (cons
               (stream/raw-string "forms:" {:fill style/util-color})
@@ -215,14 +215,14 @@
   (stream/as-is
     (stream/vertical
       (stream/stream ns)
-      (stream/raw-string "")
+      stream/separator
       (parse (:doc (meta ns)) ns))))
 
 (defn- for-spec [k]
   (stream/as-is
     (stream/vertical
       (stream/stream k)
-      (stream/raw-string "")
+      stream/separator
       (stream/raw-string "spec:" {:fill style/util-color})
       ;; todo format as code!
       (stream/stream (s/describe k)))))
