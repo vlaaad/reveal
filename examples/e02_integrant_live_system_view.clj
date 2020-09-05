@@ -1,9 +1,9 @@
-(ns e01-integrant
+(ns e02-integrant-live-system-view
   (:require [integrant.core :as ig]
             [ring.adapter.jetty :as jetty]
             [ring.util.response :as response]
             [clojure.main :as m]
-            [vlaaad.reveal.ext :as re])
+            [vlaaad.reveal.ext :as rx])
   (:import [org.eclipse.jetty.server Server]))
 
 ;; integrant example: create a system monitor with controls
@@ -54,12 +54,12 @@
 
 ;; Reveal monitor and controls: eval it and select "view" action
 
-(re/viewed-as-is
-  {:fx/type re/observable-view
+(rx/view-as-is
+  {:fx/type rx/observable-view
    :ref system
    :fn (fn [state]
          {:fx/type :v-box
-          :children [{:fx/type re/value-view
+          :children [{:fx/type rx/value-view
                       :v-box/vgrow :always
                       :value state}
                      {:fx/type :h-box

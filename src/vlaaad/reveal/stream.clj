@@ -74,13 +74,16 @@
   ([x] (stream-dispatch x nil))
   ([x ann] (stream-dispatch x ann)))
 
-(defn as [x sf]
-  (with-value x {::hidden true} sf))
+(defn as
+  ([x sf]
+   (as x nil sf))
+  ([x ann sf]
+   (with-value x (assoc ann ::hidden true) sf)))
 
-(defmethod stream-dispatch ::just [sf _] sf)
+(defmethod stream-dispatch ::as-is [sf _] sf)
 
 (defn as-is [sf]
-  (with-meta sf {::type ::just}))
+  (with-meta sf {::type ::as-is}))
 
 (defn- flush-builder [^StringBuilder builder style]
   (fn [rf acc]
@@ -193,46 +196,54 @@
   (fn [rf acc]
     (transduce xf (fn ([acc] acc) ([acc sf] (sf rf acc))) acc coll)))
 
-(defn entries [m]
-  (block :vertical
-    (streamduce
-      (comp
-        (map (fn [e]
-               (let [k (key e)
-                     v (val e)]
-                 (horizontal (stream k {:vlaaad.reveal.nav/val v
-                                        :vlaaad.reveal.nav/coll m})
-                             separator
-                             (stream v {:vlaaad.reveal.nav/key k
-                                        :vlaaad.reveal.nav/coll m})))))
-        (interpose newline))
-      m)))
+(defn entries
+  ([m]
+   (entries m nil))
+  ([m ann]
+   (block :vertical
+     (streamduce
+       (comp
+         (map (fn [e]
+                (let [k (key e)
+                      v (val e)]
+                  (horizontal (stream k (assoc ann :vlaaad.reveal.nav/val v
+                                                   :vlaaad.reveal.nav/coll m))
+                              separator
+                              (stream v (assoc ann :vlaaad.reveal.nav/key k
+                                                   :vlaaad.reveal.nav/coll m))))))
+         (interpose newline))
+       m))))
 
-(defn- delimited-items [coll sep]
+(defn- delimited-items [coll sep ann]
   (streamduce
     (comp
       (if (set? coll)
         (map
           (fn [x]
-            (stream x {:vlaaad.reveal.nav/key x
-                       :vlaaad.reveal.nav/coll coll})))
+            (stream x (assoc ann :vlaaad.reveal.nav/key x
+                                 :vlaaad.reveal.nav/coll coll))))
         (map-indexed
           (fn [i x]
-            (stream x {:vlaaad.reveal.nav/key i
-                       :vlaaad.reveal.nav/coll coll}))))
+            (stream x (assoc ann :vlaaad.reveal.nav/key i
+                                 :vlaaad.reveal.nav/coll coll)))))
       (interpose sep))
     coll))
 
-(defn vertically [xs]
-  (block :vertical (delimited-items xs newline)))
+(defn vertically
+  ([xs] (vertically xs nil))
+  ([xs ann] (block :vertical (delimited-items xs newline ann))))
 
-(defn horizontally [xs]
-  (block :horizontal (delimited-items xs separator)))
+(defn horizontally
+  ([xs] (horizontally xs nil))
+  ([xs ann] (block :horizontal (delimited-items xs separator ann))))
 
-(defn items [coll]
-  (if (some coll? coll)
-    (vertically coll)
-    (horizontally coll)))
+(defn items
+  ([coll]
+   (items coll nil))
+  ([coll ann]
+   (if (some coll? coll)
+     (vertically coll ann)
+     (horizontally coll ann))))
 
 (defn override-style [sf f & args]
   (fn [rf acc]

@@ -31,11 +31,15 @@
   When text streamed by `sf` is selected, the value in the context menu will
   be `x`. `view:value` action will be suggested to show the value using default
   streaming"
-  [x sf]
-  (stream/as x sf))
+  ([x sf] (stream/as x sf))
+  ([x ann sf] (stream/as x ann sf)))
 
-(defn streamed-as-is
-  "Returns streaming function that, when submitted to Reveal UI, is streamed as is"
+(defn stream-as-is
+  "Returns streaming function that, when streamed as a value, is streamed as is
+
+  Streaming functions are ordinary functions, and functions are streamed by
+  default as their class names. This is a way to sidestep streaming value
+  formatting and just stream the sf"
   [sf]
   (stream/as-is sf))
 
@@ -84,19 +88,33 @@
   stream/separator)
 
 (defn entries
-  "Returns streaming function that streams a sequence of entries"
-  [m]
-  (stream/entries m))
+  "Returns streaming function that streams entries (not sfs!)
+
+  Applies the annotation to every streamed key and value"
+  ([m] (stream/entries m))
+  ([m ann] (stream/entries m ann)))
 
 (defn vertically
-  "Returns streaming function that streams a sequence of values vertically"
-  [xs]
-  (stream/vertically xs))
+  "Returns streaming function that streams values (not sfs!) vertically
+
+  Applies the annotation to every streamed item"
+  ([xs] (stream/vertically xs))
+  ([xs ann] (stream/vertically xs ann)))
 
 (defn horizontally
-  "Returns streaming function that streams a sequence of values horizontally"
-  [xs]
-  (stream/horizontally xs))
+  "Returns streaming function that streams values (not sfs!) horizontally
+
+  Applies the annotation to every streamed item"
+  ([xs] (stream/horizontally xs))
+  ([xs ann] (stream/horizontally xs ann)))
+
+(defn items
+  "Returns streaming function that streams values horizontally or vertically
+
+  Might realize the whole `xs` before streaming. Applies the annotation to every
+  streamed item"
+  ([xs] (stream/items xs))
+  ([xs ann] (stream/items xs ann)))
 
 (defn override-style
   "Returns streaming function that changes the style of strings emitted by sf"
@@ -174,7 +192,7 @@
     - `:header` (optional, defaults to `:fn`'s value) - column header"
   view/table)
 
-(defn viewed-as-is
+(defn view-as-is
   "Returns a value that, when shown in Results panel, displays a supplied view
 
   `desc` is a cljfx description that defines a view to show"
