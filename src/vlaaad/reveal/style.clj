@@ -103,7 +103,10 @@
                         :-fx-cell-size font/line-height}
      ".label" {:-fx-text-fill symbol-color
                :-fx-font-family font-family
-               :-fx-font-size font-size}
+               :-fx-font-size font-size
+               ":focused" {:-fx-border-width [0 0 2 0]
+                           :-fx-padding [0 0 -2 0]
+                           :-fx-border-color selection-color}}
      ".button" {:-fx-text-fill util-color
                 :-fx-font-family font-family
                 :-fx-font-size font-size

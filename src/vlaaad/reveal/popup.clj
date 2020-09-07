@@ -392,7 +392,9 @@
                    :focus-traversable true}
             bounds
             (assoc :popup {:fx/type view
-                           :annotated-value (stream/->AnnotatedValue value annotation)
+                           :annotated-value (stream/->AnnotatedValue
+                                              value
+                                              (assoc annotation ::stream/hidden true))
                            :bounds bounds
                            :window window
                            :id [id :popup]

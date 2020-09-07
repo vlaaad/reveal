@@ -4,6 +4,10 @@
             [loom.graph :as g])
   (:import [loom.graph BasicEditableGraph]))
 
+;; This example adds formatting and navigation support for loom: a clojure
+;; library for building graph data structures.
+;; see https://github.com/aysylu/loom
+
 ;; by default we only show graph nodes when displaying the graph:
 
 (rx/defstream BasicEditableGraph [{:keys [nodeset] :as graph}]

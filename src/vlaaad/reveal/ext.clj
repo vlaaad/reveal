@@ -290,7 +290,6 @@
   ```
   {:fx/type popup-view
    :value (the-ns 'clojure.core)
-   :annotation {:vlaaad.reveal.stream/hidden true} ;; for view:value action
    :desc {:fx/type :label :text \"The clojure.core library\"}}
   ```"
   popup/ext)

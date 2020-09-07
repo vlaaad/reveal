@@ -59,6 +59,7 @@
    :desc {:fx/type output-panel/view}})
 
 (defprotocol Viewable
+  :extend-via-metadata true
   (make [this] "Returns cljfx description for the viewable"))
 
 (defn- process-value! [id value handler]
@@ -121,7 +122,8 @@
   (reify Viewable (make [_] desc)))
 
 (action/defaction ::view [v]
-  (when (instance? (:on-interface Viewable) v)
+  (when (or (instance? (:on-interface Viewable) v)
+            (`make (meta v)))
     (constantly v)))
 
 (action/defaction ::watch:latest [v]
@@ -227,8 +229,7 @@
                                                    (PseudoClass/getPseudoClass "selected"))
                                     %)))]
         {:bounds (.localToScreen cell (.getBoundsInLocal cell))
-         :value (.getCellData (.getTableColumn pos) (.getRow pos))
-         :annotation {::stream/hidden true}}))))
+         :value (.getCellData (.getTableColumn pos) (.getRow pos))}))))
 
 (defn table [{:keys [items columns]}]
   (let [xs (vec items)]
@@ -332,7 +333,6 @@
   (let [^Node node (.getTarget event)]
     (when-let [value (::value (.getProperties node))]
       {:value value
-       :annotation {::stream/hidden true}
        :bounds (.localToScreen node (.getBoundsInLocal node))})))
 
 (defn- numbered? [x]

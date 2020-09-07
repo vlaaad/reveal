@@ -6,7 +6,11 @@
             [vlaaad.reveal.ext :as rx])
   (:import [org.eclipse.jetty.server Server]))
 
-;; integrant example: create a system monitor with controls
+;; Integrant is a micro-framework for building applications with data-driven
+;; architecture. It manages application lifecycle: starting and stopping the system and
+;; wiring dependencies.
+;; In this example we create a monitor for our developed system that shows its current
+;; state and controls to start and stop it.
 
 ;; this was taken directly from integrant readme: https://github.com/weavejester/integrant
 
@@ -52,7 +56,7 @@
   (start!)
   (stop!))
 
-;; Reveal monitor and controls: eval it and select "view" action
+;; Reveal monitor and controls: eval it and execute "view" action
 
 (rx/view-as-is
   {:fx/type rx/observable-view
