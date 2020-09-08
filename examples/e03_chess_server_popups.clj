@@ -60,35 +60,38 @@
        {:fx/type rx/observable-view
         :ref x
         :fn (fn [state]
-              {:fx/type :flow-pane
-               :hgap 5
-               :vgap 5
-               :children
-               (for [[id board :as id+board] (sort-by key state)]
-                 {:fx/type :v-box
-                  :children
-                  [{:fx/type rx/popup-view
-                    :value id+board
-                    :desc {:fx/type :label
-                           :text (str "board #" id)}}
-                   {:fx/type :stack-pane
-                    :children
-                    [(grid
-                       (for [x (range 8)
-                             y (range 8)]
-                         {:fx/type :region
-                          :grid-pane/column x
-                          :grid-pane/row y
-                          :style {:-fx-background-color (if (even? (+ x y)) "#888" "#999")}}))
-                     (grid (for [[[x y] player :as coordinate+player] board]
-                             {:fx/type rx/popup-view
-                              :grid-pane/column x
-                              :grid-pane/row y
-                              :value coordinate+player
-                              :desc {:fx/type :label
-                                     :style {:-fx-font-size 20
-                                             :-fx-text-fill (:color player)}
-                                     :text (piece->symbol (:piece player))}}))]}]})})})))
+              {:fx/type :scroll-pane
+               :fit-to-width true
+               :content
+               {:fx/type :flow-pane
+                :hgap 5
+                :vgap 5
+                :children
+                (for [[id board :as id+board] (sort-by key state)]
+                  {:fx/type :v-box
+                   :children
+                   [{:fx/type rx/popup-view
+                     :value id+board
+                     :desc {:fx/type :label
+                            :text (str "board #" id)}}
+                    {:fx/type :stack-pane
+                     :children
+                     [(grid
+                        (for [x (range 8)
+                              y (range 8)]
+                          {:fx/type :region
+                           :grid-pane/column x
+                           :grid-pane/row y
+                           :style {:-fx-background-color (if (even? (+ x y)) "#888" "#999")}}))
+                      (grid (for [[[x y] player :as coordinate+player] board]
+                              {:fx/type rx/popup-view
+                               :grid-pane/column x
+                               :grid-pane/row y
+                               :value coordinate+player
+                               :desc {:fx/type :label
+                                      :style {:-fx-font-size 20
+                                              :-fx-text-fill (:color player)}
+                                      :text (piece->symbol (:piece player))}}))]}]})}})})))
 
 ;; game logic
 

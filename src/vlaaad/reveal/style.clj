@@ -121,6 +121,9 @@
      ".cell" {:-fx-text-fill symbol-color
               :-fx-background-color :transparent}
      ;; scroll bars
+     ".scroll-pane" {:-fx-background-color :transparent
+                     "> .viewport" {:-fx-background-color :transparent}
+                     "> .corner" {:-fx-background-color :transparent}}
      ".virtual-flow > .corner" {:-fx-background-color :transparent}
      ".scroll-bar" {:-fx-background-color :transparent
                     "> .thumb" {:-fx-background-color "#eee3"
