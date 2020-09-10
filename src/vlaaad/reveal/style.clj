@@ -104,9 +104,9 @@
      ".label" {:-fx-text-fill symbol-color
                :-fx-font-family font-family
                :-fx-font-size font-size
-               ":focused" {:-fx-border-width [0 0 2 0]
-                           :-fx-padding [0 0 -2 0]
-                           :-fx-border-color selection-color}}
+               ":has-popup:focused" {:-fx-border-width [0 0 2 0]
+                                     :-fx-padding [0 0 -2 0]
+                                     :-fx-border-color selection-color}}
      ".button" {:-fx-text-fill util-color
                 :-fx-font-family font-family
                 :-fx-font-size font-size
@@ -121,6 +121,7 @@
      ".cell" {:-fx-text-fill symbol-color
               :-fx-background-color :transparent}
      ;; scroll bars
+     ".table-cell" {:-fx-background-color :transparent}
      ".scroll-pane" {:-fx-background-color :transparent
                      "> .viewport" {:-fx-background-color :transparent}
                      "> .corner" {:-fx-background-color :transparent}}

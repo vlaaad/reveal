@@ -389,6 +389,7 @@
    :props (cond-> {:event-filter {::event/type ::on-popup-node-event
                                   :id id
                                   :select select}
+                   :pseudo-classes #{:has-popup}
                    :focus-traversable true}
             bounds
             (assoc :popup {:fx/type view
