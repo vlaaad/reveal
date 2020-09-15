@@ -1,11 +1,13 @@
-param ([Parameter(Mandatory)]$version)
-
 function invoke {
     $exe, $argsForExe = $Args
     $ErrorActionPreference = 'Continue'
     try { & $exe $argsForExe } catch { Throw }
     if ($LASTEXITCODE) { Throw "$exe indicated failure (exit code $LASTEXITCODE; full command: $Args)." }
 }
+if (!((invoke git rev-parse --abbrev-ref HEAD) -eq "master")) {
+    throw "not on master"
+}
+$version = "0.1.0-ea$(invoke git rev-list HEAD --count)"
 
 clj -A:build -m version $version
 clj -Spom
