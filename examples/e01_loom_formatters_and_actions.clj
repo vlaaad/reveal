@@ -1,6 +1,5 @@
 (ns e01-loom-formatters-and-actions
   (:require [vlaaad.reveal.ext :as rx]
-            [vlaaad.reveal.style :as style]
             [loom.graph :as g])
   (:import [loom.graph BasicEditableGraph]))
 
@@ -12,9 +11,9 @@
 
 (rx/defstream BasicEditableGraph [{:keys [nodeset] :as graph}]
   (rx/horizontal
-    (rx/raw-string "#loom/graph[" {:fill style/object-color})
+    (rx/raw-string "#loom/graph[" {:fill :object})
     (rx/items nodeset {::graph graph})
-    (rx/raw-string "]" {:fill style/object-color})))
+    (rx/raw-string "]" {:fill :object})))
 
 ;; define an action on a selected node when it has access to graph:
 
@@ -47,7 +46,7 @@
                      ;; forward the graph
                      (rx/stream from {::graph v})
                      rx/separator
-                     (rx/raw-string "->" {:fill style/util-color :selectable false})
+                     (rx/raw-string "->" {:fill :util :selectable false})
                      rx/separator
                      (rx/stream to {::graph v}))))
                (g/edges v)))))))

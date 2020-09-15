@@ -1,6 +1,5 @@
 (ns vlaaad.reveal.doc
-  (:require [vlaaad.reveal.style :as style]
-            [vlaaad.reveal.stream :as stream]
+  (:require [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.action :as action]
             [clojure.string :as str]
             [clojure.spec.alpha :as s]
@@ -50,7 +49,7 @@
 (extend-protocol md->sf
   Node
   (->sf [this]
-    (stream/raw-string (.getChars this) {:fill style/string-color}))
+    (stream/raw-string (.getChars this) {:fill :string}))
   Document
   (->sf [this]
     (apply stream/vertical (map ->sf (children this))))
@@ -66,7 +65,7 @@
             (stream/horizontal (stream/raw-string "\n"))))
   Text
   (->sf [this]
-    (stream/raw-string (.getChars this) {:fill style/string-color}))
+    (stream/raw-string (.getChars this) {:fill :string}))
   TextBase
   (->sf [this]
     (apply stream/horizontal (map ->sf (children this))))
@@ -74,36 +73,36 @@
   (->sf [this]
     (let [link (str (.getChars this))]
       (stream/as link
-        (stream/raw-string link {:fill style/scalar-color}))))
+        (stream/raw-string link {:fill :scalar}))))
   MailLink
   (->sf [this]
-    (stream/raw-string (.getChars this) {:fill style/string-color}))
+    (stream/raw-string (.getChars this) {:fill :string}))
   InlineLinkNode
   (->sf [this]
     (stream/horizontal
-      (stream/raw-string (.getTextOpeningMarker this) {:fill style/util-color})
-      (stream/raw-string (.getText this) {:fill style/string-color})
+      (stream/raw-string (.getTextOpeningMarker this) {:fill :util})
+      (stream/raw-string (.getText this) {:fill :string})
       (stream/raw-string (str (.getTextClosingMarker this)
                               (.getLinkOpeningMarker this))
-                         {:fill style/util-color})
+                         {:fill :util})
       (stream/as (str (.getUrl this))
-        (stream/raw-string (.getUrl this) {:fill style/scalar-color}))
-      (stream/raw-string (str (.getLinkClosingMarker this)) {:fill style/util-color})))
+        (stream/raw-string (.getUrl this) {:fill :scalar}))
+      (stream/raw-string (str (.getLinkClosingMarker this)) {:fill :util})))
   DelimitedNodeImpl
   (->sf [this]
     (let [marker (str (.getOpeningMarker this))
           marker-color (case marker
-                         "*" style/string-color
-                         style/util-color)]
+                         "*" :string
+                         :util)]
       (stream/horizontal
         (stream/raw-string marker {:fill marker-color})
         (stream/raw-string (.getText this) {:fill (case marker
-                                                    "`" style/symbol-color
-                                                    style/string-color)})
+                                                    "`" :symbol
+                                                    :string)})
         (stream/raw-string (.getClosingMarker this) {:fill marker-color}))))
   ThematicBreak
   (->sf [this]
-    (stream/raw-string (.getChars this) {:fill style/string-color}))
+    (stream/raw-string (.getChars this) {:fill :string}))
   BulletList
   (->sf [this]
     (let [marker (str (.getOpeningMarker this) " ")]
@@ -111,7 +110,7 @@
            children
            (map (fn [child]
                   (stream/horizontal
-                    (stream/raw-string marker {:fill style/string-color})
+                    (stream/raw-string marker {:fill :string})
                     (->sf child))))
            (apply stream/vertical))))
   OrderedList
@@ -120,7 +119,7 @@
          children
          (map (fn [i child]
                 (stream/horizontal
-                  (stream/raw-string (str i (.getDelimiter this) " ") {:fill style/string-color})
+                  (stream/raw-string (str i (.getDelimiter this) " ") {:fill :string})
                   (->sf child)))
               (iterate inc (.getStartNumber this)))
          (apply stream/vertical)))
@@ -130,37 +129,37 @@
   Heading
   (->sf [this]
     (stream/horizontal
-      (stream/raw-string (str (.getOpeningMarker this) " ") {:fill style/util-color})
+      (stream/raw-string (str (.getOpeningMarker this) " ") {:fill :util})
       (->> this children (map ->sf) (apply stream/horizontal))
       (stream/raw-string "\n")))
   BlockQuote
   (->sf [this]
     (stream/horizontal
-      (stream/raw-string "> " {:fill style/util-color})
+      (stream/raw-string "> " {:fill :util})
       (apply stream/horizontal (map ->sf (children this)))))
   FencedCodeBlock
   (->sf [this]
     (stream/vertical
-      (stream/raw-string (str (.getOpeningFence this) (.getInfo this)) {:fill style/util-color})
-      (stream/raw-string (str/trim-newline (.getChildChars this)) {:fill style/symbol-color})
-      (stream/raw-string (.getClosingFence this) {:fill style/util-color})))
+      (stream/raw-string (str (.getOpeningFence this) (.getInfo this)) {:fill :util})
+      (stream/raw-string (str/trim-newline (.getChildChars this)) {:fill :symbol})
+      (stream/raw-string (.getClosingFence this) {:fill :util})))
   IndentedCodeBlock
   (->sf [this]
-    (stream/raw-string (str (.getChars this)) {:fill style/symbol-color}))
+    (stream/raw-string (str (.getChars this)) {:fill :symbol}))
   HtmlInline
   (->sf [this]
-    (stream/raw-string (str (.getChars this)) {:fill style/util-color}))
+    (stream/raw-string (str (.getChars this)) {:fill :util}))
   WikiLink
   (->sf [this]
     (stream/horizontal
-      (stream/raw-string (.getOpeningMarker this) {:fill style/util-color})
+      (stream/raw-string (.getOpeningMarker this) {:fill :util})
       (if-let [var (ns-resolve *doc-ns* (symbol (str (.getChildChars this))))]
         (stream/as var
           (stream/raw-string
             (.getChildChars this)
-            {:fill style/object-color}))
-        (stream/raw-string (.getChildChars this) {:fill style/string-color}))
-      (stream/raw-string (.getClosingMarker this) {:fill style/util-color}))))
+            {:fill :object}))
+        (stream/raw-string (.getChildChars this) {:fill :string}))
+      (stream/raw-string (.getClosingMarker this) {:fill :util}))))
 
 (defn parse [docstring ns]
   (let [lines (str/split-lines docstring)
@@ -186,28 +185,28 @@
                   (stream/stream var)
                   (when (:macro m)
                     [stream/separator
-                     (stream/raw-string "(macro)" {:fill style/util-color})]))]
+                     (stream/raw-string "(macro)" {:fill :util})]))]
           (when-let [arglists (:arglists m)]
             (map stream/stream arglists))
           (when-let [deprecated (:deprecated m)]
             [stream/separator
              (if (string? deprecated)
                (stream/horizontal
-                 (stream/raw-string "Deprecated." {:fill style/string-color})
+                 (stream/raw-string "Deprecated." {:fill :string})
                  stream/separator
                  (parse deprecated (:ns m)))
-               (stream/raw-string "Deprecated." {:fill style/string-color}))])
+               (stream/raw-string "Deprecated." {:fill :string}))])
           (when-let [doc (:doc m)]
             [stream/separator
              (parse doc (:ns m))
              stream/separator])
           (when-let [forms (:forms m)]
             (cons
-              (stream/raw-string "forms:" {:fill style/util-color})
+              (stream/raw-string "forms:" {:fill :util})
               ;; todo format as code!
               (map stream/stream forms)))
           (when-let [spec (s/get-spec var)]
-            [(stream/raw-string "spec:" {:fill style/util-color})
+            [(stream/raw-string "spec:" {:fill :util})
              ;; todo format as code!
              (stream/stream (s/describe spec))]))))))
 
@@ -223,7 +222,7 @@
     (stream/vertical
       (stream/stream k)
       stream/separator
-      (stream/raw-string "spec:" {:fill style/util-color})
+      (stream/raw-string "spec:" {:fill :util})
       ;; todo format as code!
       (stream/stream (s/describe k)))))
 
@@ -283,7 +282,7 @@
                    (read read-opts (PushbackReader. pushback-reader)))]
         (stream/as-is
           (stream/as form
-            (stream/raw-string text {:fill style/string-color})))))))
+            (stream/raw-string text {:fill :string})))))))
 
 (action/defaction ::source [x]
   (cond

@@ -4,7 +4,6 @@
             [vlaaad.reveal.event :as event]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.action :as action]
-            [vlaaad.reveal.style :as style]
             vlaaad.reveal.doc
             [vlaaad.reveal.fx :as rfx]
             [cljfx.api :as fx]
@@ -151,7 +150,7 @@
                   (stream/as-is
                     (stream/horizontal
                       (stream/raw-string (format "%4d: " (vswap! *counter inc))
-                                         {:fill style/util-color})
+                                         {:fill :util})
                       (stream/stream ({::nil nil} x x))))))))]
     (submit! @*ref)
     (add-watch *ref watch-key #(submit! %4))

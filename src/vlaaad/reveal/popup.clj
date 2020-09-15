@@ -227,7 +227,7 @@
                                            actions)}}]
     {:fx/type lifecycle
      :window window
-     :stylesheets [(:cljfx.css/url style/style)]
+     :stylesheets [(:cljfx.css/url @style/style)]
      :anchor-location (if popup-at-the-bottom :window-top-left :window-bottom-left)
      :anchor-x (+ pref-anchor-x anchor-fix-x)
      :anchor-y (if popup-at-the-bottom
@@ -249,12 +249,12 @@
        :children
        (-> []
            (cond-> popup-at-the-bottom
-                   (conj {:fx/type :polygon
-                          :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                          :fill style/popup-color
-                          :points [0 arrow-height
-                                   arrow-width arrow-height
-                                   (* arrow-width 0.5) 0]}))
+             (conj {:fx/type :polygon
+                    :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
+                    :fill @style/popup-color
+                    :points [0 arrow-height
+                             arrow-width arrow-height
+                             (* arrow-width 0.5) 0]}))
            (conj
              {:fx/type fx/ext-let-refs
               :refs (into {::text-field {:fx/type :text-field
@@ -275,8 +275,8 @@
                               [[::action (:id action)]
                                {:fx/type :label
                                 :style-class (cond-> ["reveal-popup-item"]
-                                                     (= i selected-index)
-                                                     (conj "reveal-popup-item-selected"))
+                                               (= i selected-index)
+                                               (conj "reveal-popup-item-selected"))
                                 :min-width :use-pref-size
                                 :text (:label action)
                                 :on-key-pressed {::event/type ::on-action-key-pressed
@@ -299,21 +299,21 @@
                             :max-height max-content-height
                             :children (-> []
                                           (cond-> popup-at-the-bottom
-                                                  (conj {:fx/type fx/ext-get-ref
-                                                         :ref ::text-field
-                                                         :fx/key ::text-field}))
+                                            (conj {:fx/type fx/ext-get-ref
+                                                   :ref ::text-field
+                                                   :fx/key ::text-field}))
                                           (cond-> (pos? (count actions)) (conj action-view))
                                           (cond-> (not popup-at-the-bottom)
-                                                  (conj {:fx/type fx/ext-get-ref
-                                                         :ref ::text-field
-                                                         :fx/key ::text-field})))}}})
+                                            (conj {:fx/type fx/ext-get-ref
+                                                   :ref ::text-field
+                                                   :fx/key ::text-field})))}}})
            (cond-> (not popup-at-the-bottom)
-                   (conj {:fx/type :polygon
-                          :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                          :fill style/popup-color
-                          :points [0 0
-                                   arrow-width 0
-                                   (* arrow-width 0.5) arrow-height]})))}]}))
+             (conj {:fx/type :polygon
+                    :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
+                    :fill @style/popup-color
+                    :points [0 0
+                             arrow-width 0
+                             (* arrow-width 0.5) arrow-height]})))}]}))
 
 (defmethod event/handle ::init-popup [{:keys [id actions]}]
   #(assoc % id {:actions actions :id id}))

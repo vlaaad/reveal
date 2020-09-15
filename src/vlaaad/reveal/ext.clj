@@ -3,7 +3,6 @@
             [clojure.spec.alpha :as s]
             [clojure.core.specs.alpha :as specs]
             [vlaaad.reveal.stream :as stream]
-            [vlaaad.reveal.style :as style]
             [vlaaad.reveal.view :as view]
             [vlaaad.reveal.popup :as popup]))
 
@@ -47,7 +46,7 @@
   "Returns streaming function that streams x as a string
 
   Line breaks etc. are not escaped, will result in new lines"
-  ([x] (raw-string x {:fill style/symbol-color}))
+  ([x] (raw-string x {:fill :symbol}))
   ([x style] (stream/raw-string x style)))
 
 (defn escaped-string
@@ -55,7 +54,7 @@
 
   `escape` is a function from character to escape string (or nil if there is no
   escape), e.g. {\\newline \"\\\\n\"}"
-  ([x escape] (escaped-string x {:fill style/symbol-color} escape {:fill style/scalar-color}))
+  ([x escape] (escaped-string x {:fill :symbol} escape {:fill :scalar}))
   ([x style escape] (escaped-string x style escape style))
   ([x style escape escape-style] (stream/escaped-string x style escape escape-style)))
 

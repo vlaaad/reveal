@@ -29,20 +29,41 @@
 (defn- load-default [^double size]
   (Font/loadFont (io/input-stream (io/resource "vlaaad/reveal/FantasqueSansMono-Regular.ttf")) size))
 
-(def ^Font font
-  (let [[kind id] (:font-family prefs/prefs [:default])
-        size (double (:font-size prefs/prefs 14.5))]
-    (case kind
-      :default (load-default size)
-      :system-font (Font/font id size)
-      :url-string (or (Font/loadFont ^String id size) (load-default size)))))
+(def ^:private *font
+  (delay
+    (let [[kind id] (:font-family @prefs/prefs [:default])
+          size (double (:font-size @prefs/prefs 14.5))]
+      (case kind
+        :default (load-default size)
+        :system-font (Font/font id size)
+        :url-string (or (Font/loadFont ^String id size) (load-default size))))))
 
-(let [metrics (.getFontMetrics (.getFontLoader (Toolkit/getToolkit)) font)]
-  (def ^double ^:const line-height (Math/ceil (.getLineHeight metrics)))
-  (def ^double ^:const descent (.getDescent metrics)))
+(defn font ^Font [] @*font)
 
-(def ^double ^:const char-width
-  (-> font
-      ^PGFont get-native-font
-      (.getStrike BaseTransform/IDENTITY_TRANSFORM FontResource/AA_GREYSCALE)
-      (.getCharAdvance \a)))
+(def ^:private *line-height
+  (delay
+    (-> (Toolkit/getToolkit)
+        .getFontLoader
+        (.getFontMetrics (font))
+        .getLineHeight
+        Math/ceil)))
+
+(defn line-height ^double [] @*line-height)
+
+(def ^:private *descent
+  (delay
+    (-> (Toolkit/getToolkit)
+        .getFontLoader
+        (.getFontMetrics (font))
+        .getDescent)))
+
+(defn descent ^double [] @*descent)
+
+(def ^:private *char-width
+  (delay
+    (-> (font)
+        ^PGFont get-native-font
+        (.getStrike BaseTransform/IDENTITY_TRANSFORM FontResource/AA_GREYSCALE)
+        (.getCharAdvance \a))))
+
+(defn char-width ^double [] @*char-width)

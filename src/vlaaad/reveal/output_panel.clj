@@ -223,10 +223,12 @@
                           (.requestFocus node))))))))
 
 (defn- result->rect [[[line] char-index] term]
-  {:x (* char-index font/char-width)
-   :y (* line font/line-height)
-   :width (* (count term) font/char-width)
-   :height font/line-height})
+  (let [line-height (font/line-height)
+        char-width (font/char-width)]
+    {:x (* char-index char-width)
+     :y (* line line-height)
+     :width (* (count term) char-width)
+     :height line-height}))
 
 (defn- set-highlight [this highlight]
   (-> this
@@ -320,19 +322,21 @@
   (let [drawn-results (subseq results
                               >= [[dropped-line-count 0] 0]
                               <= [[(+ dropped-line-count drawn-line-count) 0] 0])
-        width (* (count term) font/char-width)]
-    (.setFill ctx (fx.coerce/color style/search-shade-color))
+        char-width (font/char-width)
+        width (* (count term) char-width)
+        line-height (font/line-height)]
+    (.setFill ctx (fx.coerce/color @style/search-shade-color))
     (doseq [[[line] char-index :as result] drawn-results
-            :let [x (* char-index font/char-width)
+            :let [x (* char-index char-width)
                   vx (+ scroll-x x)
-                  vy (- (* font/line-height (- line dropped-line-count))
+                  vy (- (* line-height (- line dropped-line-count))
                         scroll-y-remainder)
                   highlighted (= highlight result)]]
       (.setStroke ctx (fx.coerce/color
-                        (if highlighted style/search-color style/search-shade-color)))
-      (.strokeRect ctx vx vy width font/line-height)
+                        (if highlighted @style/search-color @style/search-shade-color)))
+      (.strokeRect ctx vx vy width line-height)
       (when-not highlighted
-        (.fillRect ctx vx vy width font/line-height)))))
+        (.fillRect ctx vx vy width line-height)))))
 
 (defn- indices-of [str sub]
   (if (= sub "")

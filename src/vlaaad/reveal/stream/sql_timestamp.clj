@@ -10,7 +10,7 @@
 
 (defstream Timestamp [^Timestamp timestamp]
   (horizontal
-    (raw-string "#inst" {:fill style/object-color})
+    (raw-string "#inst" {:fill :object})
     separator
     (stream (str (.format ^DateFormat (.get ^ThreadLocal utc-timestamp-format) timestamp)
                  (format ".%09d-00:00" (.getNanos timestamp))))))

@@ -4,7 +4,6 @@
             [nrepl.transport :as transport]
             [clojure.string :as str]
             [vlaaad.reveal.ui :as ui]
-            [vlaaad.reveal.style :as style]
             [vlaaad.reveal.stream :as stream]))
 
 (defn- show-output [ui request message]
@@ -23,34 +22,34 @@
             (stream/as-is
               (stream/as {:request request :message message}
                 (stream/vertical
-                  (stream/raw-string code {:fill style/util-color})
+                  (stream/raw-string code {:fill :util})
                   (stream/horizontal
-                    (stream/raw-string "=>" {:fill style/util-color})
+                    (stream/raw-string "=>" {:fill :util})
                     stream/separator
                     (stream/stream value)))))
 
             (not= out ::not-found)
             (stream/as-is
               (stream/as {:request request :message message}
-                (stream/raw-string (str/trim-newline out) {:fill style/string-color})))
+                (stream/raw-string (str/trim-newline out) {:fill :string})))
 
             (not= err ::not-found)
             (stream/as-is
               (stream/as {:request request :message message}
-                (stream/raw-string (str/trim-newline err) {:fill style/error-color})))
+                (stream/raw-string (str/trim-newline err) {:fill :error})))
 
             (not= throwable ::not-found)
             (stream/as-is
               (stream/as {:request request :message message}
                 (stream/vertical
-                  (stream/raw-string code {:fill style/util-color})
+                  (stream/raw-string code {:fill :util})
                   (stream/horizontal
-                    (stream/raw-string "=>" {:fill style/util-color})
+                    (stream/raw-string "=>" {:fill :util})
                     stream/separator
                     (stream/as throwable
                       (stream/raw-string
                         (.getSimpleName (class throwable))
-                        {:fill style/error-color}))))))
+                        {:fill :error}))))))
 
             :else
             {:request request :message message}))))))
@@ -59,7 +58,7 @@
   (ui
     (stream/as {:tap value}
       (stream/horizontal
-        (stream/raw-string "tap>" {:fill style/util-color})
+        (stream/raw-string "tap>" {:fill :util})
         stream/separator
         (stream/stream value)))))
 

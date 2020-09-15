@@ -184,7 +184,7 @@
    :modality :window-modal
    :title "Quit Reveal?"
    :scene {:fx/type :scene
-           :stylesheets [(:cljfx.css/url style/style)]
+           :stylesheets [(:cljfx.css/url @style/style)]
            :accelerators {[:escape] {::event/type ::cancel-quit}}
            :root {:fx/type :v-box
                   :style-class "reveal-ui"
@@ -221,7 +221,7 @@
                                   "vlaaad/reveal/logo-512.png"]
                           :on-focused-changed {::event/type ::on-window-focused-changed}
                           :scene {:fx/type :scene
-                                  :stylesheets [(:cljfx.css/url style/style)]
+                                  :stylesheets [(:cljfx.css/url @style/style)]
                                   :root {:fx/type :grid-pane
                                          :style-class "reveal-ui"
                                          :column-constraints [{:fx/type :column-constraints
@@ -239,13 +239,13 @@
                                                    :grid-pane/column 0
                                                    :queue queue
                                                    :id :output}]
-                                                 focused-view-index
-                                                 (conj {:fx/type tabs-view
-                                                        :grid-pane/row 1
-                                                        :grid-pane/column 0
-                                                        :views views
-                                                        :view-order view-order
-                                                        :focused-view-index focused-view-index}))}}}}
+                                           focused-view-index
+                                           (conj {:fx/type tabs-view
+                                                  :grid-pane/row 1
+                                                  :grid-pane/column 0
+                                                  :views views
+                                                  :view-order view-order
+                                                  :focused-view-index focused-view-index}))}}}}
           :desc {:fx/type fx/ext-let-refs
                  :refs (when confirm-exit-showing
                          {::confirm-exit {:fx/type confirm-exit-dialog

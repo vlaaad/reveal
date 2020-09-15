@@ -6,24 +6,24 @@
       (horizontal
         (raw-string "-")
         (stream -))
-      assoc :fill style/error-color)
+      assoc :fill :error)
     separator
     (override-style
       (horizontal
         (raw-string "+")
         (stream +))
-      assoc :fill style/success-color)))
+      assoc :fill :success)))
 
 (defstream lambdaisland.deep_diff.diff.Insertion [{:keys [+]}]
   (override-style
     (horizontal
       (raw-string "+")
       (stream +))
-    assoc :fill style/success-color))
+    assoc :fill :success))
 
 (defstream lambdaisland.deep_diff.diff.Deletion [{:keys [-]}]
   (override-style
     (horizontal
       (raw-string "-")
       (stream -))
-    assoc :fill style/error-color))
+    assoc :fill :error))

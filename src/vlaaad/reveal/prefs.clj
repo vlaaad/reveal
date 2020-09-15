@@ -30,12 +30,13 @@
   (s/keys :opt-un [::font-family ::font-size ::theme]))
 
 (def prefs
-  (try
-    (let [raw (edn/read-string (System/getProperty "vlaaad.reveal.prefs" "{}"))
-          prefs (s/conform ::prefs raw)]
-      (when (s/invalid? prefs)
-        (throw (ex-info "Invalid prefs" (s/explain-data ::prefs raw))))
-      prefs)
-    (catch Exception e
-      (println "Failed to read reveal prefs")
-      (println (-> e Throwable->map m/ex-triage m/ex-str)))))
+  (delay
+    (try
+      (let [raw (edn/read-string (System/getProperty "vlaaad.reveal.prefs" "{}"))
+            prefs (s/conform ::prefs raw)]
+        (when (s/invalid? prefs)
+          (throw (ex-info "Invalid prefs" (s/explain-data ::prefs raw))))
+        prefs)
+      (catch Exception e
+        (println "Failed to read reveal prefs")
+        (println (-> e Throwable->map m/ex-triage m/ex-str))))))

@@ -1,14 +1,13 @@
 (ns vlaaad.reveal.repl
   (:require [clojure.main :as m]
             [vlaaad.reveal.ui :as ui]
-            [vlaaad.reveal.style :as style]
             [vlaaad.reveal.stream :as stream]
             [clojure.string :as str]))
 
 (defn- stream-read [form ui]
   (ui (stream/as-is
         (stream/as form
-          (stream/raw-string (pr-str form) {:fill style/util-color})))))
+          (stream/raw-string (pr-str form) {:fill :util})))))
 
 (defn- wrap-read [ui read]
   (fn [request-prompt request-exit]
@@ -24,7 +23,7 @@
     (ui
       (stream/as-is
         (stream/horizontal
-          (stream/raw-string "=>" {:fill style/util-color})
+          (stream/raw-string "=>" {:fill :util})
           stream/separator
           (stream/stream x))))
     (print x)))
@@ -34,14 +33,14 @@
     (ui (stream/as-is
           (stream/as ex
             (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
-                               {:fill style/error-color}))))
+                               {:fill :error}))))
     (caught ex)))
 
 (defn- make-tap [ui]
   (fn [x]
     (ui (stream/as-is
           (stream/horizontal
-            (stream/raw-string "tap>" {:fill style/util-color})
+            (stream/raw-string "tap>" {:fill :util})
             stream/separator
             (stream/stream x))))))
 
@@ -57,8 +56,8 @@
     nil))
 
 (defn- wrap-eval [ui eval]
-  (let [out (make-print ui *out* style/string-color)
-        err (make-print ui *err* style/error-color)]
+  (let [out (make-print ui *out* :string)
+        err (make-print ui *err* :error)]
     (fn [form]
       (binding [*out* out
                 *err* err]
@@ -82,7 +81,7 @@
                       (update :caught #(wrap-caught ui (or % m/repl-caught))))]
     (ui (stream/as-is
           (stream/as *clojure-version*
-            (stream/raw-string version {:fill style/util-color}))))
+            (stream/raw-string version {:fill :util}))))
     (println version)
     (add-tap tap)
     (try

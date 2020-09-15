@@ -1,7 +1,6 @@
 (ns vlaaad.reveal.action
   (:require [clojure.datafy :as d]
             [vlaaad.reveal.stream :as stream]
-            [vlaaad.reveal.style :as style]
             [clojure.spec.alpha :as s]
             [clojure.core.specs.alpha :as specs])
   (:import [clojure.lang IDeref]
@@ -43,11 +42,11 @@
                         :label label
                         :form (stream/as-is
                                 (stream/horizontal
-                                  (stream/raw-string "(" {:fill style/util-color})
-                                  (stream/raw-string label {:fill style/symbol-color})
+                                  (stream/raw-string "(" {:fill :util})
+                                  (stream/raw-string label {:fill :symbol})
                                   stream/separator
                                   (stream/stream value annotation)
-                                  (stream/raw-string ")" {:fill style/util-color})))
+                                  (stream/raw-string ")" {:fill :util})))
                         :invoke f}))
                    (catch Exception _))))
          (sort-by :label)
@@ -110,13 +109,13 @@
                                      (apply
                                        stream/horizontal
                                        (stream/as name
-                                         (stream/raw-string name {:fill style/symbol-color}))
+                                         (stream/raw-string name {:fill :symbol}))
                                        stream/separator
                                        (->> kinds
                                             (map (fn [kind]
                                                    (stream/as kind
                                                      (stream/raw-string (.getSimpleName (class kind))
-                                                                        {:fill style/util-color}))))
+                                                                        {:fill :util}))))
                                             (interpose stream/separator)))
                                      (stream/horizontal
                                        (stream/raw-string "  " {:selectable false})

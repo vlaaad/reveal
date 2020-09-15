@@ -165,7 +165,7 @@
       (max min-scroll-tab-size (* canvas-size visible-ratio)))))
 
 (defn- segment-width [segment]
-  (* font/char-width (.length ^String (:text segment))))
+  (* (font/char-width) (.length ^String (:text segment))))
 
 (defn region-width [region]
   (transduce (map segment-width) + (:segments region)))
@@ -181,13 +181,14 @@
           scrolling-enabled true}
      :as layout}]
    (let [line-count (count lines)
-         document-height (+ (* font/line-height line-count) (if scrolling-enabled scroll-bar-breadth 0))
+         line-height (font/line-height)
+         document-height (+ (* line-height line-count) (if scrolling-enabled scroll-bar-breadth 0))
          canvas-height (or canvas-height document-height)
          scroll-y (clamp scroll-y (- canvas-height document-height) 0.0)
-         scroll-y-remainder (rem (- scroll-y) font/line-height)
-         dropped-line-count (- (long (/ scroll-y font/line-height)))
+         scroll-y-remainder (rem (- scroll-y) line-height)
+         dropped-line-count (- (long (/ scroll-y line-height)))
          drawn-line-count (long (min (- line-count dropped-line-count)
-                                     (Math/ceil (/ (+ canvas-height scroll-y-remainder) font/line-height))))
+                                     (Math/ceil (/ (+ canvas-height scroll-y-remainder) line-height))))
          document-width (+ (if scrolling-enabled scroll-bar-breadth 0)
                            (transduce
                              (map #(transduce (map region-width) + (lines %)))
@@ -236,7 +237,7 @@
 
 (defn- draw-scroll-bar [^GraphicsContext ctx active {:keys [x y width height]}]
   (doto ctx
-    (.setFill (fx.coerce/color (if active style/scroll-bar-color style/inactive-scroll-bar-color)))
+    (.setFill (fx.coerce/color (if active @style/scroll-bar-color @style/inactive-scroll-bar-color)))
     (.fillRoundRect x y width height scroll-bar-breadth scroll-bar-breadth)))
 
 (defn draw [^GraphicsContext ctx layout]
@@ -252,11 +253,13 @@
                 cursor
                 anchor
                 gesture
-                focused]} layout]
+                focused]} layout
+        line-height (font/line-height)
+        descent (font/descent)]
     (.clearRect ctx 0 0 canvas-width canvas-height)
     (when focused
       (doto ctx
-        (.setFill (fx.coerce/color style/selection-color))
+        (.setFill (fx.coerce/color @style/selection-color))
         (.fillRect 0 (- canvas-height 2) canvas-width 2)))
     (when (and cursor anchor)
       (let [from (-> anchor
@@ -268,8 +271,8 @@
                    (cursor/min [last-visible-line-index (dec (count (lines last-visible-line-index)))]))]
         (when-not (cursor/before? to from)
           (.setFill ctx (fx.coerce/color (if focused
-                                           style/selection-color
-                                           style/unfocused-selection-color)))
+                                           @style/selection-color
+                                           @style/unfocused-selection-color)))
           (doseq [i (range (cursor/row from) (inc (cursor/row to)))]
             (let [line (lines i)
                   start-col (if (= i (cursor/row from))
@@ -295,9 +298,9 @@
                           +
                           0
                           line)
-                  y (- (* font/line-height (- i dropped-line-count))
+                  y (- (* line-height (- i dropped-line-count))
                        scroll-y-remainder)]
-              (.fillRect ctx x y width font/line-height))))))
+              (.fillRect ctx x y width line-height))))))
     (dotimes [i drawn-line-count]
       (transduce (mapcat :segments)
                  (completing
@@ -307,13 +310,10 @@
                          (if (<= end 0)
                            end
                            (do
-                             (.setFill ctx (fx.coerce/color
-                                             (if-let [fill (:fill style)]
-                                               (get style/style fill fill)
-                                               "#000")))
-                             (.setFont ctx font/font)
-                             (.fillText ctx text x (-> (* (inc i) font/line-height)
-                                                       (- font/descent)
+                             (.setFill ctx (fx.coerce/color (style/color (:fill style "#000"))))
+                             (.setFont ctx (font/font))
+                             (.fillText ctx text x (-> (* (inc i) line-height)
+                                                       (- descent)
                                                        (- scroll-y-remainder)))
                              end)))
                        (reduced nil))))
@@ -365,10 +365,11 @@
       make))
 
 (defn- arrow-scroll [layout size-key]
-  (* font/line-height
-     (-> 5
-         (min (Math/ceil (* 0.1 (/ (get layout size-key) font/line-height))))
-         (max 1))))
+  (let [line-height (font/line-height)]
+    (* line-height
+       (-> 5
+           (min (Math/ceil (* 0.1 (/ (get layout size-key) line-height))))
+           (max 1)))))
 
 (defn arrow-scroll-left [layout]
   (make (update layout :scroll-x + (arrow-scroll layout :canvas-width))))
@@ -383,9 +384,10 @@
   (make (update layout :scroll-y - (arrow-scroll layout :canvas-height))))
 
 (defn- page-scroll [layout]
-  (let [{:keys [canvas-height]} layout]
-    (* font/line-height
-       (max 1 (Math/ceil (* 0.5 (/ canvas-height font/line-height)))))))
+  (let [{:keys [canvas-height]} layout
+        line-height (font/line-height)]
+    (* line-height
+       (max 1 (Math/ceil (* 0.5 (/ canvas-height line-height)))))))
 
 (defn page-scroll-up [layout]
   (make (update layout :scroll-y + (page-scroll layout))))
@@ -439,7 +441,7 @@
   (let [{:keys [scroll-x scroll-y lines]} layout
         doc-x (- x scroll-x)
         doc-y (- y scroll-y)
-        row (long (/ doc-y font/line-height))]
+        row (long (/ doc-y (font/line-height)))]
     (when (< -1 row (count lines))
       (let [line (lines row)
             index (first (transduce
@@ -540,26 +542,28 @@
 (defn ensure-cursor-visible [layout]
   (let [{:keys [lines cursor]} layout
         [row col] cursor
-        line (lines row)]
+        line (lines row)
+        line-height (font/line-height)]
     (ensure-rect-visible layout
                          {:x (transduce (map region-width) + (subvec line 0 col))
-                          :y (* font/line-height (cursor/row cursor))
+                          :y (* line-height (cursor/row cursor))
                           :width (region-width (line col))
-                          :height font/line-height})))
+                          :height line-height})))
 
 (defn cursor->canvas-bounds ^Bounds [layout]
   (let [{:keys [lines cursor scroll-x scroll-y]} layout
         [row col] cursor
-        line (lines row)]
+        line (lines row)
+        line-height (font/line-height)]
     (BoundingBox. (+ scroll-x (transduce (map #(-> % line region-width)) + (range col)))
-                  (double (+ scroll-y (* font/line-height row)))
+                  (double (+ scroll-y (* line-height row)))
                   (region-width (line col))
-                  font/line-height)))
+                  line-height)))
 
 (defn introduce-cursor-at-bottom-of-screen [layout]
   (let [{:keys [drawn-line-count dropped-line-count lines canvas-height scroll-y-remainder]} layout
         start-row (cond-> (dec (+ dropped-line-count drawn-line-count))
-                          (< canvas-height (- (* drawn-line-count font/line-height)
+                          (< canvas-height (- (* drawn-line-count (font/line-height))
                                               scroll-y-remainder))
                           dec)]
     (if-let [cursor (lines/scan lines [start-row -1] dec inc non-empty-region?)]
