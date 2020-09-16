@@ -56,11 +56,12 @@
 
 (defn- show-tap [ui value]
   (ui
-    (stream/as {:tap value}
-      (stream/horizontal
-        (stream/raw-string "tap>" {:fill :util})
-        stream/separator
-        (stream/stream value)))))
+    (stream/as-is
+      (stream/as {:tap value}
+        (stream/horizontal
+          (stream/raw-string "tap>" {:fill :util})
+          stream/separator
+          (stream/stream value))))))
 
 (defn middleware [f]
   (let [ui (ui/make)]
