@@ -33,7 +33,22 @@ depending on whether it was produced from a symbol or a class.
 You can find overview, setup instructions and more at 
 [vlaaad.github.io/reveal](https://vlaaad.github.io/reveal/).
 
+## Versioning, stability, public and internal code
+
+Reveal uses `1.MAJOR.REVISION` versioning where:
+- `1` is a static prefix for compatibility with semantic versioning. Reveal
+  should never introduce breaking changes, so if an update broke something, 
+  please file a bug report;
+- `MAJOR` is a number that is incremented when there are significant changes or 
+  improvements to Reveal;
+- `REVISION` is a commit number from the beginning of a history.
+
+Reveal's compatibility promise applies to its public API: `vlaaad.reveal` and 
+`vlaaad.reveal.ext` namespaces, everything else is implementation detail that 
+is subject to change. Reveal's UI and controls might change in the future.
+
 ## To do
+
 - structural navigation
 - text search:
   - should be reversible: escape scrolls to the place of search start if there is
@@ -43,7 +58,7 @@ You can find overview, setup instructions and more at
   - alt+up/down for history (persist history? per what?)
   - auto-insert closing brackets
   - pick some useful ns to eval in
-- fork out/err in repl/nrepl as well:
+- fork out/err in repl/nrepl:
   - for full experience we should fork `System/out` and `System/err`, and re-bind roots of `*out*` and `*err*` — is it 
     a good idea?
 - option to dispose javafx on quitting the repl - useful for entry points
