@@ -231,24 +231,23 @@
          :value (.getCellData (.getTableColumn pos) (.getRow pos))}))))
 
 (defn table [{:keys [items columns]}]
-  (let [xs (vec items)]
-    {:fx/type fx/ext-on-instance-lifecycle
-     :on-created initialize-table!
-     :desc {:fx/type popup/ext
-            :select select-bounds-and-value!
-            :desc {:fx/type :table-view
-                   :style-class "reveal-table"
-                   :columns (for [{:keys [header fn]
-                                   :or {header ::not-found}} columns]
-                              {:fx/type :table-column
-                               :style-class "reveal-table-column"
-                               :min-width 40
-                               :graphic {:fx/type summary
-                                         :value (if (= header ::not-found) fn header)}
-                               :cell-factory {:fx/cell-type :table-cell
-                                              :describe describe-cell}
-                               :cell-value-factory #(try (fn (xs %)) (catch Throwable e e))})
-                   :items (vec (range (count xs)))}}}))
+  {:fx/type fx/ext-on-instance-lifecycle
+   :on-created initialize-table!
+   :desc {:fx/type popup/ext
+          :select select-bounds-and-value!
+          :desc {:fx/type :table-view
+                 :style-class "reveal-table"
+                 :columns (for [{:keys [header fn]
+                                 :or {header ::not-found}} columns]
+                            {:fx/type :table-column
+                             :style-class "reveal-table-column"
+                             :min-width 40
+                             :graphic {:fx/type summary
+                                       :value (if (= header ::not-found) fn header)}
+                             :cell-factory {:fx/cell-type :table-cell
+                                            :describe describe-cell}
+                             :cell-value-factory #(try (fn (peek %)) (catch Throwable e e))})
+                 :items (into [] (map-indexed vector) items)}}})
 
 (action/defaction ::view:table [v]
   (when (and (some? v)
