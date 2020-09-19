@@ -29,7 +29,7 @@
   (let [fn-bindings (case (count bindings)
                       1 (conj bindings (gensym "_"))
                       2 bindings)]
-    `(register! ~id (fn ~fn-bindings ~@body))))
+    `(register! ~id (fn ~(symbol (name id)) ~fn-bindings ~@body))))
 
 (defn collect [annotated-value]
   (let [{:keys [value annotation]} annotated-value]
