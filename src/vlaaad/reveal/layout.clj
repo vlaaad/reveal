@@ -11,7 +11,14 @@
 
 (set! *warn-on-reflection* true)
 
-(s/def ::values (s/coll-of any? :kind vector?))
+(s/def :vlaaad.reveal.annotated-value/value any?)
+(s/def :vlaaad.reveal.annotated-value/annotation map?)
+
+(s/def ::annotated-value
+  (s/keys :req-un [:vlaaad.reveal.annotated-value/value
+                   :vlaaad.reveal.annotated-value/annotation]))
+
+(s/def ::value (s/nilable ::annotated-value))
 
 (s/def ::text string?)
 
@@ -39,7 +46,7 @@
   (s/and int? (complement neg?)))
 
 (s/def ::region
-  (s/keys :req-un [::index ::values ::segments]))
+  (s/keys :req-un [::index ::value ::segments]))
 
 (s/def ::line
   (s/coll-of ::region :kind vector?))

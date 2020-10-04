@@ -59,14 +59,14 @@
   (let [layout (layout/ensure-cursor-visible (:layout this))
         {:keys [lines cursor]} layout
         region (get-in lines cursor)
-        values (:values region)
+        value (:value region)
         ^Node target (.getTarget event)]
     (-> this
         (assoc :layout layout)
-        (cond-> (pos? (count values))
+        (cond-> value
                 (assoc :popup {:bounds (.localToScreen target (layout/cursor->canvas-bounds layout))
                                :window (.getWindow (.getScene target))
-                               :annotated-value (peek values)})))))
+                               :annotated-value value})))))
 
 (defn- show-search [this]
   (assoc this :search {:term "" :results (sorted-set)}))

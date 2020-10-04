@@ -391,17 +391,25 @@
   (+ (:index region 0)
      (segments-length (:segments region))))
 
-(defn- add-segment [line values segment]
+;; this logic should be in format-xf...
+;; index = character index
+
+;; line = regions
+;; region = segments
+;; region = value+segments+index+selectable
+;; selectable is property of a region. regions are split on changes to value and selectable!
+
+(defn- add-segment [line value segment]
   (let [last-region (peek line)]
-    (if (not= (:values last-region) values)
-      (conj line {:values values :segments [segment] :index (next-index last-region)})
+    (if (not (identical? (:value last-region) value))
+      (conj line {:value value :segments [segment] :index (next-index last-region)})
       (update-in line [(dec (count line)) :segments] conj segment))))
 
 (defn- add-separator [line]
   (let [last-region (peek line)]
     (cond-> line
             last-region
-            (conj {:values (:values last-region)
+            (conj {:value (:value last-region)
                    :segments []
                    :index (next-index last-region)}))))
 
@@ -457,7 +465,7 @@
            (let [blocks (:blocks state)
                  block (peek blocks)]
              (do (vswap! *state assoc :line (-> []
-                                                (add-segment (:values state) (blank-segment (:indent block 0)))
+                                                (add-segment (peek (:values state)) (blank-segment (:indent block 0)))
                                                 add-separator))
                  (rf acc (:line state))))
 
@@ -467,14 +475,14 @@
              (if (= :horizontal (:block block))
                (do (vswap! *state update :line #(-> %
                                                     add-separator
-                                                    (add-segment (:values state) (blank-segment 1))
+                                                    (add-segment (peek (:values state)) (blank-segment 1))
                                                     add-separator))
                    acc)
-               (do (vswap! *state update :line add-segment (:values state) (blank-segment 0))
+               (do (vswap! *state update :line add-segment (peek (:values state)) (blank-segment 0))
                    acc)))
 
            ::string
-           (do (vswap! *state update :line add-segment (:values state) (string-segment input))
+           (do (vswap! *state update :line add-segment (peek (:values state)) (string-segment input))
                acc)))))))
 
 (def stream-xf
