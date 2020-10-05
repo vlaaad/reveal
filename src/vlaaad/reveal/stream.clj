@@ -397,21 +397,26 @@
 ;; line = regions
 ;; region = segments
 ;; region = value+segments+index+selectable
-;; selectable is property of a region. regions are split on changes to value and selectable!
+;; selectable is property of a region. regions are split on:
+;; - changes to value
+;; - changes to selectable
+;; - if previous region is marked as complete (by "complete-region")
 
 (defn- add-segment [line value segment]
-  (let [last-region (peek line)]
-    (if (not (identical? (:value last-region) value))
-      (conj line {:value value :segments [segment] :index (next-index last-region)})
+  (let [last-region (peek line)
+        selectable (:selectable (:style segment) true)]
+    (if (or (not (identical? (:value last-region) value))
+            (:complete last-region)
+            (not= (:selectable last-region) selectable))
+      (conj line {:value value
+                  :selectable selectable
+                  :segments [segment]
+                  :index (next-index last-region)})
       (update-in line [(dec (count line)) :segments] conj segment))))
 
-(defn- add-separator [line]
-  (let [last-region (peek line)]
-    (cond-> line
-            last-region
-            (conj {:value (:value last-region)
-                   :segments []
-                   :index (next-index last-region)}))))
+(defn- complete-region [line]
+  (let [i (dec (count line))]
+    (cond-> line (not= i -1) (update i assoc :complete true))))
 
 (defn- line-length [line]
   (next-index (peek line)))
@@ -466,7 +471,7 @@
                  block (peek blocks)]
              (do (vswap! *state assoc :line (-> []
                                                 (add-segment (peek (:values state)) (blank-segment (:indent block 0)))
-                                                add-separator))
+                                                complete-region))
                  (rf acc (:line state))))
 
            ::separator
@@ -474,9 +479,9 @@
                  block (peek blocks)]
              (if (= :horizontal (:block block))
                (do (vswap! *state update :line #(-> %
-                                                    add-separator
+                                                    complete-region
                                                     (add-segment (peek (:values state)) (blank-segment 1))
-                                                    add-separator))
+                                                    complete-region))
                    acc)
                (do (vswap! *state update :line add-segment (peek (:values state)) (blank-segment 0))
                    acc)))

@@ -45,8 +45,10 @@
 (s/def ::index
   (s/and int? (complement neg?)))
 
+(s/def ::selectable boolean?)
+
 (s/def ::region
-  (s/keys :req-un [::index ::value ::segments]))
+  (s/keys :req-un [::index ::value ::segments ::selectable]))
 
 (s/def ::line
   (s/coll-of ::region :kind vector?))
@@ -431,18 +433,8 @@
       remove-cursor
       make))
 
-(defn empty-region? [region]
-  (every? #(false? (:selectable (:style %) true))
-          (:segments region)))
-
-(def non-empty-region?
-  (complement empty-region?))
-
-(defn empty-line? [line]
-  (every? empty-region? line))
-
-(def non-empty-line?
-  (complement empty-line?))
+(defn non-empty-line? [line]
+  (boolean (some :selectable line)))
 
 (defn canvas->cursor [layout x y]
   (let [{:keys [scroll-x scroll-y lines]} layout
@@ -461,7 +453,7 @@
                                    [(inc i) x]))))
                            [0 0]
                            (range (count line))))]
-        (when (and (< index (count line)) (non-empty-region? (line index)))
+        (when (and (< index (count line)) (:selectable (line index)))
           [row index])))))
 
 (defn perform-drag [layout ^MouseEvent event]
@@ -573,7 +565,7 @@
                           (< canvas-height (- (* drawn-line-count (font/line-height))
                                               scroll-y-remainder))
                           dec)]
-    (if-let [cursor (lines/scan lines [start-row -1] dec inc non-empty-region?)]
+    (if-let [cursor (lines/scan lines [start-row -1] dec inc :selectable)]
       (-> layout
           (set-cursor cursor)
           ensure-cursor-visible)
@@ -584,7 +576,7 @@
         start-row (cond-> dropped-line-count
                           (not (zero? scroll-y-remainder))
                           inc)]
-    (if-let [cursor (lines/scan lines [start-row -1] inc inc non-empty-region?)]
+    (if-let [cursor (lines/scan lines [start-row -1] inc inc :selectable)]
       (-> layout
           (set-cursor cursor)
           ensure-cursor-visible)
@@ -615,9 +607,9 @@
     (if-let [row (lines/scan lines row direction non-empty-line?)]
       (let [line (lines row)
             nearest-col (binary-nearest-by :index line align-char-index)
-            col (or (some #(when (non-empty-region? (line %)) %)
+            col (or (some #(when (:selectable (line %)) %)
                           (range nearest-col (count line)))
-                    (some #(when (non-empty-region? (line %)) %)
+                    (some #(when (:selectable (line %)) %)
                           (range (dec nearest-col) 0 -1)))
             cursor [row col]]
         (-> layout
@@ -627,15 +619,15 @@
 
 (defn select-all [layout]
   (let [{:keys [lines]} layout
-        from (lines/scan lines [##-Inf ##-Inf] inc inc non-empty-region?)
-        to (lines/scan lines [##Inf ##Inf] dec dec non-empty-region?)]
+        from (lines/scan lines [##-Inf ##-Inf] inc inc :selectable)
+        to (lines/scan lines [##Inf ##Inf] dec dec :selectable)]
     (cond-> layout
             (and from to)
             (set-cursor to :anchor from))))
 
 (defn move-cursor-horizontally [layout with-anchor direction]
   (let [{:keys [cursor lines]} layout]
-    (if-let [cursor (lines/scan lines cursor direction direction non-empty-region?)]
+    (if-let [cursor (lines/scan lines cursor direction direction :selectable)]
       (-> layout
           (set-cursor cursor :anchor with-anchor)
           ensure-cursor-visible)
@@ -657,7 +649,7 @@
   (let [{:keys [lines cursor]} layout
         [row col] cursor
         line (lines row)]
-    (if-let [new-col (some #(when (non-empty-region? (line %)) %)
+    (if-let [new-col (some #(when (:selectable (line %)) %)
                            (range (dec (count line)) (dec col) -1))]
       (let [cursor [row new-col]]
         (-> layout
@@ -669,7 +661,7 @@
   (let [{:keys [lines cursor]} layout
         [row col] cursor
         line (lines row)]
-    (if-let [new-col (some #(when (non-empty-region? (line %)) %) (range 0 (inc col)))]
+    (if-let [new-col (some #(when (:selectable (line %)) %) (range 0 (inc col)))]
       (let [cursor [row new-col]]
         (-> layout
             (set-cursor cursor :anchor with-anchor)
