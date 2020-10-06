@@ -425,13 +425,14 @@
   (next-index (peek line)))
 
 (defn- format-xf [rf]
-  (let [*state (volatile! {:line [] :blocks []})
-        *values (volatile! [])]
+  (let [*values (volatile! [])
+        *line (volatile! [])
+        *blocks (volatile! [])]
     (fn
       ([] (rf))
       ([acc] (rf acc))
       ([acc input]
-       (let [state @*state]
+       (let [line @*line]
          (case (:op input)
            ::push-value
            (do (vswap! *values conj (:value input)) acc)
@@ -440,52 +441,41 @@
            (do (vswap! *values pop) acc)
 
            ::push-block
-           (let [blocks (:blocks state)
-                 block (peek blocks)]
+           (let [block (peek @*blocks)]
              (case (:block block)
                :vertical
-               (do (vswap! *state update :blocks conj {:block (:block input)
-                                                       :indent (:indent block)})
+               (do (vswap! *blocks conj {:block (:block input) :indent (:indent block)})
                    acc)
 
                :horizontal
-               (do (vswap! *state update :blocks conj {:block (:block input)
-                                                       :indent (line-length (:line state))})
+               (do (vswap! *blocks conj {:block (:block input) :indent (line-length line)})
                    acc)
 
                nil
-               (do (vswap! *state update :blocks conj {:block (:block input)
-                                                       :indent 0})
+               (do (vswap! *blocks conj {:block (:block input)
+                                         :indent 0})
                    acc)))
 
            ::pop-block
-           (let [blocks (:blocks state)]
-             (if (= 1 (count blocks))
-               (do (vreset! *state (-> state
-                                       (assoc :blocks (pop blocks))
-                                       (assoc :line [])))
-                   (rf acc (:line state)))
-               (do (vreset! *state (assoc state :blocks (pop blocks)))
-                   acc)))
+           (if (= 1 (count @*blocks))
+             (do (vswap! *blocks pop)
+                 (vreset! *line [])
+                 (rf acc line))
+             (do (vswap! *blocks pop) acc))
 
            ::newline
-           (let [blocks (:blocks state)
-                 block (peek blocks)]
-             (do (vswap! *state assoc :line (add-non-selectable-segment [] (blank-segment (:indent block 0))))
-                 (rf acc (:line state))))
+           (do (vreset! *line (add-non-selectable-segment [] (blank-segment (:indent (peek @*blocks) 0))))
+               (rf acc line))
 
            ::separator
-           (let [blocks (:blocks state)
-                 block (peek blocks)]
-             (if (= :horizontal (:block block))
-               (do (vswap! *state update :line add-non-selectable-segment (blank-segment 1))
-                   acc)
-               acc))
+           (if (= :horizontal (:block (peek @*blocks)))
+             (do (vswap! *line add-non-selectable-segment (blank-segment 1)) acc)
+             acc)
 
            ::string
            (do (if (:selectable (:style input) true)
-                 (vswap! *state update :line add-selectable-segment @*values (string-segment input))
-                 (vswap! *state update :line add-non-selectable-segment (string-segment input)))
+                 (vswap! *line add-selectable-segment @*values (string-segment input))
+                 (vswap! *line add-non-selectable-segment (string-segment input)))
                acc)))))))
 
 (def stream-xf
