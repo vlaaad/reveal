@@ -375,8 +375,9 @@
     value))
 
 (defn- blank-segment [n]
-  {:text (apply str (repeat n \space))
-   :style {:selectable false}})
+  (let [sb (StringBuilder.)]
+    (dotimes [_ n] (.append sb \space))
+    {:text (.toString sb)}))
 
 (defn- string-segment [string-op]
   (dissoc string-op :op))
@@ -402,27 +403,30 @@
 ;; - changes to selectable
 ;; - if previous region is marked as complete (by "complete-region")
 
-(defn- add-segment [line value segment]
-  (let [last-region (peek line)
-        selectable (:selectable (:style segment) true)]
-    (if (or (not (identical? (:value last-region) value))
-            (:complete last-region)
-            (not= (:selectable last-region) selectable))
-      (conj line {:value value
-                  :selectable selectable
-                  :segments [segment]
-                  :index (next-index last-region)})
+(defn- add-non-selectable-segment [line segment]
+  (let [last-region (peek line)]
+    (if (:selectable last-region true)
+      (conj line {:selectable false :segments [segment] :index (next-index last-region)})
       (update-in line [(dec (count line)) :segments] conj segment))))
 
-(defn- complete-region [line]
-  (let [i (dec (count line))]
-    (cond-> line (not= i -1) (update i assoc :complete true))))
+(defn- add-selectable-segment [line values segment]
+  (let [last-region (peek line)
+        value (peek values)]
+    (if (or (not (identical? (:value last-region) value))
+            (not (:selectable last-region false)))
+      (conj line {:value value
+                  :selectable true
+                  :segments [segment]
+                  :index (next-index last-region)
+                  :nav {:depth (max 0 (dec (count values)))}})
+      (update-in line [(dec (count line)) :segments] conj segment))))
 
 (defn- line-length [line]
   (next-index (peek line)))
 
 (defn- format-xf [rf]
-  (let [*state (volatile! {:line [] :values [] :blocks []})]
+  (let [*state (volatile! {:line [] :blocks []})
+        *values (volatile! [])]
     (fn
       ([] (rf))
       ([acc] (rf acc))
@@ -430,12 +434,10 @@
        (let [state @*state]
          (case (:op input)
            ::push-value
-           (do (vswap! *state update :values conj (:value input))
-               acc)
+           (do (vswap! *values conj (:value input)) acc)
 
            ::pop-value
-           (do (vswap! *state update :values pop)
-               acc)
+           (do (vswap! *values pop) acc)
 
            ::push-block
            (let [blocks (:blocks state)
@@ -469,25 +471,21 @@
            ::newline
            (let [blocks (:blocks state)
                  block (peek blocks)]
-             (do (vswap! *state assoc :line (-> []
-                                                (add-segment (peek (:values state)) (blank-segment (:indent block 0)))
-                                                complete-region))
+             (do (vswap! *state assoc :line (add-non-selectable-segment [] (blank-segment (:indent block 0))))
                  (rf acc (:line state))))
 
            ::separator
            (let [blocks (:blocks state)
                  block (peek blocks)]
              (if (= :horizontal (:block block))
-               (do (vswap! *state update :line #(-> %
-                                                    complete-region
-                                                    (add-segment (peek (:values state)) (blank-segment 1))
-                                                    complete-region))
+               (do (vswap! *state update :line add-non-selectable-segment (blank-segment 1))
                    acc)
-               (do (vswap! *state update :line add-segment (peek (:values state)) (blank-segment 0))
-                   acc)))
+               acc))
 
            ::string
-           (do (vswap! *state update :line add-segment (peek (:values state)) (string-segment input))
+           (do (if (:selectable (:style input) true)
+                 (vswap! *state update :line add-selectable-segment @*values (string-segment input))
+                 (vswap! *state update :line add-non-selectable-segment (string-segment input)))
                acc)))))))
 
 (def stream-xf
