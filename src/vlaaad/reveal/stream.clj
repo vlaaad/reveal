@@ -409,23 +409,53 @@
       (conj line {:selectable false :segments [segment] :index (next-index last-region)})
       (update-in line [(dec (count line)) :segments] conj segment))))
 
-(defn- add-selectable-segment [line values segment]
+(defn- add-selectable-segment [line values *value-starts segment]
   (let [last-region (peek line)
         value (peek values)]
     (if (or (not (identical? (:value last-region) value))
             (not (:selectable last-region false)))
-      (conj line {:value value
-                  :selectable true
-                  :segments [segment]
-                  :index (next-index last-region)
-                  :nav {:depth (max 0 (dec (count values)))}})
+      (let [value-starts @*value-starts
+            start (peek value-starts)]
+        (when start
+          (vreset! *value-starts (assoc value-starts (dec (count value-starts)) false)))
+        (conj line {:value value
+                    :selectable true
+                    :segments [segment]
+                    :index (next-index last-region)
+                    :nav {:depth (max 0 (dec (count values)))
+                          :start-value start}}))
       (update-in line [(dec (count line)) :segments] conj segment))))
+
+
+(comment
+  ((emit-xf conj) [] {:a 1 :b 2})
+
+  (->> {:a 1 :b 2}
+       ((stream-xf conj) [])
+       (mapv (fn [x] (mapv #(-> %
+                                (dissoc :value :index)
+                                (update :segments (fn [segments]
+                                                    (->> segments
+                                                         (map :text)
+                                                         (clojure.string/join)))))
+                           x))))
+
+  ((stream-xf conj) [] (as-is
+                         (horizontal
+                           (raw-string "tap>")
+                           separator
+                           (stream {:a 1 :b [2]}))))
+
+  nil)
+
+;; start-row?..
 
 (defn- line-length [line]
   (next-index (peek line)))
 
 (defn- format-xf [rf]
   (let [*values (volatile! [])
+        *value-starts (volatile! [false])
         *line (volatile! [])
         *blocks (volatile! [])]
     (fn
@@ -435,10 +465,14 @@
        (let [line @*line]
          (case (:op input)
            ::push-value
-           (do (vswap! *values conj (:value input)) acc)
+           (do (vswap! *values conj (:value input))
+               (vswap! *value-starts conj true)
+               acc)
 
            ::pop-value
-           (do (vswap! *values pop) acc)
+           (do (vswap! *values pop)
+               (vswap! *value-starts pop)
+               acc)
 
            ::push-block
            (let [block (peek @*blocks)]
@@ -474,7 +508,7 @@
 
            ::string
            (do (if (:selectable (:style input) true)
-                 (vswap! *line add-selectable-segment @*values (string-segment input))
+                 (vswap! *line add-selectable-segment @*values *value-starts (string-segment input))
                  (vswap! *line add-non-selectable-segment (string-segment input)))
                acc)))))))
 
