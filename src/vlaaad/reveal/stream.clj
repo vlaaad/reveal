@@ -392,16 +392,8 @@
   (+ (:index region 0)
      (segments-length (:segments region))))
 
-;; this logic should be in format-xf...
-;; index = character index
-
-;; line = regions
-;; region = segments
-;; region = value+segments+index+selectable
-;; selectable is property of a region. regions are split on:
-;; - changes to value
-;; - changes to selectable
-;; - if previous region is marked as complete (by "complete-region")
+(defn- set-last [xs x]
+  (assoc xs (dec (count xs)) x))
 
 (defn- add-non-selectable-segment [line segment]
   (let [last-region (peek line)]
@@ -409,28 +401,37 @@
       (conj line {:selectable false :segments [segment] :index (next-index last-region)})
       (update-in line [(dec (count line)) :segments] conj segment))))
 
-(defn- add-selectable-segment [line values *value-starts segment]
+(defn- add-selectable-segment [line values *value-starts *row-starts segment]
   (let [last-region (peek line)
         value (peek values)]
     (if (or (not (identical? (:value last-region) value))
             (not (:selectable last-region false)))
       (let [value-starts @*value-starts
-            start (peek value-starts)]
-        (when start
-          (vreset! *value-starts (assoc value-starts (dec (count value-starts)) false)))
+            value-start (peek value-starts)
+            row-starts @*row-starts
+            row-start (and (some? value)
+                           (peek row-starts))]
+        (when row-start
+          (vswap! *row-starts set-last false))
+        (when value-start
+          (vswap! *value-starts set-last false))
         (conj line {:value value
                     :selectable true
                     :segments [segment]
                     :index (next-index last-region)
                     :nav {:depth (max 0 (dec (count values)))
-                          :start-value start}}))
+                          :start-value value-start
+                          :start-row row-start}}))
       (update-in line [(dec (count line)) :segments] conj segment))))
-
 
 (comment
   ((emit-xf conj) [] {:a 1 :b 2})
 
-  (->> {:a 1 :b 2}
+  (->> (as-is
+         (horizontal
+           (raw-string "tap>")
+           separator
+           (stream {:a 1 :b 2})))
        ((stream-xf conj) [])
        (mapv (fn [x] (mapv #(-> %
                                 (dissoc :value :index)
@@ -444,7 +445,11 @@
                          (horizontal
                            (raw-string "tap>")
                            separator
-                           (stream {:a 1 :b [2]}))))
+                           (stream {:a 1 :b 2}))))
+
+  (require 'criterium.core)
+  (criterium.core/quick-bench
+    ((stream-xf (constantly nil)) nil user/interesting-values))
 
   nil)
 
@@ -456,6 +461,7 @@
 (defn- format-xf [rf]
   (let [*values (volatile! [])
         *value-starts (volatile! [false])
+        *row-starts (volatile! [true])
         *line (volatile! [])
         *blocks (volatile! [])]
     (fn
@@ -475,30 +481,30 @@
                acc)
 
            ::push-block
-           (let [block (peek @*blocks)]
-             (case (:block block)
-               :vertical
-               (do (vswap! *blocks conj {:block (:block input) :indent (:indent block)})
-                   acc)
-
-               :horizontal
-               (do (vswap! *blocks conj {:block (:block input) :indent (line-length line)})
-                   acc)
-
-               nil
-               (do (vswap! *blocks conj {:block (:block input)
-                                         :indent 0})
-                   acc)))
+           (let [block (:block input)
+                 parent (peek @*blocks)]
+             (when (= :vertical block)
+               (vswap! *row-starts conj true))
+             (case (:block parent)
+               :vertical (vswap! *blocks conj {:block block :indent (:indent parent)})
+               :horizontal (vswap! *blocks conj {:block block :indent (line-length line)})
+               nil (vswap! *blocks conj {:block block :indent 0}))
+             acc)
 
            ::pop-block
-           (if (= 1 (count @*blocks))
-             (do (vswap! *blocks pop)
-                 (vreset! *line [])
-                 (rf acc line))
-             (do (vswap! *blocks pop) acc))
+           (let [blocks @*blocks]
+             (when (= :vertical (:block (peek blocks)))
+               (vswap! *row-starts pop))
+             (if (= 1 (count blocks))
+               (do (vreset! *blocks (pop blocks))
+                   (vreset! *line [])
+                   (rf acc line))
+               (do (vswap! *blocks pop) acc)))
 
            ::newline
            (do (vreset! *line (add-non-selectable-segment [] (blank-segment (:indent (peek @*blocks) 0))))
+               (when (= :vertical (:block (peek @*blocks)))
+                 (vswap! *row-starts set-last true))
                (rf acc line))
 
            ::separator
@@ -508,7 +514,7 @@
 
            ::string
            (do (if (:selectable (:style input) true)
-                 (vswap! *line add-selectable-segment @*values *value-starts (string-segment input))
+                 (vswap! *line add-selectable-segment @*values *value-starts *row-starts (string-segment input))
                  (vswap! *line add-non-selectable-segment (string-segment input)))
                acc)))))))
 
