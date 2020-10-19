@@ -401,26 +401,20 @@
       (conj line {:selectable false :segments [segment] :index (next-index last-region)})
       (update-in line [(dec (count line)) :segments] conj segment))))
 
-(defn- add-selectable-segment [line values *value-starts *row-starts segment]
-  (let [last-region (peek line)
-        value (peek values)]
+(defn- add-selectable-segment [line value ids *row-starts segment]
+  (let [last-region (peek line)]
     (if (or (not (identical? (:value last-region) value))
             (not (:selectable last-region false)))
-      (let [value-starts @*value-starts
-            value-start (peek value-starts)
-            row-starts @*row-starts
+      (let [row-starts @*row-starts
             row-start (and (some? value)
                            (peek row-starts))]
         (when row-start
           (vswap! *row-starts set-last false))
-        (when value-start
-          (vswap! *value-starts set-last false))
         (conj line {:value value
                     :selectable true
                     :segments [segment]
                     :index (next-index last-region)
-                    :nav {:depth (max 0 (dec (count values)))
-                          :start-value value-start
+                    :nav {:ids ids
                           :start-row row-start}}))
       (update-in line [(dec (count line)) :segments] conj segment))))
 
@@ -458,9 +452,13 @@
 (defn- line-length [line]
   (next-index (peek line)))
 
+(defonce ^:private *id (atom 0))
+
+(defn- next-id [] (swap! *id inc))
+
 (defn- format-xf [rf]
   (let [*values (volatile! [])
-        *value-starts (volatile! [false])
+        *ids (volatile! [])
         *row-starts (volatile! [true])
         *line (volatile! [])
         *blocks (volatile! [])]
@@ -472,12 +470,12 @@
          (case (:op input)
            ::push-value
            (do (vswap! *values conj (:value input))
-               (vswap! *value-starts conj true)
+               (vswap! *ids conj (next-id))
                acc)
 
            ::pop-value
            (do (vswap! *values pop)
-               (vswap! *value-starts pop)
+               (vswap! *ids pop)
                acc)
 
            ::push-block
@@ -514,7 +512,7 @@
 
            ::string
            (do (if (:selectable (:style input) true)
-                 (vswap! *line add-selectable-segment @*values *value-starts *row-starts (string-segment input))
+                 (vswap! *line add-selectable-segment (peek @*values) @*ids *row-starts (string-segment input))
                  (vswap! *line add-non-selectable-segment (string-segment input)))
                acc)))))))
 

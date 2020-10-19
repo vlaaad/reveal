@@ -101,6 +101,7 @@
 (defn- handle-key-pressed [this ^KeyEvent event]
   (let [code (.getCode event)
         shortcut (.isShortcutDown event)
+        alt (.isAltDown event)
         with-anchor (not (.isShiftDown event))
         layout (:layout this)
         {:keys [cursor anchor]} layout]
@@ -117,6 +118,7 @@
           :layout
           (cond
             shortcut layout
+            (and alt cursor) (layout/nav-cursor-up layout with-anchor)
             (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
             (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
             :else (layout/move-cursor-vertically layout with-anchor dec))))
@@ -128,6 +130,7 @@
           :layout
           (cond
             shortcut layout
+            (and alt cursor) (layout/nav-cursor-down layout with-anchor)
             (not cursor) (layout/introduce-cursor-at-top-of-screen layout)
             (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
             :else (layout/move-cursor-vertically layout with-anchor inc))))
@@ -137,6 +140,7 @@
         :layout
         (cond
           shortcut layout
+          (and alt cursor) (layout/nav-cursor-left layout with-anchor)
           (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
           (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
           :else (layout/move-cursor-horizontally layout with-anchor dec)))
@@ -146,6 +150,7 @@
         :layout
         (cond
           shortcut layout
+          (and alt cursor) (layout/nav-cursor-right layout with-anchor)
           (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
           (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
           :else (layout/move-cursor-horizontally layout with-anchor inc)))
@@ -200,7 +205,7 @@
       (show-search this)
 
       KeyCode/F
-      (cond-> this (.isShortcutDown event) show-search)
+      (cond-> this shortcut show-search)
 
       this)))
 
