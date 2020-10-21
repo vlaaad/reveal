@@ -34,7 +34,8 @@
 (defn add-cursor [nav id cursor]
   (-> nav
       (update-in [::id->cursor id] #(or % cursor))
-      (assoc-in [::cursor->id cursor] id)))
+      (assoc-in [::cursor->id cursor] id)
+      (assoc ::latest-id id)))
 
 (defn ensure-parents [nav parent-ids]
   (loop [nav nav
@@ -47,12 +48,13 @@
           (recur (add-row nav parent id) ids))))))
 
 (defn latest-ids [nav]
-  (loop [acc []
-         id nil]
-    (if-let [grid (get-in nav [::id->grid id])]
-      (let [id (get-in grid (last-coordinate grid))]
-        (recur (conj acc id) id))
-      acc)))
+  (loop [acc nil
+         id (::latest-id nav)]
+    (if id
+      (recur
+        (conj acc id)
+        ((::id->parent nav) id))
+      (vec acc))))
 
 (defn has? [nav id]
   (contains? (::id->parent nav) id))

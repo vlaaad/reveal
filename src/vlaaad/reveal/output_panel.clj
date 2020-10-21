@@ -109,7 +109,7 @@
       KeyCode/ESCAPE
       (assoc this
         :layout
-        (cond-> layout cursor layout/remove-cursor))
+        (cond-> layout cursor layout/reset-anchor))
 
       KeyCode/UP
       (do
@@ -156,10 +156,10 @@
           :else (layout/move-cursor-horizontally layout with-anchor inc)))
 
       KeyCode/PAGE_UP
-      (assoc this :layout (layout/page-scroll-up layout))
+      (assoc this :layout (layout/move-by-page layout dec with-anchor))
 
       KeyCode/PAGE_DOWN
-      (assoc this :layout (layout/page-scroll-down layout))
+      (assoc this :layout (layout/move-by-page layout inc with-anchor))
 
       KeyCode/HOME
       (assoc this
@@ -167,7 +167,7 @@
         (cond
           shortcut (-> layout
                        layout/scroll-to-top
-                       (cond-> cursor layout/remove-cursor))
+                       (cond-> cursor (layout/move-cursor-home with-anchor)))
           (not cursor) (layout/scroll-to-left layout)
           :else (layout/cursor-to-beginning-of-line layout with-anchor)))
 
@@ -177,7 +177,7 @@
         (cond
           shortcut (-> layout
                        layout/scroll-to-bottom
-                       (cond-> cursor layout/remove-cursor))
+                       (cond-> cursor (layout/move-cursor-end with-anchor)))
           (not cursor) (layout/scroll-to-right layout)
           :else (layout/cursor-to-end-of-line layout with-anchor)))
 

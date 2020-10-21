@@ -349,21 +349,59 @@
 (defn scrolled-to-top? [layout]
   (zero? (:scroll-y layout)))
 
+(defn- adjust-scroll [scroll canvas-size region-start region-size]
+  (let [canvas-start (- scroll)
+        region-end (+ region-start region-size)
+        canvas-end (+ canvas-start canvas-size)
+        start (if (> region-end canvas-end)
+                (- region-start (- region-end canvas-end))
+                region-start)
+        start (if (< start canvas-start)
+                (+ start (- canvas-start start))
+                start)]
+    (- scroll (- region-start start))))
+
+(defn ensure-rect-visible [layout {:keys [x y width height]}]
+  (let [{:keys [canvas-width canvas-height]} layout]
+    (-> layout
+        (update :scroll-y adjust-scroll canvas-height y height)
+        (update :scroll-x adjust-scroll canvas-width x width)
+        make)))
+
+(defn ensure-cursor-visible [layout]
+  (let [{:keys [lines cursor]} layout
+        [row col] cursor
+        line (lines row)
+        line-height (font/line-height)]
+    (ensure-rect-visible layout
+                         {:x (transduce (map region-width) + (subvec line 0 col))
+                          :y (* line-height (cursor/row cursor))
+                          :width (region-width (line col))
+                          :height line-height})))
+
 (defn set-cursor
   "Set cursor
 
   - `:anchor` - either true/false, or specific cursor value
-  - `:align` - whether should update align char index used for vertical navigation"
-  [layout cursor & {:keys [anchor align]
+  - `:align` - whether should update align char index used for vertical navigation
+  - `:ensure-visible` - whether to scroll the view to ensure cursor is visible"
+  [layout cursor & {:keys [anchor align ensure-visible]
                     :or {anchor true
-                         align true}}]
-  (-> layout
-      (assoc :cursor cursor)
-      (cond-> (or align (nil? (:align-char-index layout)))
-              (assoc :align-char-index (:index (get-in (:lines layout) cursor)))
+                         align true
+                         ensure-visible true}}]
+  (if cursor
+    (-> layout
+        (assoc :cursor cursor)
+        (cond->
+          (or align (nil? (:align-char-index layout)))
+          (assoc :align-char-index (:index (get-in (:lines layout) cursor)))
 
-              (or anchor (nil? (:anchor layout)))
-              (assoc :anchor (if (cursor/cursor? anchor) anchor cursor)))))
+          (or anchor (nil? (:anchor layout)))
+          (assoc :anchor (if (cursor/cursor? anchor) anchor cursor))
+
+          ensure-visible
+          ensure-cursor-visible))
+    layout))
 
 (defn remove-cursor [layout]
   (dissoc layout :cursor :anchor :align-char-index))
@@ -373,18 +411,6 @@
       (update :scroll-x + dx)
       (update :scroll-y + dy)
       make))
-
-(defn- page-scroll [layout]
-  (let [{:keys [canvas-height]} layout
-        line-height (font/line-height)]
-    (* line-height
-       (max 1 (Math/ceil (* 0.5 (/ canvas-height line-height)))))))
-
-(defn page-scroll-up [layout]
-  (make (update layout :scroll-y + (page-scroll layout))))
-
-(defn page-scroll-down [layout]
-  (make (update layout :scroll-y - (page-scroll layout))))
 
 (defn scroll-to-top [layout]
   (make (assoc layout :scroll-y 0)))
@@ -483,11 +509,8 @@
                                  (-> layout :scroll-tab-y :scroll-per-pixel))))
           make)
       :selection
-      (if-let [cursor (canvas->cursor layout (.getX event) (.getY event))]
-        (-> layout
-            (set-cursor cursor :anchor false))
-        layout)
-
+      (set-cursor layout (canvas->cursor layout (.getX event) (.getY event))
+                  :anchor false :ensure-visible false)
 
       layout)
     layout))
@@ -532,36 +555,6 @@
       (assoc :focused focused)
       (cond-> (not focused) stop-gesture)))
 
-(defn- adjust-scroll [scroll canvas-size region-start region-size]
-  (let [canvas-start (- scroll)
-        region-end (+ region-start region-size)
-        canvas-end (+ canvas-start canvas-size)
-        start (if (> region-end canvas-end)
-                (- region-start (- region-end canvas-end))
-                region-start)
-        start (if (< start canvas-start)
-                (+ start (- canvas-start start))
-                start)]
-    (- scroll (- region-start start))))
-
-(defn ensure-rect-visible [layout {:keys [x y width height]}]
-  (let [{:keys [canvas-width canvas-height]} layout]
-    (-> layout
-        (update :scroll-y adjust-scroll canvas-height y height)
-        (update :scroll-x adjust-scroll canvas-width x width)
-        make)))
-
-(defn ensure-cursor-visible [layout]
-  (let [{:keys [lines cursor]} layout
-        [row col] cursor
-        line (lines row)
-        line-height (font/line-height)]
-    (ensure-rect-visible layout
-                         {:x (transduce (map region-width) + (subvec line 0 col))
-                          :y (* line-height (cursor/row cursor))
-                          :width (region-width (line col))
-                          :height line-height})))
-
 (defn- clamped-nth [xs i]
   (xs (clamp i 0 (dec (count xs)))))
 
@@ -603,47 +596,32 @@
            (or (nav/cursor nav child-id)
                (recur child-id))))))
 
-(defn- change-maybe-cursor [maybe-cursor layout with-anchor]
-  (if maybe-cursor
-    (-> layout
-        (set-cursor maybe-cursor :anchor with-anchor)
-        ensure-cursor-visible)
-    layout))
-
 (defn nav-cursor-up [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
-    (change-maybe-cursor
-      (or (start-cursor nav cursor)
-          (grid-movement-cursor nav cursor dec identity)
-          (out-cursor nav cursor))
-      layout
-      with-anchor)))
+    (set-cursor layout (or (start-cursor nav cursor)
+                           (grid-movement-cursor nav cursor dec identity)
+                           (out-cursor nav cursor))
+                :anchor with-anchor)))
 
 (defn nav-cursor-left [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
-    (change-maybe-cursor
-      (or (start-cursor nav cursor)
-          (grid-movement-cursor nav cursor identity dec)
-          (out-cursor nav cursor))
-      layout
-      with-anchor)))
+    (set-cursor layout (or (start-cursor nav cursor)
+                           (grid-movement-cursor nav cursor identity dec)
+                           (out-cursor nav cursor))
+                :anchor with-anchor)))
 
 (defn nav-cursor-down [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
-    (change-maybe-cursor
-      (or (grid-movement-cursor nav cursor inc identity)
-          (in-cursor nav cursor))
-      layout
-      with-anchor)))
+    (set-cursor layout (or (grid-movement-cursor nav cursor inc identity)
+                           (in-cursor nav cursor))
+                :anchor with-anchor)))
 
 (defn nav-cursor-right [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
-    (change-maybe-cursor
-      (or (grid-movement-cursor nav cursor identity inc)
-          (in-cursor nav cursor)
-          (next-line-cursor nav cursor))
-      layout
-      with-anchor)))
+    (set-cursor layout (or (grid-movement-cursor nav cursor identity inc)
+                           (in-cursor nav cursor)
+                           (next-line-cursor nav cursor))
+                :anchor with-anchor)))
 
 (defn cursor->canvas-bounds ^Bounds [layout]
   (let [{:keys [lines cursor scroll-x scroll-y]} layout
@@ -661,20 +639,14 @@
                           (< canvas-height (- (* drawn-line-count (font/line-height))
                                               scroll-y-remainder))
                           dec)]
-    (change-maybe-cursor
-      (lines/scan lines [start-row -1] dec inc :selectable)
-      layout
-      true)))
+    (set-cursor layout (lines/scan lines [start-row -1] dec inc :selectable))))
 
 (defn introduce-cursor-at-top-of-screen [layout]
   (let [{:keys [dropped-line-count lines scroll-y-remainder]} layout
         start-row (cond-> dropped-line-count
                           (not (zero? scroll-y-remainder))
                           inc)]
-    (change-maybe-cursor
-      (lines/scan lines [start-row -1] inc inc :selectable)
-      layout
-      true)))
+    (set-cursor layout (lines/scan lines [start-row -1] inc inc :selectable))))
 
 (defn- binary-nearest-by [f xs x]
   (let [last-i (dec (count xs))]
@@ -695,21 +667,52 @@
             :else
             (recur (inc i) high)))))))
 
-(defn move-cursor-vertically [layout with-anchor direction]
-  (let [{:keys [cursor lines align-char-index]} layout
-        row (cursor/row cursor)]
-    (if-let [row (lines/scan lines row direction non-empty-line?)]
+(defn- vertical-move-cursor [layout row direction]
+  (let [{:keys [lines align-char-index]} layout]
+    (when-let [row (lines/scan lines row direction non-empty-line?)]
       (let [line (lines row)
             nearest-col (binary-nearest-by :index line align-char-index)
             col (or (some #(when (:selectable (line %)) %)
                           (range nearest-col (count line)))
                     (some #(when (:selectable (line %)) %)
-                          (range (dec nearest-col) 0 -1)))
-            cursor [row col]]
-        (-> layout
-            (set-cursor cursor :anchor with-anchor :align false)
-            ensure-cursor-visible))
-      layout)))
+                          (range (dec nearest-col) 0 -1)))]
+        [row col]))))
+
+(defn move-cursor-vertically [layout with-anchor direction]
+  (let [{:keys [cursor]} layout
+        row (cursor/row cursor)]
+    (set-cursor layout (vertical-move-cursor layout row direction)
+                :anchor with-anchor
+                :align false)))
+
+(defn move-cursor-home [layout with-anchor]
+  (let [{:keys [lines]} layout]
+    (set-cursor layout (lines/scan lines [##-Inf ##-Inf] inc inc :selectable)
+                :anchor with-anchor)))
+
+(defn move-cursor-end [layout with-anchor]
+  (let [{:keys [lines]} layout]
+    (set-cursor layout (lines/scan lines [##Inf ##Inf] dec dec :selectable)
+                :anchor with-anchor)))
+
+(defn move-by-page [layout direction with-anchor]
+  (let [{:keys [canvas-height cursor]} layout
+        line-height (font/line-height)
+        row-delta (* (direction 0)
+                     (int (* 0.75 (/ canvas-height line-height))))
+        row (cursor/row cursor)
+        new-cursor (vertical-move-cursor layout (+ row row-delta) direction)]
+    (cond
+      new-cursor
+      (-> layout
+          (scroll-by 0 (* line-height (- row (cursor/row new-cursor))))
+          (set-cursor new-cursor :anchor with-anchor :align false))
+
+      (= inc direction)
+      (move-cursor-end layout with-anchor)
+
+      :else
+      (move-cursor-home layout with-anchor))))
 
 (defn select-all [layout]
   (let [{:keys [lines]} layout
@@ -721,22 +724,13 @@
 
 (defn move-cursor-horizontally [layout with-anchor direction]
   (let [{:keys [cursor lines]} layout]
-    (change-maybe-cursor
-      (lines/scan lines cursor direction direction :selectable)
-      layout
-      with-anchor)))
+    (set-cursor layout (lines/scan lines cursor direction direction :selectable) :anchor with-anchor)))
 
 (defn cursor-to-start-of-selection [layout]
-  (let [start (cursor/min (:cursor layout) (:anchor layout))]
-    (-> layout
-        (set-cursor start)
-        ensure-cursor-visible)))
+  (set-cursor layout (cursor/min (:cursor layout) (:anchor layout))))
 
 (defn cursor-to-end-of-selection [layout]
-  (let [end (cursor/max (:cursor layout) (:anchor layout))]
-    (-> layout
-        (set-cursor end)
-        ensure-cursor-visible)))
+  (set-cursor layout (cursor/max (:cursor layout) (:anchor layout))))
 
 (defn cursor-to-end-of-line [layout with-anchor]
   (let [{:keys [lines cursor]} layout
@@ -744,10 +738,7 @@
         line (lines row)]
     (if-let [new-col (some #(when (:selectable (line %)) %)
                            (range (dec (count line)) (dec col) -1))]
-      (let [cursor [row new-col]]
-        (-> layout
-            (set-cursor cursor :anchor with-anchor)
-            ensure-cursor-visible))
+      (set-cursor layout [row new-col] :anchor with-anchor)
       layout)))
 
 (defn cursor-to-beginning-of-line [layout with-anchor]
@@ -755,11 +746,11 @@
         [row col] cursor
         line (lines row)]
     (if-let [new-col (some #(when (:selectable (line %)) %) (range 0 (inc col)))]
-      (let [cursor [row new-col]]
-        (-> layout
-            (set-cursor cursor :anchor with-anchor)
-            ensure-cursor-visible))
+      (set-cursor layout [row new-col] :anchor with-anchor)
       layout)))
+
+(defn reset-anchor [layout]
+  (set-cursor layout (:cursor layout)))
 
 (defn- string-builder
   ([] (StringBuilder.))
