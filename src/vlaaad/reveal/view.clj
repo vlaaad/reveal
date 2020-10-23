@@ -57,10 +57,6 @@
    :args queue
    :desc {:fx/type output-panel/view}})
 
-(defprotocol Viewable
-  :extend-via-metadata true
-  (make [this] "Returns cljfx description for the viewable"))
-
 (defn- process-value! [id value handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make {:autoscroll false})})
   (let [*running (volatile! true)
@@ -79,6 +75,9 @@
    :start process-value!
    :args value
    :desc {:fx/type output-panel/view}})
+
+(defn- ->desc [x]
+  (if (:fx/type x) x {:fx/type value :value x}))
 
 (defn- watch! [id *ref handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make {:autoscroll false})})
@@ -117,17 +116,13 @@
    :args ref
    :desc {:fx/type output-panel/view}})
 
-(defn as-is [desc]
-  (reify Viewable (make [_] desc)))
-
 (action/defaction ::view [v]
-  (when (or (instance? (:on-interface Viewable) v)
-            (`make (meta v)))
+  (when (:fx/type v)
     (constantly v)))
 
 (action/defaction ::watch:latest [v]
   (when (instance? IRef v)
-    #(as-is {:fx/type ref-watch-latest :ref v})))
+    (constantly {:fx/type ref-watch-latest :ref v})))
 
 (defn- log! [id *ref handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
@@ -168,7 +163,7 @@
 
 (action/defaction ::watch:all [v]
   (when (instance? IRef v)
-    #(as-is {:fx/type ref-watch-all :ref v})))
+    (constantly {:fx/type ref-watch-all :ref v})))
 
 (defn- deref! [id blocking-deref handler]
   (handler {::event/type ::create-view-state :id id :state {:state ::waiting}})
@@ -190,21 +185,14 @@
     ::waiting {:fx/type :label
                :focus-traversable true
                :text "Loading..."}
-    ::value (make (:value props))
-    ::exception (make (:exception props))))
+    ::value (->desc (:value props))
+    ::exception (->desc (:exception props))))
 
 (defn derefable [{:keys [derefable]}]
   {:fx/type rfx/ext-with-process
    :start deref!
    :args derefable
    :desc {:fx/type blocking-deref-view}})
-
-(extend-protocol Viewable
-  nil
-  (make [this] {:fx/type value :value this})
-
-  Object
-  (make [this] {:fx/type value :value this}))
 
 (defn summary [{:keys [value max-length]
                 :or {max-length 48}}]
@@ -255,22 +243,22 @@
              (seqable? v))
     (fn []
       (let [head (first v)]
-        (as-is {:fx/type table
-                :items v
-                :columns (cond
-                           (map? head)
-                           (for [k (keys head)]
-                             {:header k :fn #(get % k)})
+        {:fx/type table
+         :items v
+         :columns (cond
+                    (map? head)
+                    (for [k (keys head)]
+                      {:header k :fn #(get % k)})
 
-                           (map-entry? head)
-                           [{:header 'key :fn key} {:header 'val :fn val}]
+                    (map-entry? head)
+                    [{:header 'key :fn key} {:header 'val :fn val}]
 
-                           (indexed? head)
-                           (for [i (range (count head))]
-                             {:header i :fn #(nth % i)})
+                    (indexed? head)
+                    (for [i (range (count head))]
+                      {:header i :fn #(nth % i)})
 
-                           :else
-                           [{:header 'item :fn identity}])})))))
+                    :else
+                    [{:header 'item :fn identity}])}))))
 
 (action/defaction ::browse:internal [v]
   (when (or (and (instance? URI v)
@@ -279,8 +267,8 @@
                           (.endsWith (.getPath ^URI v) ".html"))))
             (instance? URL v)
             (and (string? v) (re-matches #"^https?://.+" v)))
-    #(as-is {:fx/type :web-view
-             :url (str v)})))
+    (constantly {:fx/type :web-view
+                 :url (str v)})))
 
 (defn- request-source-focus! [^Event e]
   (.requestFocus ^Node (.getSource e)))
@@ -316,7 +304,7 @@
 
 (action/defaction ::view:pie-chart [x]
   (when (labeled? x number? :min 2)
-    #(as-is {:fx/type pie-chart :data x})))
+    (constantly {:fx/type pie-chart :data x})))
 
 (def ^:private ext-with-value-on-node
   (fx/make-ext-with-props
@@ -371,8 +359,7 @@
 
                     (labeled? x #(labeled? % numbered?))
                     x)]
-    #(as-is {:fx/type bar-chart
-             :data data})))
+    (constantly {:fx/type bar-chart :data data})))
 
 (defn- numbereds? [x]
   (and (sequential? x)
@@ -422,7 +409,7 @@
 
                     (labeled? x numbereds?)
                     x)]
-    #(as-is {:fx/type line-chart :data data})))
+    (constantly {:fx/type line-chart :data data})))
 
 (defn- coordinate? [x]
   (and (sequential? x)
@@ -475,15 +462,19 @@
 
                     (scattereds? x)
                     {x x})]
-    #(as-is {:fx/type scatter-chart :data data})))
+    (constantly {:fx/type scatter-chart :data data})))
 
 (action/defaction ::view:color [v]
   (when-let [color (cond
                      (instance? Color v) v
                      (string? v) (Color/valueOf v)
                      (keyword? v) (Color/valueOf (name v)))]
-    #(as-is {:fx/type :region
-             :background {:fills [{:fill color}]}})))
+    (constantly {:fx/type :region
+                 :background {:fills [{:fill color}]}})))
+
+(action/defaction ::view:value [x ann]
+  (when (::stream/hidden ann)
+    (constantly {:fx/type value :value x})))
 
 (deftype Observable [*ref f]
   IRef

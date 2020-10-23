@@ -8,19 +8,18 @@
 
 (let [last-tap (atom nil)]
   (add-tap #(reset! last-tap %))
-  (rx/view-as-is
-    {:fx/type rx/observable-view
-     :ref last-tap
-     :fn (fn [x]
-           (if (or (nil? x) (string? x) (not (seqable? x)))
+  {:fx/type rx/observable-view
+   :ref last-tap
+   :fn (fn [x]
+         (if (or (nil? x) (string? x) (not (seqable? x)))
+           {:fx/type rx/table-view
+            :items [x]
+            :columns [{:fn identity :header 'value}]}
+           (let [head (first x)]
              {:fx/type rx/table-view
-              :items [x]
-              :columns [{:fn identity :header 'value}]}
-             (let [head (first x)]
-               {:fx/type rx/table-view
-                :items x
-                :columns (cond
-                           (map? head) (for [k (keys head)] {:header k :fn #(get % k)})
-                           (map-entry? head) [{:header 'key :fn key} {:header 'val :fn val}]
-                           (indexed? head) (for [i (range (count head))] {:header i :fn #(nth % i)})
-                           :else [{:header 'item :fn identity}])})))}))
+              :items x
+              :columns (cond
+                         (map? head) (for [k (keys head)] {:header k :fn #(get % k)})
+                         (map-entry? head) [{:header 'key :fn key} {:header 'val :fn val}]
+                         (indexed? head) (for [i (range (count head))] {:header i :fn #(nth % i)})
+                         :else [{:header 'item :fn identity}])})))})
