@@ -54,24 +54,24 @@
 
 (comment
   (start!)
+  (slurp "http://localhost:8080")
   (stop!))
 
 ;; Reveal monitor and controls: eval it and execute "view" action
 
-(rx/view-as-is
-  {:fx/type rx/observable-view
-   :ref system
-   :fn (fn [state]
-         {:fx/type :v-box
-          :children [{:fx/type rx/value-view
-                      :v-box/vgrow :always
-                      :value state}
-                     {:fx/type :h-box
-                      :children [{:fx/type :button
-                                  :disable (not state)
-                                  :text "Stop"
-                                  :on-action (fn [_] (stop!))}
-                                 {:fx/type :button
-                                  :disable (some? state)
-                                  :text "Start"
-                                  :on-action (fn [_] (start!))}]}]})})
+{:fx/type rx/observable-view
+ :ref system
+ :fn (fn [state]
+       {:fx/type :v-box
+        :children [{:fx/type rx/value-view
+                    :v-box/vgrow :always
+                    :value state}
+                   {:fx/type :h-box
+                    :children [{:fx/type :button
+                                :disable (not state)
+                                :text "Stop"
+                                :on-action (fn [_] (stop!))}
+                               {:fx/type :button
+                                :disable (some? state)
+                                :text "Start"
+                                :on-action (fn [_] (start!))}]}]})}

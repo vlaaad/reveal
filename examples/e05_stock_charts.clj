@@ -67,23 +67,22 @@
                 tickers)]
     (rx/stream-as-is
       (rx/as
-        (rx/view-as-is
-          {:fx/type :h-box
-           :children [{:fx/type :v-box
-                       :children [{:fx/type :label
-                                   :text "Prices:"}
-                                  {:fx/type rx/scatter-chart-view
-                                   :data prices}]}
-                      {:fx/type :v-box
-                       :children [{:fx/type :label
-                                   :text "Dividends:"}
-                                  {:fx/type rx/scatter-chart-view
-                                   :data divs}]}
-                      {:fx/type :v-box
-                       :children [{:fx/type :label
-                                   :text "Yields:"}
-                                  {:fx/type rx/scatter-chart-view
-                                   :data yields}]}]})
+        {:fx/type :h-box
+         :children [{:fx/type :v-box
+                     :children [{:fx/type :label
+                                 :text "Prices:"}
+                                {:fx/type rx/scatter-chart-view
+                                 :data prices}]}
+                    {:fx/type :v-box
+                     :children [{:fx/type :label
+                                 :text "Dividends:"}
+                                {:fx/type rx/scatter-chart-view
+                                 :data divs}]}
+                    {:fx/type :v-box
+                     :children [{:fx/type :label
+                                 :text "Yields:"}
+                                {:fx/type rx/scatter-chart-view
+                                 :data yields}]}]}
         (rx/horizontal
           (rx/raw-string "#charts" {:fill :object})
           (rx/stream tickers))))))

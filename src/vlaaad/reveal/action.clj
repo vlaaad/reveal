@@ -66,10 +66,6 @@
         (not= key ::not-found) #(d/nav datafied-coll key x)
         (not= val ::not-found) #(d/nav datafied-coll x val)))))
 
-(defaction ::view:value [x ann]
-  (when (::stream/hidden ann)
-    (constantly x)))
-
 (defaction ::java-bean [x]
   (when (some? x)
     (fn []

@@ -191,13 +191,6 @@
     - `:header` (optional, defaults to `:fn`'s value) - column header"
   view/table)
 
-(defn view-as-is
-  "Returns a value that, when shown in Results panel, displays a supplied view
-
-  `desc` is a cljfx description that defines a view to show"
-  [desc]
-  (view/as-is desc))
-
 (defn observable
   "Returns an instance of IRef that wraps another `ref` with `fn` transform"
   [ref fn]
@@ -292,5 +285,17 @@
    :desc {:fx/type :label :text \"The clojure.core library\"}}
   ```"
   popup/ext)
+
+;; endregion
+
+;; region deprecated
+
+(def ^:deprecated view-as-is
+  "Returns a value that, when shown in Results panel, displays a supplied view
+
+  `desc` is a cljfx description that defines a view to show
+
+  Deprecated: just return the description"
+  identity)
 
 ;; endregion
