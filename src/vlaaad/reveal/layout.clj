@@ -599,8 +599,7 @@
 (defn nav-cursor-up [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
     (set-cursor layout (or (start-cursor nav cursor)
-                           (grid-movement-cursor nav cursor dec identity)
-                           (out-cursor nav cursor))
+                           (grid-movement-cursor nav cursor dec identity))
                 :anchor with-anchor)))
 
 (defn nav-cursor-left [layout with-anchor]

@@ -156,10 +156,10 @@
           :else (layout/move-cursor-horizontally layout with-anchor inc)))
 
       KeyCode/PAGE_UP
-      (assoc this :layout (layout/move-by-page layout dec with-anchor))
+      (cond-> this cursor (assoc :layout (layout/move-by-page layout dec with-anchor)))
 
       KeyCode/PAGE_DOWN
-      (assoc this :layout (layout/move-by-page layout inc with-anchor))
+      (cond-> this cursor (assoc :layout (layout/move-by-page layout inc with-anchor)))
 
       KeyCode/HOME
       (assoc this
