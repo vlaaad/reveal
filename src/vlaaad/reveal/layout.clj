@@ -341,14 +341,6 @@
               (assoc :canvas-height canvas-height)
               (cond-> (neg? diff) (update :scroll-y + diff))))))
 
-(defn scrolled-to-bottom? [layout]
-  (let [{:keys [scroll-y canvas-height document-height]} layout]
-    (or (< document-height canvas-height)
-        (= scroll-y (- canvas-height document-height)))))
-
-(defn scrolled-to-top? [layout]
-  (zero? (:scroll-y layout)))
-
 (defn- adjust-scroll [scroll canvas-size region-start region-size]
   (let [canvas-start (- scroll)
         region-end (+ region-start region-size)
@@ -403,9 +395,6 @@
           ensure-cursor-visible))
     layout))
 
-(defn remove-cursor [layout]
-  (dissoc layout :cursor :anchor :align-char-index))
-
 (defn scroll-by [layout dx dy]
   (-> layout
       (update :scroll-x + dx)
@@ -424,52 +413,10 @@
 (defn scroll-to-right [layout]
   (make (assoc layout :scroll-x ##-Inf)))
 
-(defn- add-lines-with-nav [layout lines]
-  (let [start-y (count (:lines layout))]
-    (-> layout
-        (update :lines into lines)
-        (update :nav
-                (fn [nav]
-                  (reduce-kv
-                    (fn [nav y line]
-                      (reduce-kv
-                        (fn [nav x region]
-                          (if (:selectable region)
-                            (let [{:keys [ids start-row]} (:nav region)
-                                  ids (if (= ids [])
-                                        (let [ids (nav/latest-ids nav)]
-                                          (if (= ids [])
-                                            [-1]
-                                            ids))
-                                        ids)
-                                  id (peek ids)
-                                  parent-ids (pop ids)]
-                              (-> nav
-                                  (nav/ensure-parents parent-ids)
-                                  (cond-> (not (nav/has? nav id))
-                                    ((if start-row nav/add-row nav/add-col) (peek parent-ids) id))
-                                  (nav/add-cursor id [(+ start-y y) x])))
-                            nav))
-                        nav
-                        line))
-                    nav
-                    lines))))))
-
-(defn add-lines [layout lines]
-  (let [layout (add-lines-with-nav layout lines)
-        should-scroll (if (:autoscroll layout true)
-                        (scrolled-to-bottom? layout)
-                        (and (scrolled-to-bottom? layout)
-                             (not (scrolled-to-top? layout))))]
-
-    (if should-scroll
-      (scroll-to-bottom layout)
-      (make layout))))
-
 (defn clear-lines [layout]
   (-> layout
       (assoc :lines [] :nav nil)
-      remove-cursor
+      (dissoc :cursor :anchor :align-char-index)
       make))
 
 (defn non-empty-line? [line]
@@ -602,6 +549,16 @@
                            (grid-movement-cursor nav cursor dec identity))
                 :anchor with-anchor)))
 
+(defn nav-cursor-home [layout with-anchor]
+  (let [{:keys [cursor nav]} layout]
+    (set-cursor layout (grid-movement-cursor nav cursor (constantly 0) identity)
+                :anchor with-anchor)))
+
+(defn nav-cursor-end [layout with-anchor]
+  (let [{:keys [cursor nav]} layout]
+    (set-cursor layout (grid-movement-cursor nav cursor (constantly ##Inf) identity)
+                :anchor with-anchor)))
+
 (defn nav-cursor-left [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
     (set-cursor layout (or (start-cursor nav cursor)
@@ -611,8 +568,7 @@
 
 (defn nav-cursor-down [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
-    (set-cursor layout (or (grid-movement-cursor nav cursor inc identity)
-                           (in-cursor nav cursor))
+    (set-cursor layout (grid-movement-cursor nav cursor inc identity)
                 :anchor with-anchor)))
 
 (defn nav-cursor-right [layout with-anchor]
@@ -621,6 +577,28 @@
                            (in-cursor nav cursor)
                            (next-line-cursor nav cursor))
                 :anchor with-anchor)))
+
+(defn add-lines [layout lines]
+  (let [start-y (count (:lines layout))
+        with-lines (-> layout
+                       (update :lines into lines)
+                       (update :nav nav/add-lines start-y lines))]
+    (if (:autoscroll layout true)
+      (let [nav (:nav with-lines)]
+        (make
+          (cond
+            (not (:cursor layout))
+            (set-cursor with-lines (nav/cursor nav (get (peek (nav/grid nav nil)) 0)))
+
+            (and (:cursor layout) (nav/at-last-row? (:nav layout) (:cursor layout)))
+            (nav-cursor-end with-lines true)
+
+            :else
+            with-lines)))
+      (-> with-lines
+          (cond-> (not (:cursor layout))
+            (set-cursor (lines/scan (:lines with-lines) [(dec start-y) -1] inc inc :selectable)))
+          make))))
 
 (defn cursor->canvas-bounds ^Bounds [layout]
   (let [{:keys [lines cursor scroll-x scroll-y]} layout
@@ -631,21 +609,6 @@
                   (double (+ scroll-y (* line-height row)))
                   (region-width (line col))
                   line-height)))
-
-(defn introduce-cursor-at-bottom-of-screen [layout]
-  (let [{:keys [drawn-line-count dropped-line-count lines canvas-height scroll-y-remainder]} layout
-        start-row (cond-> (dec (+ dropped-line-count drawn-line-count))
-                          (< canvas-height (- (* drawn-line-count (font/line-height))
-                                              scroll-y-remainder))
-                          dec)]
-    (set-cursor layout (lines/scan lines [start-row -1] dec inc :selectable))))
-
-(defn introduce-cursor-at-top-of-screen [layout]
-  (let [{:keys [dropped-line-count lines scroll-y-remainder]} layout
-        start-row (cond-> dropped-line-count
-                          (not (zero? scroll-y-remainder))
-                          inc)]
-    (set-cursor layout (lines/scan lines [start-row -1] inc inc :selectable))))
 
 (defn- binary-nearest-by [f xs x]
   (let [last-i (dec (count xs))]

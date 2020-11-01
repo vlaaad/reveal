@@ -11,7 +11,7 @@
 (defn- last-coordinate [grid]
   [(dec (count grid)) (dec (count (peek grid)))])
 
-(defn add-row [nav parent id]
+(defn- add-row [nav parent id]
   (let [grid (-> nav
                  ::id->grid
                  (get parent)
@@ -21,7 +21,7 @@
         (assoc-in [::id->coordinate id] (last-coordinate grid))
         (assoc-in [::id->parent id] parent))))
 
-(defn add-col [nav parent id]
+(defn- add-col [nav parent id]
   (let [grid (-> nav
                  ::id->grid
                  (get parent)
@@ -31,13 +31,13 @@
         (assoc-in [::id->coordinate id] (last-coordinate grid))
         (assoc-in [::id->parent id] parent))))
 
-(defn add-cursor [nav id cursor]
+(defn- add-cursor [nav id cursor]
   (-> nav
       (update-in [::id->cursor id] #(or % cursor))
       (assoc-in [::cursor->id cursor] id)
       (assoc ::latest-id id)))
 
-(defn ensure-parents [nav parent-ids]
+(defn- ensure-parents [nav parent-ids]
   (loop [nav nav
          ids parent-ids]
     (let [id (peek ids)]
@@ -47,7 +47,7 @@
               parent (peek ids)]
           (recur (add-row nav parent id) ids))))))
 
-(defn latest-ids [nav]
+(defn- latest-ids [nav]
   (loop [acc nil
          id (::latest-id nav)]
     (if id
@@ -56,7 +56,7 @@
         ((::id->parent nav) id))
       (vec acc))))
 
-(defn has? [nav id]
+(defn- has? [nav id]
   (contains? (::id->parent nav) id))
 
 (defn cursor [nav id]
@@ -73,3 +73,36 @@
 
 (defn grid [nav id]
   (get-in nav [::id->grid id]))
+
+(defn at-last-row? [nav cursor]
+  (let [id (id nav cursor)
+        parent (parent nav id)
+        grid (grid nav parent)
+        row ((coordinate nav id) 0)]
+    (= row (dec (count grid)))))
+
+(defn add-lines [nav start-y lines]
+  (reduce-kv
+    (fn [nav y line]
+      (reduce-kv
+        (fn [nav x region]
+          (if (:selectable region)
+            (let [{:keys [ids start-row]} (:nav region)
+                  ids (if (= ids [])
+                        (let [ids (latest-ids nav)]
+                          (if (= ids [])
+                            [-1]
+                            ids))
+                        ids)
+                  id (peek ids)
+                  parent-ids (pop ids)]
+              (-> nav
+                  (ensure-parents parent-ids)
+                  (cond-> (not (has? nav id))
+                    ((if start-row add-row add-col) (peek parent-ids) id))
+                  (add-cursor id [(+ start-y y) x])))
+            nav))
+        nav
+        line))
+    nav
+    lines))

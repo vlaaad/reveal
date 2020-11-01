@@ -119,7 +119,6 @@
           (cond
             shortcut layout
             (and alt cursor) (layout/nav-cursor-up layout with-anchor)
-            (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
             (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
             :else (layout/move-cursor-vertically layout with-anchor dec))))
 
@@ -131,7 +130,6 @@
           (cond
             shortcut layout
             (and alt cursor) (layout/nav-cursor-down layout with-anchor)
-            (not cursor) (layout/introduce-cursor-at-top-of-screen layout)
             (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
             :else (layout/move-cursor-vertically layout with-anchor inc))))
 
@@ -141,7 +139,6 @@
         (cond
           shortcut layout
           (and alt cursor) (layout/nav-cursor-left layout with-anchor)
-          (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
           (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
           :else (layout/move-cursor-horizontally layout with-anchor dec)))
 
@@ -151,7 +148,6 @@
         (cond
           shortcut layout
           (and alt cursor) (layout/nav-cursor-right layout with-anchor)
-          (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
           (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
           :else (layout/move-cursor-horizontally layout with-anchor inc)))
 
@@ -168,6 +164,7 @@
           shortcut (-> layout
                        layout/scroll-to-top
                        (cond-> cursor (layout/move-cursor-home with-anchor)))
+          (and alt cursor) (layout/nav-cursor-home layout with-anchor)
           (not cursor) (layout/scroll-to-left layout)
           :else (layout/cursor-to-beginning-of-line layout with-anchor)))
 
@@ -178,6 +175,7 @@
           shortcut (-> layout
                        layout/scroll-to-bottom
                        (cond-> cursor (layout/move-cursor-end with-anchor)))
+          (and alt cursor) (layout/nav-cursor-end layout with-anchor)
           (not cursor) (layout/scroll-to-right layout)
           :else (layout/cursor-to-end-of-line layout with-anchor)))
 
