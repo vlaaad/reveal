@@ -418,35 +418,6 @@
                           :start-row row-start}}))
       (update-in line [(dec (count line)) :segments] conj segment))))
 
-(comment
-  ((emit-xf conj) [] {:a 1 :b 2})
-
-  (->> (as-is
-         (horizontal
-           (raw-string "tap>")
-           separator
-           (stream {:a 1 :b 2})))
-       ((stream-xf conj) [])
-       (mapv (fn [x] (mapv #(-> %
-                                (dissoc :value :index)
-                                (update :segments (fn [segments]
-                                                    (->> segments
-                                                         (map :text)
-                                                         (clojure.string/join)))))
-                           x))))
-
-  ((stream-xf conj) [] (as-is
-                         (horizontal
-                           (raw-string "tap>")
-                           separator
-                           (stream {:a 1 :b 2}))))
-
-  (require 'criterium.core)
-  (criterium.core/quick-bench
-    ((stream-xf (constantly nil)) nil user/interesting-values))
-
-  nil)
-
 ;; start-row?..
 
 (defn- line-length [line]

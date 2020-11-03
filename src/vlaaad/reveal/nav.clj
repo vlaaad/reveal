@@ -11,54 +11,6 @@
 (defn- last-coordinate [grid]
   [(dec (count grid)) (dec (count (peek grid)))])
 
-(defn- add-row [nav parent id]
-  (let [grid (-> nav
-                 ::id->grid
-                 (get parent)
-                 (vec-conj [id]))]
-    (-> nav
-        (assoc-in [::id->grid parent] grid)
-        (assoc-in [::id->coordinate id] (last-coordinate grid))
-        (assoc-in [::id->parent id] parent))))
-
-(defn- add-col [nav parent id]
-  (let [grid (-> nav
-                 ::id->grid
-                 (get parent)
-                 (grid-conj id))]
-    (-> nav
-        (assoc-in [::id->grid parent] grid)
-        (assoc-in [::id->coordinate id] (last-coordinate grid))
-        (assoc-in [::id->parent id] parent))))
-
-(defn- add-cursor [nav id cursor]
-  (-> nav
-      (update-in [::id->cursor id] #(or % cursor))
-      (assoc-in [::cursor->id cursor] id)
-      (assoc ::latest-id id)))
-
-(defn- ensure-parents [nav parent-ids]
-  (loop [nav nav
-         ids parent-ids]
-    (let [id (peek ids)]
-      (if (or (nil? id) (contains? (::id->parent nav) id))
-        nav
-        (let [ids (pop ids)
-              parent (peek ids)]
-          (recur (add-row nav parent id) ids))))))
-
-(defn- latest-ids [nav]
-  (loop [acc nil
-         id (::latest-id nav)]
-    (if id
-      (recur
-        (conj acc id)
-        ((::id->parent nav) id))
-      (vec acc))))
-
-(defn- has? [nav id]
-  (contains? (::id->parent nav) id))
-
 (defn cursor [nav id]
   (get-in nav [::id->cursor id]))
 
@@ -82,27 +34,66 @@
     (= row (dec (count grid)))))
 
 (defn add-lines [nav start-y lines]
-  (reduce-kv
-    (fn [nav y line]
-      (reduce-kv
-        (fn [nav x region]
-          (if (:selectable region)
-            (let [{:keys [ids start-row]} (:nav region)
-                  ids (if (= ids [])
-                        (let [ids (latest-ids nav)]
-                          (if (= ids [])
-                            [-1]
-                            ids))
-                        ids)
-                  id (peek ids)
-                  parent-ids (pop ids)]
-              (-> nav
-                  (ensure-parents parent-ids)
-                  (cond-> (not (has? nav id))
-                    ((if start-row add-row add-col) (peek parent-ids) id))
-                  (add-cursor id [(+ start-y y) x])))
-            nav))
-        nav
-        line))
-    nav
-    lines))
+  (let [id->grid (volatile! (transient (::id->grid nav {})))
+        id->coordinate (volatile! (transient (::id->coordinate nav {})))
+        id->parent (volatile! (transient (::id->parent nav {})))
+        id->cursor (volatile! (transient (::id->cursor nav {})))
+        cursor->id (volatile! (transient (::cursor->id nav {})))
+        latest-id (volatile! (::latest-id nav))
+        latest-ids! (fn []
+                      (loop [acc nil
+                             id @latest-id]
+                        (if id
+                          (recur (conj acc id) (@id->parent id))
+                          (vec acc))))
+        add-row! (fn [parent id]
+                   (let [grid (-> @id->grid (get parent) (vec-conj [id]))]
+                     (vswap! id->grid assoc! parent grid)
+                     (vswap! id->coordinate assoc! id (last-coordinate grid))
+                     (vswap! id->parent assoc! id parent)))
+        ensure-parents! (fn [parent-ids]
+                          (loop [ids parent-ids]
+                            (let [id (peek ids)]
+                              (if (or (nil? id) (contains? @id->parent id))
+                                nil
+                                (let [ids (pop ids)]
+                                  (add-row! (peek ids) id)
+                                  (recur ids))))))
+        add-col! (fn [parent id]
+                   (let [grid (-> @id->grid (get parent) (grid-conj id))]
+                     (vswap! id->grid assoc! parent grid)
+                     (vswap! id->coordinate assoc! id (last-coordinate grid))
+                     (vswap! id->parent assoc! id parent)))
+        add-cursor! (fn [id cursor]
+                      (when-not (@id->cursor id)
+                        (vswap! id->cursor assoc! id cursor))
+                      (vswap! cursor->id assoc! cursor id)
+                      (vreset! latest-id id))]
+    (reduce-kv
+      (fn [_ y line]
+        (reduce-kv
+          (fn [_ x region]
+            (when (:selectable region)
+              (let [{:keys [ids start-row]} (:nav region)
+                    ids (if (= ids [])
+                          (let [ids (latest-ids!)]
+                            (if (= ids [])
+                              [-1]
+                              ids))
+                          ids)
+                    id (peek ids)
+                    parent-ids (pop ids)]
+                (ensure-parents! parent-ids)
+                (when-not (contains? @id->parent id)
+                  ((if start-row add-row! add-col!) (peek parent-ids) id))
+                (add-cursor! id [(+ start-y y) x]))))
+          nil
+          line))
+      nil
+      lines)
+    {::id->grid (persistent! @id->grid)
+     ::id->coordinate (persistent! @id->coordinate)
+     ::id->parent (persistent! @id->parent)
+     ::id->cursor (persistent! @id->cursor)
+     ::cursor->id (persistent! @cursor->id)
+     ::latest-id @latest-id}))
