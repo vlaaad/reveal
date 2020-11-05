@@ -52,5 +52,9 @@
            :local-date-time (LocalDateTime/ofEpochSecond 0 0 ZoneOffset/UTC)}})
 
 (comment
-  (->> (range 10000)
-       (map #(hash-map :index % :string (str %)))))
+  (->> (range 100000)
+       (map #(hash-map :index % :string (str %))))
+
+  (repeat 1000 {:boolean true
+                :integer 100
+                :string "woop"}))

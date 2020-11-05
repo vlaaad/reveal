@@ -26,11 +26,11 @@
             (recur tags parent (zip/right child)))
           (zip/append-child parent replace-node))))))
 
-(defn -main [& version]
+(defn -main [version hash]
   (with-open [reader (io/reader "pom.xml")]
     (let [xml (-> reader
                   (xml/parse :skip-whitespace true)
                   (xml-update [::pom/version] (xml/sexp-as-element [::pom/version version]))
-                  (xml-update [::pom/scm ::pom/tag] (xml/sexp-as-element [::pom/tag version])))]
+                  (xml-update [::pom/scm ::pom/tag] (xml/sexp-as-element [::pom/tag hash])))]
       (with-open [writer (io/writer "pom.xml")]
         (xml/indent xml writer)))))

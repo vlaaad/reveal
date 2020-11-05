@@ -9,14 +9,14 @@ if (!((invoke git rev-parse --abbrev-ref HEAD) -eq "master")) {
 }
 $version = "1.0.$(invoke git rev-list HEAD --count)"
 
-clj -A:build -m version $version
+clj -A:build -M -m version $version $(invoke git rev-parse HEAD)
 clj -Spom
 invoke git commit -am "Release $version"
 invoke git tag $version
 invoke git push
 invoke git push origin $version
 clj -A:depstar "$version.jar"
-clj -A:build -m deploy "$version.jar" (Read-Host -Prompt "Username") (Read-Host -Prompt "Token" -AsSecureString | ConvertFrom-SecureString -AsPlainText)
+clj -A:build -M -m deploy "$version.jar" (Read-Host -Prompt "Username") (Read-Host -Prompt "Token" -AsSecureString | ConvertFrom-SecureString -AsPlainText)
 rm "$version.jar"
 
 

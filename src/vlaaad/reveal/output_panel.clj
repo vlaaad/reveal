@@ -56,17 +56,17 @@
   #(update-in % [id :layout] layout/perform-drag event))
 
 (defn- show-popup [this ^Event event]
-  (let [layout (layout/ensure-cursor-visible (:layout this))
+  (let [layout (layout/ensure-cursor-visible (:layout this) :text)
         {:keys [lines cursor]} layout
         region (get-in lines cursor)
-        values (:values region)
+        value (:value region)
         ^Node target (.getTarget event)]
     (-> this
         (assoc :layout layout)
-        (cond-> (pos? (count values))
+        (cond-> value
                 (assoc :popup {:bounds (.localToScreen target (layout/cursor->canvas-bounds layout))
                                :window (.getWindow (.getScene target))
-                               :annotated-value (peek values)})))))
+                               :annotated-value value})))))
 
 (defn- show-search [this]
   (assoc this :search {:term "" :results (sorted-set)}))
@@ -101,6 +101,7 @@
 (defn- handle-key-pressed [this ^KeyEvent event]
   (let [code (.getCode event)
         shortcut (.isShortcutDown event)
+        alt (.isAltDown event)
         with-anchor (not (.isShiftDown event))
         layout (:layout this)
         {:keys [cursor anchor]} layout]
@@ -108,7 +109,7 @@
       KeyCode/ESCAPE
       (assoc this
         :layout
-        (cond-> layout cursor layout/remove-cursor))
+        (cond-> layout cursor layout/reset-anchor))
 
       KeyCode/UP
       (do
@@ -117,7 +118,7 @@
           :layout
           (cond
             shortcut layout
-            (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
+            (and alt cursor) (layout/nav-cursor-up layout with-anchor)
             (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
             :else (layout/move-cursor-vertically layout with-anchor dec))))
 
@@ -128,7 +129,7 @@
           :layout
           (cond
             shortcut layout
-            (not cursor) (layout/introduce-cursor-at-top-of-screen layout)
+            (and alt cursor) (layout/nav-cursor-down layout with-anchor)
             (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
             :else (layout/move-cursor-vertically layout with-anchor inc))))
 
@@ -137,7 +138,7 @@
         :layout
         (cond
           shortcut layout
-          (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
+          (and alt cursor) (layout/nav-cursor-left layout with-anchor)
           (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
           :else (layout/move-cursor-horizontally layout with-anchor dec)))
 
@@ -146,15 +147,15 @@
         :layout
         (cond
           shortcut layout
-          (not cursor) (layout/introduce-cursor-at-bottom-of-screen layout)
+          (and alt cursor) (layout/nav-cursor-right layout with-anchor)
           (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
           :else (layout/move-cursor-horizontally layout with-anchor inc)))
 
       KeyCode/PAGE_UP
-      (assoc this :layout (layout/page-scroll-up layout))
+      (cond-> this cursor (assoc :layout (layout/move-by-page layout dec with-anchor)))
 
       KeyCode/PAGE_DOWN
-      (assoc this :layout (layout/page-scroll-down layout))
+      (cond-> this cursor (assoc :layout (layout/move-by-page layout inc with-anchor)))
 
       KeyCode/HOME
       (assoc this
@@ -162,7 +163,8 @@
         (cond
           shortcut (-> layout
                        layout/scroll-to-top
-                       (cond-> cursor layout/remove-cursor))
+                       (cond-> cursor (layout/move-cursor-home with-anchor)))
+          (and alt cursor) (layout/nav-cursor-home layout with-anchor)
           (not cursor) (layout/scroll-to-left layout)
           :else (layout/cursor-to-beginning-of-line layout with-anchor)))
 
@@ -172,7 +174,8 @@
         (cond
           shortcut (-> layout
                        layout/scroll-to-bottom
-                       (cond-> cursor layout/remove-cursor))
+                       (cond-> cursor (layout/move-cursor-end with-anchor)))
+          (and alt cursor) (layout/nav-cursor-end layout with-anchor)
           (not cursor) (layout/scroll-to-right layout)
           :else (layout/cursor-to-end-of-line layout with-anchor)))
 
@@ -200,7 +203,7 @@
       (show-search this)
 
       KeyCode/F
-      (cond-> this (.isShortcutDown event) show-search)
+      (cond-> this shortcut show-search)
 
       this)))
 
@@ -237,11 +240,11 @@
               (result->rect highlight (-> this :search :term)))))
 
 (defn- select-highlight [this]
-  (let [result (-> this :search :highlight)]
+  (let [cursor (-> this :search :highlight first)]
     (-> this
-      hide-search
-      (cond-> result
-        (update :layout layout/set-cursor (first result))))))
+        hide-search
+        (cond-> cursor
+          (update :layout layout/select-nearest cursor)))))
 
 (defn- jump-to-prev-match [{:keys [search] :as this}]
   (let [highlight (:highlight search)

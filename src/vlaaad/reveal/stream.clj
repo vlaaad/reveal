@@ -375,8 +375,9 @@
     value))
 
 (defn- blank-segment [n]
-  {:text (apply str (repeat n \space))
-   :style {:selectable false}})
+  (let [sb (StringBuilder.)]
+    (dotimes [_ n] (.append sb \space))
+    {:text (.toString sb)}))
 
 (defn- string-segment [string-op]
   (dissoc string-op :op))
@@ -391,90 +392,99 @@
   (+ (:index region 0)
      (segments-length (:segments region))))
 
-(defn- add-segment [line values segment]
+(defn- set-last [xs x]
+  (assoc xs (dec (count xs)) x))
+
+(defn- add-non-selectable-segment [line segment]
   (let [last-region (peek line)]
-    (if (not= (:values last-region) values)
-      (conj line {:values values :segments [segment] :index (next-index last-region)})
+    (if (:selectable last-region true)
+      (conj line {:selectable false :segments [segment] :index (next-index last-region)})
       (update-in line [(dec (count line)) :segments] conj segment))))
 
-(defn- add-separator [line]
+(defn- add-selectable-segment [line value ids *row-starts segment]
   (let [last-region (peek line)]
-    (cond-> line
-            last-region
-            (conj {:values (:values last-region)
-                   :segments []
-                   :index (next-index last-region)}))))
+    (if (or (not (identical? (:value last-region) value))
+            (not (:selectable last-region false)))
+      (let [row-starts @*row-starts
+            row-start (and (some? value)
+                           (peek row-starts))]
+        (when row-start
+          (vswap! *row-starts set-last false))
+        (conj line {:value value
+                    :selectable true
+                    :segments [segment]
+                    :index (next-index last-region)
+                    :nav {:ids ids
+                          :start-row row-start}}))
+      (update-in line [(dec (count line)) :segments] conj segment))))
+
+;; start-row?..
 
 (defn- line-length [line]
   (next-index (peek line)))
 
+(defonce ^:private *id (atom 0))
+
+(defn- next-id [] (swap! *id inc))
+
 (defn- format-xf [rf]
-  (let [*state (volatile! {:line [] :values [] :blocks []})]
+  (let [*values (volatile! [])
+        *ids (volatile! [])
+        *row-starts (volatile! [true])
+        *line (volatile! [])
+        *blocks (volatile! [])]
     (fn
       ([] (rf))
       ([acc] (rf acc))
       ([acc input]
-       (let [state @*state]
+       (let [line @*line]
          (case (:op input)
            ::push-value
-           (do (vswap! *state update :values conj (:value input))
+           (do (vswap! *values conj (:value input))
+               (vswap! *ids conj (next-id))
                acc)
 
            ::pop-value
-           (do (vswap! *state update :values pop)
+           (do (vswap! *values pop)
+               (vswap! *ids pop)
                acc)
 
            ::push-block
-           (let [blocks (:blocks state)
-                 block (peek blocks)]
-             (case (:block block)
-               :vertical
-               (do (vswap! *state update :blocks conj {:block (:block input)
-                                                       :indent (:indent block)})
-                   acc)
-
-               :horizontal
-               (do (vswap! *state update :blocks conj {:block (:block input)
-                                                       :indent (line-length (:line state))})
-                   acc)
-
-               nil
-               (do (vswap! *state update :blocks conj {:block (:block input)
-                                                       :indent 0})
-                   acc)))
+           (let [block (:block input)
+                 parent (peek @*blocks)]
+             (when (= :vertical block)
+               (vswap! *row-starts conj true))
+             (case (:block parent)
+               :vertical (vswap! *blocks conj {:block block :indent (:indent parent)})
+               :horizontal (vswap! *blocks conj {:block block :indent (line-length line)})
+               nil (vswap! *blocks conj {:block block :indent 0}))
+             acc)
 
            ::pop-block
-           (let [blocks (:blocks state)]
+           (let [blocks @*blocks]
+             (when (= :vertical (:block (peek blocks)))
+               (vswap! *row-starts pop))
              (if (= 1 (count blocks))
-               (do (vreset! *state (-> state
-                                       (assoc :blocks (pop blocks))
-                                       (assoc :line [])))
-                   (rf acc (:line state)))
-               (do (vreset! *state (assoc state :blocks (pop blocks)))
-                   acc)))
+               (do (vreset! *blocks (pop blocks))
+                   (vreset! *line [])
+                   (rf acc line))
+               (do (vswap! *blocks pop) acc)))
 
            ::newline
-           (let [blocks (:blocks state)
-                 block (peek blocks)]
-             (do (vswap! *state assoc :line (-> []
-                                                (add-segment (:values state) (blank-segment (:indent block 0)))
-                                                add-separator))
-                 (rf acc (:line state))))
+           (do (vreset! *line (add-non-selectable-segment [] (blank-segment (:indent (peek @*blocks) 0))))
+               (when (= :vertical (:block (peek @*blocks)))
+                 (vswap! *row-starts set-last true))
+               (rf acc line))
 
            ::separator
-           (let [blocks (:blocks state)
-                 block (peek blocks)]
-             (if (= :horizontal (:block block))
-               (do (vswap! *state update :line #(-> %
-                                                    add-separator
-                                                    (add-segment (:values state) (blank-segment 1))
-                                                    add-separator))
-                   acc)
-               (do (vswap! *state update :line add-segment (:values state) (blank-segment 0))
-                   acc)))
+           (if (= :horizontal (:block (peek @*blocks)))
+             (do (vswap! *line add-non-selectable-segment (blank-segment 1)) acc)
+             acc)
 
            ::string
-           (do (vswap! *state update :line add-segment (:values state) (string-segment input))
+           (do (if (:selectable (:style input) true)
+                 (vswap! *line add-selectable-segment (peek @*values) @*ids *row-starts (string-segment input))
+                 (vswap! *line add-non-selectable-segment (string-segment input)))
                acc)))))))
 
 (def stream-xf
