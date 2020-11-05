@@ -46,26 +46,3 @@ Reveal uses `1.MAJOR.REVISION` versioning where:
 Reveal's compatibility promise applies to its public API: `vlaaad.reveal` and 
 `vlaaad.reveal.ext` namespaces, everything else is implementation detail that 
 is subject to change. Reveal's UI and controls might change in the future.
-
-## To do
-
-- structural navigation
-- text search:
-  - should be reversible: escape scrolls to the place of search start if there is
-    a highlight
-  - could show number of matches and index of current match
-- contextual eval:
-  - alt+up/down for history (persist history? per what?)
-  - auto-insert closing brackets
-  - pick some useful ns to eval in
-- fork out/err in repl/nrepl:
-  - for full experience we should fork `System/out` and `System/err`, and re-bind roots of `*out*` and `*err*` — is it 
-    a good idea?
-- option to dispose javafx on quitting the repl - useful for entry points
-- multiple accordions
-- more actions:
-  - view files ending with `.html` as web pages
-- remember window position and size
-- popup might appear in weird locations
-- *very* long lines have poor performance
-- bigger font size may break result header scrolling
