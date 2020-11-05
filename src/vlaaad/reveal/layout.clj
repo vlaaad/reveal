@@ -698,6 +698,11 @@
             (and from to)
             (set-cursor to :anchor from))))
 
+(defn select-nearest [layout [row col]]
+  (let [{:keys [lines]} layout
+        cursor (lines/scan lines [row (dec col)] inc inc :selectable)]
+    (cond-> layout cursor (set-cursor cursor))))
+
 (defn move-cursor-horizontally [layout with-anchor direction]
   (let [{:keys [cursor lines]} layout]
     (set-cursor layout (lines/scan lines cursor direction direction :selectable) :anchor with-anchor)))

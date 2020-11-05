@@ -240,11 +240,11 @@
               (result->rect highlight (-> this :search :term)))))
 
 (defn- select-highlight [this]
-  (let [result (-> this :search :highlight)]
+  (let [cursor (-> this :search :highlight first)]
     (-> this
-      hide-search
-      (cond-> result
-        (update :layout layout/set-cursor (first result))))))
+        hide-search
+        (cond-> cursor
+          (update :layout layout/select-nearest cursor)))))
 
 (defn- jump-to-prev-match [{:keys [search] :as this}]
   (let [highlight (:highlight search)
