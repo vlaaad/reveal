@@ -56,7 +56,7 @@
   #(update-in % [id :layout] layout/perform-drag event))
 
 (defn- show-popup [this ^Event event]
-  (let [layout (layout/ensure-cursor-visible (:layout this))
+  (let [layout (layout/ensure-cursor-visible (:layout this) :text)
         {:keys [lines cursor]} layout
         region (get-in lines cursor)
         value (:value region)

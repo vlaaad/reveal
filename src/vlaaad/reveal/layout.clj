@@ -360,7 +360,7 @@
         (update :scroll-x adjust-scroll canvas-width x width)
         make)))
 
-(defn ensure-cursor-visible [layout]
+(defn ensure-cursor-visible [layout mode]
   (let [{:keys [lines cursor]} layout
         [row col] cursor
         line (lines row)
@@ -369,18 +369,24 @@
                          {:x (transduce (map region-width) + (subvec line 0 col))
                           :y (* line-height (cursor/row cursor))
                           :width (region-width (line col))
-                          :height line-height})))
+                          :height (case mode
+                                    :text line-height
+                                    :nav (-> (nav/last-row (:nav layout) cursor)
+                                             (- row)
+                                             inc
+                                             (* line-height)
+                                             (+ scroll-bar-breadth)))})))
 
 (defn set-cursor
   "Set cursor
 
   - `:anchor` - either true/false, or specific cursor value
   - `:align` - whether should update align char index used for vertical navigation
-  - `:ensure-visible` - whether to scroll the view to ensure cursor is visible"
-  [layout cursor & {:keys [anchor align ensure-visible]
+  - `:scroll` - :text, :nav or false - whether and how to adjust the scroll of the view"
+  [layout cursor & {:keys [anchor align scroll]
                     :or {anchor true
                          align true
-                         ensure-visible true}}]
+                         scroll :text}}]
   (if cursor
     (-> layout
         (assoc :cursor cursor)
@@ -391,8 +397,8 @@
           (or anchor (nil? (:anchor layout)))
           (assoc :anchor (if (cursor/cursor? anchor) anchor cursor))
 
-          ensure-visible
-          ensure-cursor-visible))
+          scroll
+          (ensure-cursor-visible scroll)))
     layout))
 
 (defn scroll-by [layout dx dy]
@@ -457,7 +463,8 @@
           make)
       :selection
       (set-cursor layout (canvas->cursor layout (.getX event) (.getY event))
-                  :anchor false :ensure-visible false)
+                  :anchor false
+                  :scroll false)
 
       layout)
     layout))
@@ -547,36 +554,42 @@
   (let [{:keys [cursor nav]} layout]
     (set-cursor layout (or (start-cursor nav cursor)
                            (grid-movement-cursor nav cursor dec identity))
-                :anchor with-anchor)))
+                :anchor with-anchor
+                :scroll :nav)))
 
 (defn nav-cursor-home [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
     (set-cursor layout (grid-movement-cursor nav cursor (constantly 0) identity)
-                :anchor with-anchor)))
+                :anchor with-anchor
+                :scroll :nav)))
 
 (defn nav-cursor-end [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
     (set-cursor layout (grid-movement-cursor nav cursor (constantly ##Inf) identity)
-                :anchor with-anchor)))
+                :anchor with-anchor
+                :scroll :nav)))
 
 (defn nav-cursor-left [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
     (set-cursor layout (or (start-cursor nav cursor)
                            (grid-movement-cursor nav cursor identity dec)
                            (out-cursor nav cursor))
-                :anchor with-anchor)))
+                :anchor with-anchor
+                :scroll :nav)))
 
 (defn nav-cursor-down [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
     (set-cursor layout (grid-movement-cursor nav cursor inc identity)
-                :anchor with-anchor)))
+                :anchor with-anchor
+                :scroll :nav)))
 
 (defn nav-cursor-right [layout with-anchor]
   (let [{:keys [cursor nav]} layout]
     (set-cursor layout (or (grid-movement-cursor nav cursor identity inc)
                            (in-cursor nav cursor)
                            (next-line-cursor nav cursor))
-                :anchor with-anchor)))
+                :anchor with-anchor
+                :scroll :nav)))
 
 (defn add-lines [layout lines]
   (let [start-y (count (:lines layout))
@@ -588,7 +601,8 @@
         (make
           (cond
             (not (:cursor layout))
-            (set-cursor with-lines (nav/cursor nav (get (peek (nav/grid nav nil)) 0)))
+            (set-cursor with-lines (nav/cursor nav (get (peek (nav/grid nav nil)) 0))
+                        :scroll :nav)
 
             (and (:cursor layout) (nav/at-last-row? (:nav layout) (:cursor layout)))
             (nav-cursor-end with-lines true)

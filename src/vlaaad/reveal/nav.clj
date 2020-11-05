@@ -12,7 +12,7 @@
   [(dec (count grid)) (dec (count (peek grid)))])
 
 (defn cursor [nav id]
-  (get-in nav [::id->cursor id]))
+  (get-in nav [::id->first-cursor id]))
 
 (defn coordinate [nav id]
   (get-in nav [::id->coordinate id]))
@@ -37,7 +37,8 @@
   (let [id->grid (volatile! (transient (::id->grid nav {})))
         id->coordinate (volatile! (transient (::id->coordinate nav {})))
         id->parent (volatile! (transient (::id->parent nav {})))
-        id->cursor (volatile! (transient (::id->cursor nav {})))
+        id->first-cursor (volatile! (transient (::id->first-cursor nav {})))
+        id->last-cursor (volatile! (transient (::id->last-cursor nav {})))
         cursor->id (volatile! (transient (::cursor->id nav {})))
         latest-id (volatile! (::latest-id nav))
         latest-ids! (fn []
@@ -65,8 +66,9 @@
                      (vswap! id->coordinate assoc! id (last-coordinate grid))
                      (vswap! id->parent assoc! id parent)))
         add-cursor! (fn [id cursor]
-                      (when-not (@id->cursor id)
-                        (vswap! id->cursor assoc! id cursor))
+                      (when-not (@id->first-cursor id)
+                        (vswap! id->first-cursor assoc! id cursor))
+                      (vswap! id->last-cursor assoc! id cursor)
                       (vswap! cursor->id assoc! cursor id)
                       (vreset! latest-id id))]
     (reduce-kv
@@ -94,6 +96,22 @@
     {::id->grid (persistent! @id->grid)
      ::id->coordinate (persistent! @id->coordinate)
      ::id->parent (persistent! @id->parent)
-     ::id->cursor (persistent! @id->cursor)
+     ::id->first-cursor (persistent! @id->first-cursor)
+     ::id->last-cursor (persistent! @id->last-cursor)
      ::cursor->id (persistent! @cursor->id)
      ::latest-id @latest-id}))
+
+(defn last-row [nav cursor]
+  (let [{::keys [cursor->id id->coordinate id->parent id->grid id->last-cursor]} nav
+        id (cursor->id cursor)
+        row ((id->coordinate id) 0)
+        parent-id (id->parent id)
+        target-id (peek ((id->grid parent-id) row))]
+    ((fn search [id]
+       (let [self-cursor (id->last-cursor id)
+             self-grid (id->grid id)
+             child-row (when self-grid (-> self-grid peek peek search))]
+         (if (and self-cursor child-row)
+           (max (self-cursor 0) child-row)
+           (or child-row (self-cursor 0)))))
+     target-id)))
