@@ -56,6 +56,9 @@
 (def ^:private newline
   (op {:op ::newline}))
 
+(def newrow
+  (op {:op ::newrow}))
+
 (defn- string [str style]
   (op {:op ::string
        :text str
@@ -170,7 +173,7 @@
   (block :horizontal (apply => sfs)))
 
 (defn vertical [& sfs]
-  (block :vertical (apply => (interpose newline sfs))))
+  (block :vertical (apply => (interpose (=> newline newrow) sfs))))
 
 #_(defn- returning-xf [rf]
     (fn
@@ -211,7 +214,7 @@
                               separator
                               (stream v (assoc ann :vlaaad.reveal.nav/key k
                                                    :vlaaad.reveal.nav/coll m))))))
-         (interpose newline))
+         (interpose (=> newline newrow)))
        m))))
 
 (defn- delimited-items [coll sep ann]
@@ -231,7 +234,7 @@
 
 (defn vertically
   ([xs] (vertically xs nil))
-  ([xs ann] (block :vertical (delimited-items xs newline ann))))
+  ([xs ann] (block :vertical (delimited-items xs (=> newline newrow) ann))))
 
 (defn horizontally
   ([xs] (horizontally xs nil))
@@ -472,9 +475,10 @@
 
            ::newline
            (do (vreset! *line (add-non-selectable-segment [] (blank-segment (:indent (peek @*blocks) 0))))
-               (when (= :vertical (:block (peek @*blocks)))
-                 (vswap! *row-starts set-last true))
                (rf acc line))
+
+           ::newrow
+           (do (vswap! *row-starts set-last true) acc)
 
            ::separator
            (if (= :horizontal (:block (peek @*blocks)))

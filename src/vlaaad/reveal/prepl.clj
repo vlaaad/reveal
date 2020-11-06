@@ -7,28 +7,30 @@
 
 (defn- prepl-output [x]
   (stream/as-is
-    (stream/as x
-      (if (:exception x)
+    (if (:exception x)
+      (stream/as x
         (cond-> (stream/raw-string (-> x :val m/ex-triage m/ex-str) {:fill :error})
-                (:form x)
-                (as-> err-output
-                      (stream/vertical
-                        (stream/raw-string (:form x) {:fill :util})
-                        err-output)))
-        (case (:tag x)
-          :ret (stream/vertical
-                 (stream/raw-string (:form x) {:fill :util})
-                 (stream/horizontal
-                   (stream/raw-string "=>" {:fill :util})
-                   stream/separator
-                   (stream/stream (:val x))))
-          :out (stream/raw-string (str/trim-newline (:val x)) {:fill :string})
-          :err (stream/raw-string (str/trim-newline (:val x)) {:fill :error})
-          :tap (stream/horizontal
-                 (stream/raw-string "tap>" {:fill :util})
-                 stream/separator
-                 (stream/stream (:val x)))
-          (stream/stream x))))))
+          (:form x)
+          (as-> $ (stream/vertical
+                    (stream/raw-string (:form x) {:fill :util})
+                    $))))
+      (case (:tag x)
+        :ret (stream/horizontal
+               (stream/as x
+                 (stream/vertical
+                   (stream/raw-string (:form x) {:fill :util})
+                   (stream/raw-string "=>" {:fill :util})))
+               stream/separator
+               stream/newrow
+               (stream/stream (:val x)))
+        :out (stream/as x (stream/raw-string (str/trim-newline (:val x)) {:fill :string}))
+        :err (stream/as x (stream/raw-string (str/trim-newline (:val x)) {:fill :error}))
+        :tap (stream/horizontal
+               (stream/as x (stream/raw-string "tap>" {:fill :util}))
+               stream/separator
+               stream/newrow
+               (stream/stream (:val x)))
+        (stream/stream x)))))
 
 (defn- wrap-out-fn [ui out-fn]
   (fn [x]
