@@ -20,13 +20,14 @@
           (cond
             (not= value ::not-found)
             (stream/as-is
-              (stream/as {:request request :message message}
-                (stream/vertical
-                  (stream/raw-string code {:fill :util})
-                  (stream/horizontal
-                    (stream/raw-string "=>" {:fill :util})
-                    stream/separator
-                    (stream/stream value)))))
+              (stream/horizontal
+                (stream/as {:request request :message message}
+                  (stream/vertical
+                    (stream/raw-string code {:fill :util})
+                    (stream/raw-string "=>" {:fill :util})))
+                stream/separator
+                stream/newrow
+                (stream/stream value)))
 
             (not= out ::not-found)
             (stream/as-is
@@ -40,16 +41,17 @@
 
             (not= throwable ::not-found)
             (stream/as-is
-              (stream/as {:request request :message message}
-                (stream/vertical
-                  (stream/raw-string code {:fill :util})
-                  (stream/horizontal
-                    (stream/raw-string "=>" {:fill :util})
-                    stream/separator
-                    (stream/as throwable
-                      (stream/raw-string
-                        (.getSimpleName (class throwable))
-                        {:fill :error}))))))
+              (stream/horizontal
+                (stream/as {:request request :message message}
+                  (stream/vertical
+                    (stream/raw-string code {:fill :util})
+                    (stream/raw-string "=>" {:fill :util})))
+                stream/separator
+                stream/newrow
+                (stream/as throwable
+                  (stream/raw-string
+                    (.getSimpleName (class throwable))
+                    {:fill :error}))))
 
             :else
             {:request request :message message}))))))
