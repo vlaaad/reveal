@@ -26,8 +26,12 @@
 (s/def ::theme
   #{:dark :light})
 
+
+(s/def ::color-scheme-file
+  (s/and string? valid-url?))
+
 (s/def ::prefs
-  (s/keys :opt-un [::font-family ::font-size ::theme]))
+  (s/keys :opt-un [::font-family ::font-size ::theme ::color-scheme-file]))
 
 (def prefs
   (delay
