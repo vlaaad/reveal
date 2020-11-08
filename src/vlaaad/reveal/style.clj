@@ -60,8 +60,6 @@
                                         slurp
                                         clojure.edn/read-string)
                                {})]
-                (println (str "Prefs " @prefs/prefs))
-                (println (str "read colors " colors))
                 (deep-merge colormap-base colors)))
 
 (def scroll-bar-color (delay (get-in colormap [@theme :scroll-bar-color])))
