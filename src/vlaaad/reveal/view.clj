@@ -19,7 +19,7 @@
            [java.net URL URI]
            [javafx.event Event]
            [javafx.scene.paint Color]
-           [javafx.scene.input KeyEvent KeyCode]))
+           [javafx.scene.input KeyEvent KeyCode Clipboard ClipboardContent]))
 
 (defn- runduce!
   ([xf x]
@@ -220,7 +220,8 @@
          :value (.getCellData (.getTableColumn pos) (.getRow pos))}))))
 
 (defmethod event/handle ::on-table-key-pressed [{:keys [^KeyEvent fx/event]}]
-  (when (.isAltDown event)
+  (cond
+    (.isAltDown event)
     (when-let [sort-type ({KeyCode/UP TableColumn$SortType/ASCENDING
                            KeyCode/DOWN TableColumn$SortType/DESCENDING} (.getCode event))]
       (let [^TableView table (.getTarget event)
@@ -228,7 +229,16 @@
             col (.getTableColumn ^TablePosition (first (.getSelectedCells sm)))]
         (.setSortType col sort-type)
         (.setAll (.getSortOrder table) [col])
-        (.clearAndSelect sm 0 col))))
+        (.clearAndSelect sm 0 col)))
+
+    (and (.isShortcutDown event) (= KeyCode/C (.getCode event)))
+    (let [^TableView table (.getTarget event)
+          ^TablePosition pos (first (.getSelectedCells (.getSelectionModel table)))]
+      (fx/on-fx-thread
+        (.setContent
+          (Clipboard/getSystemClipboard)
+          (doto (ClipboardContent.)
+            (.putString (stream/->str (.getCellData (.getTableColumn pos) (.getRow pos)))))))))
   identity)
 
 (defn table [{:keys [items columns]}]
