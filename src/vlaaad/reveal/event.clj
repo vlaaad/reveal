@@ -18,7 +18,7 @@
 
 (defmulti handle ::type)
 
-(defmethod handle :default [e] (prn e))
+(defmethod handle :default [e] (prn e) identity)
 
 (defrecord MapEventHandler [*state]
   IFn

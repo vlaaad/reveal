@@ -13,12 +13,13 @@
             [cljfx.component :as fx.component])
   (:import [clojure.lang IRef]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
-           [javafx.scene.control TableView TablePosition]
+           [javafx.scene.control TableView TablePosition TableColumn$SortType]
            [javafx.scene Node]
            [javafx.css PseudoClass]
            [java.net URL URI]
            [javafx.event Event]
-           [javafx.scene.paint Color]))
+           [javafx.scene.paint Color]
+           [javafx.scene.input KeyEvent KeyCode]))
 
 (defn- runduce!
   ([xf x]
@@ -218,12 +219,25 @@
         {:bounds (.localToScreen cell (.getBoundsInLocal cell))
          :value (.getCellData (.getTableColumn pos) (.getRow pos))}))))
 
+(defmethod event/handle ::on-table-key-pressed [{:keys [^KeyEvent fx/event]}]
+  (when (.isAltDown event)
+    (when-let [sort-type ({KeyCode/UP TableColumn$SortType/ASCENDING
+                           KeyCode/DOWN TableColumn$SortType/DESCENDING} (.getCode event))]
+      (let [^TableView table (.getTarget event)
+            sm (.getSelectionModel table)
+            col (.getTableColumn ^TablePosition (first (.getSelectedCells sm)))]
+        (.setSortType col sort-type)
+        (.setAll (.getSortOrder table) [col])
+        (.clearAndSelect sm 0 col))))
+  identity)
+
 (defn table [{:keys [items columns]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created initialize-table!
    :desc {:fx/type popup/ext
           :select select-bounds-and-value!
           :desc {:fx/type :table-view
+                 :on-key-pressed {::event/type ::on-table-key-pressed}
                  :style-class "reveal-table"
                  :columns (for [{:keys [header fn]
                                  :or {header ::not-found}} columns]
