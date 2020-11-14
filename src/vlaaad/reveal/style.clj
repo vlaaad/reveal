@@ -105,7 +105,11 @@
                " .chart-horizontal-grid-lines" {:-fx-stroke unfocused-selection-color}
                " .chart-plot-background" {:-fx-background-color unfocused-background-color}
                " .chart-content" {:-fx-padding 8}
-               " .chart-legend" {:-fx-background-color unfocused-background-color}}
+               " .chart-legend" {:-fx-background-color unfocused-background-color}
+               " .chart-line-symbol" {:-fx-background-insets "0, 1"
+                                      :-fx-padding 2}
+               " .chart-symbol" {:-fx-padding 3}
+               " .chart-series-line" {:-fx-stroke-width 2}}
             "-view" {"-header" {:-fx-background-color popup-color
                                 "-tab" {"-focused" {:-fx-background-color background-color}}
                                 "-separator" {:-fx-min-width 1

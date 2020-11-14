@@ -390,6 +390,20 @@
        (<= 2 (bounded-count 1025 x) 1024)
        (every? numbered? x)))
 
+(def ext-recreate-on-key-changed
+  (reify fx.lifecycle/Lifecycle
+    (create [_ {:keys [key desc]} opts]
+      (with-meta {:key key
+                  :child (fx.lifecycle/create fx.lifecycle/dynamic desc opts)}
+                 {`fx.component/instance #(-> % :child fx.component/instance)}))
+    (advance [this component {:keys [key desc] :as this-desc} opts]
+      (if (= (:key component) key)
+        (update component :child #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
+        (do (fx.lifecycle/delete this component opts)
+            (fx.lifecycle/create this this-desc opts))))
+    (delete [_ component opts]
+      (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
+
 (defn line-chart [{:keys [data]}]
   {:fx/type popup/ext
    :select select-chart-node!
@@ -412,19 +426,21 @@
                    :label "value"
                    :force-zero-in-range false}
           :data (for [[series numbers] (labeled->label+values data)]
-                  {:fx/type :xy-chart-series
-                   :name (stream/str-summary series)
-                   :data (->> numbers
-                              (map-indexed
-                                (fn [index value]
-                                  {:fx/type :xy-chart-data
-                                   :x-value index
-                                   :y-value (numbered->number value)
-                                   :node {:fx/type ext-with-value-on-node
-                                          :props {::value {:value value
-                                                           :index index
-                                                           :series series}}
-                                          :desc {:fx/type :region}}})))})}})
+                  {:fx/type ext-recreate-on-key-changed
+                   :key (count numbers)
+                   :desc {:fx/type :xy-chart-series
+                          :name (stream/str-summary series)
+                          :data (->> numbers
+                                     (map-indexed
+                                       (fn [index value]
+                                         {:fx/type :xy-chart-data
+                                          :x-value index
+                                          :y-value (numbered->number value)
+                                          :node {:fx/type ext-with-value-on-node
+                                                 :props {::value {:value value
+                                                                  :index index
+                                                                  :series series}}
+                                                 :desc {:fx/type :region}}})))}})}})
 
 (action/defaction ::view:line-chart [x]
   (when-let [data (cond
