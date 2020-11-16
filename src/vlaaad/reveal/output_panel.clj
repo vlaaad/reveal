@@ -205,6 +205,9 @@
       KeyCode/F
       (cond-> this shortcut show-search)
 
+      KeyCode/D
+      (cond-> this shortcut clear-lines)
+
       this)))
 
 (defmethod event/handle ::on-key-pressed [{:keys [id fx/event]}]
