@@ -15,7 +15,8 @@
                                    ring/ring-core {:mvn/version "1.8.1"}
                                    aysylu/loom {:mvn/version "1.0.2"}
                                    clj-http/clj-http {:mvn/version "3.10.1"}
-                                   cheshire/cheshire {:mvn/version "5.10.0"}}}
+                                   cheshire/cheshire {:mvn/version "5.10.0"}
+                                   com.taoensso/timbre {:mvn/version "5.1.0"}}}
            :dev {:extra-paths ["dev"]
                  :extra-deps {org.clojure/test.check {:mvn/version "1.0.0"}}}
            :optional {:extra-deps {lambdaisland/deep-diff2 {:mvn/version "2.0.0-93"}
