@@ -2,19 +2,14 @@
   (:require [cljfx.api :as fx]
             [vlaaad.reveal.style :as style]
             [vlaaad.reveal.event :as event]
-            [vlaaad.reveal.view :as view]
-            [cljfx.lifecycle :as fx.lifecycle]
-            [cljfx.composite :as fx.composite]
-            [cljfx.fx.scroll-pane :as fx.scroll-pane]
-            [cljfx.mutator :as fx.mutator]
-            [cljfx.prop :as fx.prop])
+            [vlaaad.reveal.stream :as stream]
+            [vlaaad.reveal.view :as view])
   (:import [javafx.scene.input KeyEvent KeyCode]
            [javafx.scene Node Parent]
            [javafx.beans.value ChangeListener]
            [javafx.event Event]
            [java.util.concurrent ArrayBlockingQueue]
-           [java.util UUID]
-           [javafx.scene.control ScrollPane]))
+           [java.util UUID List]))
 
 (defmethod event/handle ::on-view-event [{:keys [index ^Event fx/event]}]
   (if (and (instance? KeyEvent event)
@@ -39,18 +34,25 @@
         (do
           (.consume event)
           (fn [state]
-            (let [id (get-in state [:view-order index])
-                  view-order (:view-order state)
-                  new-view-order (into (subvec view-order 0 index)
-                                       (subvec view-order (inc index)))]
+            (let [{:keys [views view-order]} state
+                  id (view-order index)
+                  depth (:depth (views id))
+                  splice-count (count (take-while #(< depth (:depth (views %))) (subvec view-order (inc index))))
+                  new-order (into (subvec view-order 0 index)
+                                  (subvec view-order (inc index)))
+                  new-views (reduce
+                              (fn [acc id]
+                                (update-in acc [id :depth] dec))
+                              (dissoc views id)
+                              (subvec view-order (inc index) (+ (inc index) splice-count)))]
               (-> state
                   (dissoc id)
-                  (assoc :view-order new-view-order)
-                  (as-> $ (if (empty? new-view-order)
+                  (assoc :view-order new-order
+                         :views new-views)
+                  (as-> $ (if (empty? new-order)
                             (dissoc $ :focused-view-index)
                             (assoc $ :focused-view-index
-                                     (min index (dec (count new-view-order))))))
-                  (update :views dissoc id)))))
+                                     (min index (dec (count new-order))))))))))
 
         :else
         identity))
@@ -91,74 +93,44 @@
 (defmethod event/handle ::focus-on-tab [{:keys [index]}]
   #(assoc % :focused-view-index index))
 
-(def ^:private scroll-pane
-  (fx.composite/lifecycle
-    {:ctor #(proxy [ScrollPane] []
-              (requestFocus []))
-     :args []
-     :prop-order {:focused-view 1}
-     :props (assoc fx.scroll-pane/props
-              :focused-view
-              (fx.prop/make
-                (fx.mutator/setter
-                  (fn [^ScrollPane scroll-pane id]
-                    (.layout scroll-pane)
-                    (when-let [view (->> ^Parent (.getContent scroll-pane)
-                                         (.getChildrenUnmodifiable)
-                                         (some #(when (= id (::id (.getProperties ^Node %))) %)))]
-                      (let [content (.getBoundsInLocal (.getContent scroll-pane))
-                            region (.getBoundsInParent view)
-                            viewport (.getViewportBounds scroll-pane)
-                            viewport-x (.getMinX viewport)
-                            viewport-width (.getWidth viewport)
-                            region-x (.getMinX region)
-                            region-width (.getWidth region)
-                            canvas-start (- viewport-x)
-                            region-end (+ region-x region-width)
-                            canvas-end (+ canvas-start viewport-width)
-                            start (if (> region-end canvas-end)
-                                    (- region-x (- region-end canvas-end))
-                                    region-x)
-                            start (max start canvas-start)]
-                        ;; fixme something is wrong here
-                        (.setHvalue scroll-pane (/ (- region-x start viewport-x)
-                                                   (- (.getWidth content) viewport-width)))))))
-                fx.lifecycle/scalar))}))
-
 (defn- tabs-view [{:keys [view-order views focused-view-index]}]
   (let [focused-view-id (view-order focused-view-index)
-        tabs (->> view-order
-                  (map-indexed
-                    (fn [index id]
-                      {:fx/type fx/ext-on-instance-lifecycle
-                       :fx/key id
-                       :on-created #(.put (.getProperties ^Node %) ::id id)
-                       :desc {:fx/type :anchor-pane
-                              :style-class ["reveal-view-header-tab" (str "reveal-view-header-tab-" (if (= id focused-view-id) "focused" "blurred"))]
-                              :min-width :use-pref-size
-                              :min-height :use-pref-size
-                              :on-mouse-clicked {::event/type ::focus-on-tab :index index}
-                              :children [{:fx/type view/summary
-                                          :anchor-pane/left 5
-                                          :anchor-pane/right 5
-                                          :anchor-pane/top 5
-                                          :anchor-pane/bottom 5
-                                          :value (get-in views [id :action :form])}]}}))
-                  (interpose
-                    {:fx/type :region
-                     :style-class "reveal-view-header-separator"}))]
+        {:keys [form depth]} (get views focused-view-id)]
     {:fx/type :v-box
      :event-filter {::event/type ::on-view-event :index focused-view-index}
-     :children [{:fx/type scroll-pane
-                 :style-class "reveal-view-scroll-pane"
-                 :fit-to-width true
-                 :vbar-policy :never
-                 :hbar-policy :never
-                 :focused-view focused-view-id
-                 :content {:fx/type :h-box
-                           :style-class "reveal-view-header"
-                           :min-width :use-pref-size
-                           :children tabs}}
+     :children [{:fx/type :h-box
+                 :style-class "reveal-view-header"
+                 :alignment :center
+                 :children (interpose
+                             {:fx/type :region
+                              :style-class "reveal-view-header-separator"}
+                             [{:fx/type :button
+                               :style-class "reveal-view-header-button"
+                               :disable (zero? focused-view-index)
+                               :text "<"
+                               :on-action {::event/type ::focus-on-tab :index (dec focused-view-index)}}
+                              {:fx/type :button
+                               :style-class "reveal-view-header-button"
+                               :disable (= focused-view-index (dec (count view-order)))
+                               :text ">"
+                               :on-action {::event/type ::focus-on-tab :index (inc focused-view-index)}}
+                              {:fx/type :button
+                               :style-class "reveal-view-header-button"
+                               :h-box/hgrow :always
+                               :alignment :baseline-left
+                               :min-width 0
+                               :max-width Double/MAX_VALUE
+                               :graphic {:fx/type view/summary
+                                         :max-length 128
+                                         :value (stream/as-is
+                                                  (stream/horizontal
+                                                    (stream/raw-string
+                                                      (apply str (repeat depth "·"))
+                                                      {:fill :util})
+                                                    (stream/stream form)))}}
+                              #_{:fx/type :button
+                                 :style-class "reveal-view-header-button"
+                                 :text "↕"}])}
                 {:fx/type ext-focused-by-default
                  :fx/key focused-view-id
                  :v-box/vgrow :always
@@ -206,7 +178,15 @@
 
 (defn- view [{:keys [title queue showing view-order views focused-view-index confirm-exit-showing dispose]}]
   {:fx/type fx/ext-let-refs
-   :refs (into {} (map (juxt key #(-> % val :desc)) views))
+   :refs (into {}
+               (map (juxt key (fn [e]
+                                {:fx/type fx/ext-set-env
+                                 :env {::depth (-> e val :depth)
+                                       ::id (key e)}
+                                 :desc {:fx/type view/ext-try
+                                        :desc {:fx/type view/derefable
+                                               :derefable (-> e val :future)}}})))
+               views)
    :desc {:fx/type fx/ext-let-refs
           :refs {::stage {:fx/type :stage
                           :title title
@@ -259,18 +239,27 @@
    (let [rf (xf (completing #(f %2)))]
      (rf (rf nil x)))))
 
-(defmethod event/handle ::execute-action [{:keys [action]}]
+(defmethod event/handle ::execute-action [{:keys [action view-id]}]
   (let [id (UUID/randomUUID)
         f (future ((:invoke action)))]
     (fn [state]
-      (let [view-order (:view-order state)]
+      (let [view-order (:view-order state)
+            views (:views state)
+            parent (views view-id)
+            parent-depth (or (:depth parent) -1)
+            parent-index (.indexOf ^List view-order view-id)
+            insert-index (inc (+ parent-index
+                                 (->> (subvec view-order (inc parent-index))
+                                      (take-while #(< parent-depth (:depth (views %))))
+                                      count)))
+            depth (inc parent-depth)]
         (-> state
-            (assoc :focused-view-index (count view-order)
-                   :view-order (conj view-order id))
-            (assoc-in [:views id] {:action action
-                                   :desc {:fx/type view/ext-try
-                                          :desc {:fx/type view/derefable
-                                                 :derefable f}}}))))))
+            (assoc :focused-view-index insert-index
+                   :view-order (into (subvec view-order 0 insert-index)
+                                     (cons id (subvec view-order insert-index))))
+            (assoc-in [:views id] {:form (:form action)
+                                   :depth depth
+                                   :future f}))))))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)

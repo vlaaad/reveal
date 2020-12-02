@@ -111,10 +111,16 @@
                " .chart-symbol" {:-fx-padding 3}
                " .chart-series-line" {:-fx-stroke-width 2}}
             "-view" {"-header" {:-fx-background-color popup-color
-                                "-tab" {"-focused" {:-fx-background-color background-color}}
+                                "-button" {:-fx-text-fill symbol-color
+                                           :-fx-font-family font-family
+                                           :-fx-font-size font-size
+                                           :-fx-focus-traversable false
+                                           :-fx-padding [3 7]
+                                           ":hover" {:-fx-background-color unfocused-selection-color}
+                                           ":disabled" {:-fx-text-fill util-color
+                                                        :-fx-opacity 0.5}}
                                 "-separator" {:-fx-min-width 1
-                                              :-fx-background-color background-color}}
-                     "-scroll-pane" {:-fx-min-height 27}}}
+                                              :-fx-background-color background-color}}}}
          ".table-row-cell" {:-fx-padding 0
                             :-fx-cell-size (font/line-height)}
          ".label" {:-fx-text-fill symbol-color
