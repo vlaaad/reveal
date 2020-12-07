@@ -2,6 +2,7 @@
   (:require [cljfx.api :as fx]
             [vlaaad.reveal.style :as style]
             [vlaaad.reveal.event :as event]
+            [vlaaad.reveal.focus-tree :as focus-tree]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.view :as view])
   (:import [javafx.scene.input KeyEvent KeyCode]
@@ -9,9 +10,9 @@
            [javafx.beans.value ChangeListener]
            [javafx.event Event]
            [java.util.concurrent ArrayBlockingQueue]
-           [java.util UUID List]))
+           [java.util UUID]))
 
-(defmethod event/handle ::on-view-event [{:keys [index ^Event fx/event]}]
+(defmethod event/handle ::on-view-event [{:keys [^Event fx/event]}]
   (if (and (instance? KeyEvent event)
            (= KeyEvent/KEY_PRESSED (.getEventType event)))
     (let [^KeyEvent event event
@@ -20,39 +21,26 @@
         (and (= KeyCode/LEFT code) (.isShortcutDown event))
         (do
           (.consume event)
-          (fn [state]
-            (update state :focused-view-index #(max 0 (dec %)))))
+          #(update % :results focus-tree/focus-prev))
 
         (and (= KeyCode/RIGHT code) (.isShortcutDown event))
         (do
           (.consume event)
-          (fn [state]
-            (update state :focused-view-index #(min (inc %) (dec (count (:view-order state)))))))
+          #(update % :results focus-tree/focus-next))
 
         (and (= KeyCode/ESCAPE code)
              (not (::consumes-escape (.getProperties ^Node (.getTarget event)))))
         (do
           (.consume event)
           (fn [state]
-            (let [{:keys [views view-order]} state
-                  id (view-order index)
-                  depth (:depth (views id))
-                  splice-count (count (take-while #(< depth (:depth (views %))) (subvec view-order (inc index))))
-                  new-order (into (subvec view-order 0 index)
-                                  (subvec view-order (inc index)))
-                  new-views (reduce
-                              (fn [acc id]
-                                (update-in acc [id :depth] dec))
-                              (dissoc views id)
-                              (subvec view-order (inc index) (+ (inc index) splice-count)))]
-              (-> state
+            (let [results (:results state)
+                  id (::focus-tree/id results)
+                  new-results (focus-tree/close results)]
+              (-> (if new-results
+                    (assoc state :results new-results)
+                    (dissoc state :results))
                   (dissoc id)
-                  (assoc :view-order new-order
-                         :views new-views)
-                  (as-> $ (if (empty? new-order)
-                            (dissoc $ :focused-view-index)
-                            (assoc $ :focused-view-index
-                                     (min index (dec (count new-order))))))))))
+                  (update :views dissoc id)))))
 
         :else
         identity))
@@ -90,14 +78,14 @@
 (defmethod event/handle ::on-window-focused-changed [{:keys [fx/event]}]
   #(assoc % :window-focused event))
 
-(defmethod event/handle ::focus-on-tab [{:keys [index]}]
-  #(assoc % :focused-view-index index))
+(defmethod event/handle ::change-result-focus [{:keys [fn]}]
+  #(update % :results fn))
 
-(defn- tabs-view [{:keys [view-order views focused-view-index]}]
-  (let [focused-view-id (view-order focused-view-index)
-        {:keys [form depth]} (get views focused-view-id)]
+(defn- tabs-view [{:keys [views results]}]
+  (let [{::focus-tree/keys [id depth]} results
+        {:keys [form]} (get views id)]
     {:fx/type :v-box
-     :event-filter {::event/type ::on-view-event :index focused-view-index}
+     :event-filter {::event/type ::on-view-event}
      :children [{:fx/type :h-box
                  :style-class "reveal-view-header"
                  :alignment :center
@@ -106,14 +94,14 @@
                               :style-class "reveal-view-header-separator"}
                              [{:fx/type :button
                                :style-class "reveal-view-header-button"
-                               :disable (zero? focused-view-index)
+                               :disable (not (focus-tree/has-prev? results))
                                :text "<"
-                               :on-action {::event/type ::focus-on-tab :index (dec focused-view-index)}}
+                               :on-action {::event/type ::change-result-focus :fn focus-tree/focus-prev}}
                               {:fx/type :button
                                :style-class "reveal-view-header-button"
-                               :disable (= focused-view-index (dec (count view-order)))
+                               :disable (not (focus-tree/has-next? results))
                                :text ">"
-                               :on-action {::event/type ::focus-on-tab :index (inc focused-view-index)}}
+                               :on-action {::event/type ::change-result-focus :fn focus-tree/focus-next}}
                               {:fx/type :button
                                :style-class "reveal-view-header-button"
                                :h-box/hgrow :always
@@ -125,17 +113,17 @@
                                          :value (stream/as-is
                                                   (stream/horizontal
                                                     (stream/raw-string
-                                                      (apply str (repeat depth "·"))
+                                                      (apply str (repeat (get depth id) "·"))
                                                       {:fill :util})
                                                     (stream/stream form)))}}
                               #_{:fx/type :button
                                  :style-class "reveal-view-header-button"
                                  :text "↕"}])}
                 {:fx/type ext-focused-by-default
-                 :fx/key focused-view-id
+                 :fx/key id
                  :v-box/vgrow :always
                  :desc {:fx/type fx/ext-get-ref
-                        :ref focused-view-id}}]}))
+                        :ref id}}]}))
 
 (defmethod event/handle ::confirm-exit [{:keys [^Event fx/event]}]
   (.consume event)
@@ -176,7 +164,7 @@
                                                              :dispose dispose}
                                                  :text "Quit"}}]}]}}})
 
-(defn- view [{:keys [title queue showing view-order views focused-view-index confirm-exit-showing dispose]}]
+(defn- view [{:keys [title queue showing views results confirm-exit-showing dispose]}]
   {:fx/type fx/ext-let-refs
    :refs (into {}
                (map (juxt key (fn [e]
@@ -206,7 +194,7 @@
                                          :style-class "reveal-ui"
                                          :column-constraints [{:fx/type :column-constraints
                                                                :hgrow :always}]
-                                         :row-constraints (if focused-view-index
+                                         :row-constraints (if results
                                                             [{:fx/type :row-constraints
                                                               :percent-height 50}
                                                              {:fx/type :row-constraints
@@ -219,13 +207,12 @@
                                                    :grid-pane/column 0
                                                    :queue queue
                                                    :id :output}]
-                                           focused-view-index
+                                           results
                                            (conj {:fx/type tabs-view
                                                   :grid-pane/row 1
                                                   :grid-pane/column 0
                                                   :views views
-                                                  :view-order view-order
-                                                  :focused-view-index focused-view-index}))}}}}
+                                                  :results results}))}}}}
           :desc {:fx/type fx/ext-let-refs
                  :refs (when confirm-exit-showing
                          {::confirm-exit {:fx/type confirm-exit-dialog
@@ -242,24 +229,9 @@
 (defmethod event/handle ::execute-action [{:keys [action view-id]}]
   (let [id (UUID/randomUUID)
         f (future ((:invoke action)))]
-    (fn [state]
-      (let [view-order (:view-order state)
-            views (:views state)
-            parent (views view-id)
-            parent-depth (or (:depth parent) -1)
-            parent-index (.indexOf ^List view-order view-id)
-            insert-index (inc (+ parent-index
-                                 (->> (subvec view-order (inc parent-index))
-                                      (take-while #(< parent-depth (:depth (views %))))
-                                      count)))
-            depth (inc parent-depth)]
-        (-> state
-            (assoc :focused-view-index insert-index
-                   :view-order (into (subvec view-order 0 insert-index)
-                                     (cons id (subvec view-order insert-index))))
-            (assoc-in [:views id] {:form (:form action)
-                                   :depth depth
-                                   :future f}))))))
+    #(-> %
+         (update :results focus-tree/add view-id id)
+         (assoc-in [:views id] {:form (:form action) :future f}))))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)
@@ -278,7 +250,6 @@
          value-queue (ArrayBlockingQueue. 1024)
          *state (atom {:queue value-queue
                        :views {}
-                       :view-order []
                        :title (cond-> "Reveal" title (str ": " title))
                        :showing true
                        :dispose (constantly nil)})
