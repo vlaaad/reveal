@@ -12,7 +12,10 @@
            [java.util.concurrent ArrayBlockingQueue]
            [java.util UUID]))
 
-(defmethod event/handle ::on-view-event [{:keys [^Event fx/event]}]
+(defn- remove-index [xs i]
+  (into (subvec xs 0 i) (subvec xs (inc i))))
+
+(defmethod event/handle ::on-view-event [{:keys [^Event fx/event index]}]
   (if (and (instance? KeyEvent event)
            (= KeyEvent/KEY_PRESSED (.getEventType event)))
     (let [^KeyEvent event event
@@ -21,24 +24,25 @@
         (and (= KeyCode/LEFT code) (.isShortcutDown event))
         (do
           (.consume event)
-          #(update % :results focus-tree/focus-prev))
+          #(update-in % [:result-trees index] focus-tree/focus-prev))
 
         (and (= KeyCode/RIGHT code) (.isShortcutDown event))
         (do
           (.consume event)
-          #(update % :results focus-tree/focus-next))
+          #(update-in % [:result-trees index] focus-tree/focus-next))
 
         (and (= KeyCode/ESCAPE code)
              (not (::consumes-escape (.getProperties ^Node (.getTarget event)))))
         (do
           (.consume event)
           (fn [state]
-            (let [results (:results state)
-                  id (::focus-tree/id results)
-                  new-results (focus-tree/close results)]
-              (-> (if new-results
-                    (assoc state :results new-results)
-                    (dissoc state :results))
+            (let [result-trees (:result-trees state)
+                  tree (result-trees index)
+                  id (::focus-tree/id tree)
+                  new-tree (focus-tree/close tree)]
+              (-> (if new-tree
+                    (assoc-in state [:result-trees index] new-tree)
+                    (update state :result-trees remove-index index))
                   (dissoc id)
                   (update :views dissoc id)))))
 
@@ -78,14 +82,14 @@
 (defmethod event/handle ::on-window-focused-changed [{:keys [fx/event]}]
   #(assoc % :window-focused event))
 
-(defmethod event/handle ::change-result-focus [{:keys [fn]}]
-  #(update % :results fn))
+(defmethod event/handle ::change-result-focus [{:keys [fn index]}]
+  #(update-in % [:result-trees index] fn))
 
-(defn- tabs-view [{:keys [views results]}]
-  (let [{::focus-tree/keys [id depth]} results
+(defn- result-tree-view [{:keys [views result-tree index]}]
+  (let [{::focus-tree/keys [id depth]} result-tree
         {:keys [form]} (get views id)]
     {:fx/type :v-box
-     :event-filter {::event/type ::on-view-event}
+     :event-filter {::event/type ::on-view-event :index index}
      :children [{:fx/type :h-box
                  :style-class "reveal-view-header"
                  :alignment :center
@@ -94,14 +98,18 @@
                               :style-class "reveal-view-header-separator"}
                              [{:fx/type :button
                                :style-class "reveal-view-header-button"
-                               :disable (not (focus-tree/has-prev? results))
+                               :disable (not (focus-tree/has-prev? result-tree))
                                :text "<"
-                               :on-action {::event/type ::change-result-focus :fn focus-tree/focus-prev}}
+                               :on-action {::event/type ::change-result-focus
+                                           :index index
+                                           :fn focus-tree/focus-prev}}
                               {:fx/type :button
                                :style-class "reveal-view-header-button"
-                               :disable (not (focus-tree/has-next? results))
+                               :disable (not (focus-tree/has-next? result-tree))
                                :text ">"
-                               :on-action {::event/type ::change-result-focus :fn focus-tree/focus-next}}
+                               :on-action {::event/type ::change-result-focus
+                                           :index index
+                                           :fn focus-tree/focus-next}}
                               {:fx/type :button
                                :style-class "reveal-view-header-button"
                                :h-box/hgrow :always
@@ -164,17 +172,16 @@
                                                              :dispose dispose}
                                                  :text "Quit"}}]}]}}})
 
-(defn- view [{:keys [title queue showing views results confirm-exit-showing dispose]}]
+(defn- view [{:keys [title queue showing views result-trees confirm-exit-showing dispose]}]
   {:fx/type fx/ext-let-refs
    :refs (into {}
-               (map (juxt key (fn [e]
-                                {:fx/type fx/ext-set-env
-                                 :env {::depth (-> e val :depth)
-                                       ::id (key e)}
-                                 :desc {:fx/type view/ext-try
-                                        :desc {:fx/type view/derefable
-                                               :derefable (-> e val :future)}}})))
-               views)
+               (for [i (range (count result-trees))
+                     id (::focus-tree/order (result-trees i))]
+                 [id {:fx/type fx/ext-set-env
+                      :env {::id id ::index i}
+                      :desc {:fx/type view/ext-try
+                             :desc {:fx/type view/derefable
+                                    :derefable (get-in views [id :future])}}}]))
    :desc {:fx/type fx/ext-let-refs
           :refs {::stage {:fx/type :stage
                           :title title
@@ -194,25 +201,24 @@
                                          :style-class "reveal-ui"
                                          :column-constraints [{:fx/type :column-constraints
                                                                :hgrow :always}]
-                                         :row-constraints (if results
-                                                            [{:fx/type :row-constraints
-                                                              :percent-height 50}
-                                                             {:fx/type :row-constraints
-                                                              :percent-height 50}]
-                                                            [{:fx/type :row-constraints
-                                                              :percent-height 100}])
+                                         :row-constraints (let [n (inc (count result-trees))]
+                                                            (repeat n {:fx/type :row-constraints
+                                                                       :percent-height (/ 100 n)}))
                                          :children
-                                         (cond-> [{:fx/type view/queue
-                                                   :grid-pane/row 0
-                                                   :grid-pane/column 0
-                                                   :queue queue
-                                                   :id :output}]
-                                           results
-                                           (conj {:fx/type tabs-view
-                                                  :grid-pane/row 1
-                                                  :grid-pane/column 0
-                                                  :views views
-                                                  :results results}))}}}}
+                                         (into [{:fx/type view/queue
+                                                 :grid-pane/row 0
+                                                 :grid-pane/column 0
+                                                 :queue queue
+                                                 :id :output}]
+                                               (map-indexed
+                                                 (fn [i result-tree]
+                                                   {:fx/type result-tree-view
+                                                    :grid-pane/row (inc i)
+                                                    :grid-pane/column 0
+                                                    :views views
+                                                    :index i
+                                                    :result-tree result-tree}))
+                                               result-trees)}}}}
           :desc {:fx/type fx/ext-let-refs
                  :refs (when confirm-exit-showing
                          {::confirm-exit {:fx/type confirm-exit-dialog
@@ -226,12 +232,15 @@
    (let [rf (xf (completing #(f %2)))]
      (rf (rf nil x)))))
 
-(defmethod event/handle ::execute-action [{:keys [action view-id]}]
+(defmethod event/handle ::execute-action [{:keys [action view-id view-index new-result-tree]}]
   (let [id (UUID/randomUUID)
         f (future ((:invoke action)))]
-    #(-> %
-         (update :results focus-tree/add view-id id)
-         (assoc-in [:views id] {:form (:form action) :future f}))))
+    (fn [state]
+      (let [result-trees (:result-trees state)
+            index (if new-result-tree (count result-trees) (or view-index 0))]
+        (-> state
+            (assoc :result-trees (update result-trees index focus-tree/add view-id id))
+            (assoc-in [:views id] {:form (:form action) :future f}))))))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)
@@ -250,6 +259,7 @@
          value-queue (ArrayBlockingQueue. 1024)
          *state (atom {:queue value-queue
                        :views {}
+                       :result-trees []
                        :title (cond-> "Reveal" title (str ": " title))
                        :showing true
                        :dispose (constantly nil)})

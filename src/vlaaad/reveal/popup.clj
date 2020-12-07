@@ -18,7 +18,7 @@
            [javafx.stage Screen Popup Window]
            [com.sun.javafx.event RedirectedEvent]
            [javafx.event Event]
-           [javafx.scene.input KeyCode KeyEvent ContextMenuEvent]
+           [javafx.scene.input KeyCode KeyEvent ContextMenuEvent MouseEvent]
            [java.util Collection List]
            [javafx.beans.value ChangeListener]
            [javafx.scene Node]))
@@ -58,13 +58,16 @@
                                        (search/select text :label)))
       (dissoc :selected-index)))
 
-(defmethod event/handle ::on-action-key-pressed [{:keys [id ^KeyEvent fx/event action on-cancel view-id]}]
+(defmethod event/handle ::on-action-key-pressed
+  [{:keys [id ^KeyEvent fx/event action on-cancel view-id view-index]}]
   (condp = (.getCode event)
     KeyCode/ESCAPE (event/handle on-cancel)
     KeyCode/ENTER (comp
                     (event/handle on-cancel)
                     (event/handle {::event/type :vlaaad.reveal.ui/execute-action
                                    :view-id view-id
+                                   :view-index view-index
+                                   :new-result-tree (.isShortcutDown event)
                                    :action action}))
     KeyCode/UP #(update % id move-selected-index dec)
     KeyCode/DOWN #(update % id move-selected-index inc)
@@ -73,14 +76,18 @@
 (defmethod event/handle ::on-action-pressed [{:keys [id action]}]
   #(update % id select-action action))
 
-(defmethod event/handle ::on-action-clicked [{:keys [action on-cancel view-id]}]
+(defmethod event/handle ::on-action-clicked
+  [{:keys [action on-cancel view-id view-index ^MouseEvent fx/event]}]
   (comp
     (event/handle {::event/type :vlaaad.reveal.ui/execute-action
                    :view-id view-id
+                   :view-index view-index
+                   :new-result-tree (.isShortcutDown event)
                    :action action})
     (event/handle on-cancel)))
 
-(defmethod event/handle ::on-text-key-pressed [{:keys [text id ^KeyEvent fx/event on-cancel annotated-value view-id]}]
+(defmethod event/handle ::on-text-key-pressed
+  [{:keys [text id ^KeyEvent fx/event on-cancel annotated-value view-id view-index]}]
   (let [value (:value annotated-value)]
     (condp = (.getCode event)
       KeyCode/ESCAPE
@@ -100,6 +107,8 @@
             (comp
               (event/handle {::event/type :vlaaad.reveal.ui/execute-action
                              :view-id view-id
+                             :view-index view-index
+                             :new-result-tree (.isShortcutDown event)
                              :action {:form (cond
                                               (= '*v form) (list 'identity value)
                                               (ident? form) (list form value)
@@ -170,6 +179,7 @@
                           id
                           on-cancel
                           view-id
+                          view-index
                           text
                           selected-index]
                    :or {text ""}
@@ -268,6 +278,7 @@
                                                               :id id}
                                          :on-key-pressed {::event/type ::on-text-key-pressed
                                                           :view-id view-id
+                                                          :view-index view-index
                                                           :text text
                                                           :id id
                                                           :annotated-value annotated-value
@@ -286,11 +297,13 @@
                                 :text (:label action)
                                 :on-key-pressed {::event/type ::on-action-key-pressed
                                                  :view-id view-id
+                                                 :view-index view-index
                                                  :id id
                                                  :action action
                                                  :on-cancel on-cancel}
                                 :on-mouse-pressed {::event/type ::on-action-pressed
                                                    :view-id view-id
+                                                   :view-index view-index
                                                    :id id
                                                    :action action}
                                 :on-mouse-clicked {::event/type ::on-action-clicked
@@ -334,7 +347,7 @@
 
 (defn- view-with-env [props]
   {:fx/type fx/ext-get-env
-   :env {:vlaaad.reveal.ui/id :view-id}
+   :env {:vlaaad.reveal.ui/id :view-id :vlaaad.reveal.ui/index :view-index}
    :desc (assoc props :fx/type view-impl)})
 
 (defn view [{:keys [annotated-value bounds window id on-cancel]
