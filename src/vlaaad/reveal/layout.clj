@@ -335,11 +335,18 @@
 (defn set-canvas-width [layout canvas-width]
   (make (assoc layout :canvas-width canvas-width)))
 
+(defn- adjust-resize-scroll [layout ratio]
+  (let [{:keys [cursor scroll-y]} layout
+        offset (+ scroll-y (* (cursor/row cursor) (font/line-height)))
+        dy (- offset (* offset ratio))]
+    (assoc layout :scroll-y (+ scroll-y dy))))
+
 (defn set-canvas-height [layout canvas-height]
-  (let [diff (- canvas-height (:canvas-height layout))]
-    (make (-> layout
-              (assoc :canvas-height canvas-height)
-              (cond-> (neg? diff) (update :scroll-y + diff))))))
+  (-> layout
+      (assoc :canvas-height canvas-height)
+      (cond-> (and (:cursor layout) (pos? canvas-height))
+        (adjust-resize-scroll (/ (:canvas-height layout) canvas-height)))
+      make))
 
 (defn- adjust-scroll [scroll canvas-size region-start region-size]
   (let [canvas-start (- scroll)

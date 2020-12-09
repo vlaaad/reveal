@@ -205,6 +205,7 @@
       KeyCode/F
       (cond-> this shortcut show-search)
 
+      ;; FIXME should be on another level: only applies for main output panel
       KeyCode/L
       (cond-> this (.isControlDown event) clear-lines)
 
