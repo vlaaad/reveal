@@ -844,7 +844,8 @@
 
 (defmacro ^:private when-ns [ns-sym & body]
   `(try
-     (require '~ns-sym)
+     (binding [*warn-on-reflection* false] ;; not our problem
+       (require '~ns-sym))
      ~@body
      (catch FileNotFoundException _#)))
 
