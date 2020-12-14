@@ -117,10 +117,12 @@
                                            :-fx-focus-traversable false
                                            :-fx-padding [3 7]
                                            ":hover" {:-fx-background-color unfocused-selection-color}
-                                           ":disabled" {:-fx-text-fill util-color
-                                                        :-fx-opacity 0.5}}
+                                           ":disabled" {:-fx-text-fill unfocused-selection-color}}
                                 "-separator" {:-fx-min-width 1
-                                              :-fx-background-color background-color}}}}
+                                              :-fx-background-color background-color}}
+                     "-result-tree" {:-fx-background-color popup-color
+                                     "-item" {:-fx-padding [3.5 7]
+                                              ":selected" {:-fx-background-color selection-color}}}}}
          ".table-row-cell" {:-fx-padding 0
                             :-fx-cell-size (font/line-height)}
          ".label" {:-fx-text-fill symbol-color

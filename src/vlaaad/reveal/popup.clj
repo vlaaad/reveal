@@ -25,7 +25,7 @@
 
 (set! *warn-on-reflection* true)
 
-(defn- consume-popup-event [^Event e]
+(defn consume-popup-event [^Event e]
   (if (instance? RedirectedEvent e)
     (.consume (.getOriginalEvent ^RedirectedEvent e))
     (.consume e)))
@@ -137,7 +137,7 @@
     #(update % id dissoc :selected-index)
     identity))
 
-(def ^:private lifecycle
+(def lifecycle
   (fx.lifecycle/wrap-on-delete
     (fx.composite/describe Popup
       :ctor []

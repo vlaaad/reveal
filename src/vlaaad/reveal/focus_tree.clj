@@ -11,11 +11,12 @@
                              (->> (subvec order (inc parent-index))
                                   (take-while #(< parent-depth (get depth %)))
                                   count)))]
-    {::id id
-     ::index insert-index
-     ::order (into (subvec order 0 insert-index)
-                   (cons id (subvec order insert-index)))
-     ::depth (assoc depth id (inc parent-depth))}))
+    (assoc tree
+      ::id id
+      ::index insert-index
+      ::order (into (subvec order 0 insert-index)
+                    (cons id (subvec order insert-index)))
+      ::depth (assoc depth id (inc parent-depth)))))
 
 (defn has-prev? [tree]
   (pos? (::index tree)))
@@ -53,7 +54,8 @@
                              (min (cond-> index (zero? splice-count) dec)
                                   (dec (count new-order))))]
     (when (pos? (count new-order))
-      {::id (new-order new-focus-index)
-       ::index new-focus-index
-       ::order new-order
-       ::depth new-depth})))
+      (assoc tree
+        ::id (new-order new-focus-index)
+        ::index new-focus-index
+        ::order new-order
+        ::depth new-depth))))
