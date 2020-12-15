@@ -1,5 +1,6 @@
 (ns vlaaad.reveal.action-popup
   (:require [vlaaad.reveal.event :as event]
+            [vlaaad.reveal.popup :as popup]
             [cljfx.fx.popup :as fx.popup]
             [vlaaad.reveal.search :as search]
             [cljfx.composite :as fx.composite]
@@ -185,49 +186,7 @@
                    :or {text ""}
                    :as this}]
   (let [actions (displayed-actions this)
-        ^Screen screen (first (Screen/getScreensForRectangle (.getMinX bounds)
-                                                             (.getMinY bounds)
-                                                             (.getWidth bounds)
-                                                             (.getHeight bounds)))
-        screen-bounds (.getVisualBounds screen)
-        bounds-min-x (max (.getMinX screen-bounds) (.getMinX bounds))
-        bounds-min-y (max (.getMinY screen-bounds) (.getMinY bounds))
-        bounds (Rectangle2D. bounds-min-x
-                             bounds-min-y
-                             (- (min (.getMaxX screen-bounds) (.getMaxX bounds))
-                                bounds-min-x)
-                             (- (min (.getMaxY screen-bounds) (.getMaxY bounds))
-                                bounds-min-y))
-        content-width 300
-        shadow-radius 10
-        shadow-offset-y 5
-        popup-width (+ content-width shadow-radius shadow-radius)
-        space-below (- (.getMaxY screen-bounds)
-                       (.getMaxY bounds))
-        space-above (- (.getMinY bounds)
-                       (.getMinY screen-bounds))
-        popup-at-the-bottom (< space-above space-below)
-        pref-anchor-x (-> (.getMinX bounds)
-                          (+ (* (.getWidth bounds) 0.5))
-                          (- (* popup-width 0.5)))
-        visible-start-x (+ pref-anchor-x shadow-radius)
-        visible-end-x (+ pref-anchor-x popup-width (- shadow-radius))
-        anchor-fix-x (cond
-                       (< visible-start-x (.getMinX screen-bounds))
-                       (- (.getMinX screen-bounds) visible-start-x)
-
-                       (> visible-end-x (.getMaxX screen-bounds))
-                       (- (.getMaxX screen-bounds) visible-end-x)
-
-                       :else
-                       0)
-        arrow-width 10
-        arrow-height 10
-        arrow-x (- (* content-width 0.5) anchor-fix-x)
-        max-content-height (- (if popup-at-the-bottom
-                                space-below
-                                space-above)
-                              arrow-height)
+        bottom (popup/more-screen-space-below? bounds)
         action-view {:fx/type :scroll-pane
                      :style-class "reveal-popup-scroll-pane"
                      :fit-to-width true
@@ -239,101 +198,68 @@
                                               :fx/key (:id action)
                                               :ref [::action (:id action)]})
                                            actions)}}]
-    {:fx/type lifecycle
+    {:fx/type popup/view
+     :bounds bounds
      :window window
-     :stylesheets [(:cljfx.css/url @style/style)]
-     :anchor-location (if popup-at-the-bottom :window-top-left :window-bottom-left)
-     :anchor-x (+ pref-anchor-x anchor-fix-x)
-     :anchor-y (if popup-at-the-bottom
-                 (- (.getMaxY bounds) shadow-radius (- shadow-offset-y))
-                 (+ (.getMinY bounds) shadow-radius shadow-offset-y))
-     :auto-fix false
-     :hide-on-escape false
-     :auto-hide true
-     :on-auto-hide on-cancel
-     :event-handler consume-popup-event
-     :content
-     [{:fx/type :v-box
-       :pref-width content-width
-       :max-width content-width
-       :effect {:fx/type :drop-shadow
-                :radius shadow-radius
-                :offset-y shadow-offset-y
-                :color "#0006"}
-       :children
-       (-> []
-           (cond-> popup-at-the-bottom
-             (conj {:fx/type :polygon
-                    :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                    :fill @style/popup-color
-                    :points [0 arrow-height
-                             arrow-width arrow-height
-                             (* arrow-width 0.5) 0]}))
-           (conj
-             {:fx/type fx/ext-let-refs
-              :refs (into {::text-field {:fx/type :text-field
-                                         :style-class "reveal-text-field"
-                                         :text text
-                                         :on-focused-changed {::event/type ::on-text-focused
-                                                              :id id}
-                                         :on-key-pressed {::event/type ::on-text-key-pressed
-                                                          :view-id view-id
-                                                          :view-index view-index
-                                                          :text text
-                                                          :id id
-                                                          :annotated-value annotated-value
-                                                          :on-cancel on-cancel}
-                                         :on-text-changed {::event/type ::on-text-changed
-                                                           :fx/sync true
-                                                           :id id}}}
-                          (map-indexed
-                            (fn [i action]
-                              [[::action (:id action)]
-                               {:fx/type :label
-                                :style-class (cond-> ["reveal-popup-item"]
-                                               (= i selected-index)
-                                               (conj "reveal-popup-item-selected"))
-                                :min-width :use-pref-size
-                                :text (:label action)
-                                :on-key-pressed {::event/type ::on-action-key-pressed
+     :position (if bottom :bottom :top)
+     :on-cancel on-cancel
+     :desc {:fx/type fx/ext-let-refs
+            :refs (into {::text-field {:fx/type :text-field
+                                       :style-class "reveal-text-field"
+                                       :text text
+                                       :on-focused-changed {::event/type ::on-text-focused
+                                                            :id id}
+                                       :on-key-pressed {::event/type ::on-text-key-pressed
+                                                        :view-id view-id
+                                                        :view-index view-index
+                                                        :text text
+                                                        :id id
+                                                        :annotated-value annotated-value
+                                                        :on-cancel on-cancel}
+                                       :on-text-changed {::event/type ::on-text-changed
+                                                         :fx/sync true
+                                                         :id id}}}
+                        (map-indexed
+                          (fn [i action]
+                            [[::action (:id action)]
+                             {:fx/type :label
+                              :style-class (cond-> ["reveal-popup-item"]
+                                             (= i selected-index)
+                                             (conj "reveal-popup-item-selected"))
+                              :min-width :use-pref-size
+                              :text (:label action)
+                              :on-key-pressed {::event/type ::on-action-key-pressed
+                                               :view-id view-id
+                                               :view-index view-index
+                                               :id id
+                                               :action action
+                                               :on-cancel on-cancel}
+                              :on-mouse-pressed {::event/type ::on-action-pressed
                                                  :view-id view-id
                                                  :view-index view-index
                                                  :id id
+                                                 :action action}
+                              :on-mouse-clicked {::event/type ::on-action-clicked
                                                  :action action
-                                                 :on-cancel on-cancel}
-                                :on-mouse-pressed {::event/type ::on-action-pressed
-                                                   :view-id view-id
-                                                   :view-index view-index
-                                                   :id id
-                                                   :action action}
-                                :on-mouse-clicked {::event/type ::on-action-clicked
-                                                   :action action
-                                                   :on-cancel on-cancel}}]))
-                          actions)
-              :desc {:fx/type ext-with-focused-ref
-                     :props {:focused-ref (if selected-index
-                                            [::action (:id (actions selected-index))]
-                                            ::text-field)}
-                     :desc {:fx/type :v-box
-                            :style-class "reveal-popup"
-                            :max-height max-content-height
-                            :children (-> []
-                                          (cond-> popup-at-the-bottom
-                                            (conj {:fx/type fx/ext-get-ref
-                                                   :ref ::text-field
-                                                   :fx/key ::text-field}))
-                                          (cond-> (pos? (count actions)) (conj action-view))
-                                          (cond-> (not popup-at-the-bottom)
-                                            (conj {:fx/type fx/ext-get-ref
-                                                   :ref ::text-field
-                                                   :fx/key ::text-field})))}}})
-           (cond-> (not popup-at-the-bottom)
-             (conj {:fx/type :polygon
-                    :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                    :fill @style/popup-color
-                    :points [0 0
-                             arrow-width 0
-                             (* arrow-width 0.5) arrow-height]})))}]}))
+                                                 :on-cancel on-cancel}}]))
+                        actions)
+            :desc {:fx/type ext-with-focused-ref
+                   :props {:focused-ref (if selected-index
+                                          [::action (:id (actions selected-index))]
+                                          ::text-field)}
+                   :desc {:fx/type :v-box
+                          :spacing style/default-padding
+                          :padding style/default-padding
+                          :children (-> []
+                                        (cond-> bottom
+                                          (conj {:fx/type fx/ext-get-ref
+                                                 :ref ::text-field
+                                                 :fx/key ::text-field}))
+                                        (cond-> (pos? (count actions)) (conj action-view))
+                                        (cond-> (not bottom)
+                                          (conj {:fx/type fx/ext-get-ref
+                                                 :ref ::text-field
+                                                 :fx/key ::text-field})))}}}}))
 
 (defmethod event/handle ::init-popup [{:keys [id actions]}]
   #(assoc % id {:actions actions :id id}))

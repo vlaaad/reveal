@@ -45,8 +45,6 @@
         {".reveal"
            {"-ui" {:-fx-background-color background-color}
             "-popup" {:-fx-background-color popup-color
-                      :-fx-spacing default-padding
-                      :-fx-padding default-padding
                       "-scroll-pane" {:-fx-hbar-policy :never
                                       :-fx-min-height 0}
                       "-item" {:-fx-font-family font-family

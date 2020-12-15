@@ -4,7 +4,7 @@
             [vlaaad.reveal.event :as event]
             [vlaaad.reveal.focus-tree :as focus-tree]
             [vlaaad.reveal.stream :as stream]
-            [vlaaad.reveal.action-popup :as action-popup]
+            [vlaaad.reveal.popup :as popup]
             [vlaaad.reveal.view :as view]
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
@@ -16,7 +16,6 @@
            [java.util.concurrent ArrayBlockingQueue]
            [java.util UUID]
            [javafx.geometry Bounds]
-           [javafx.stage Screen]
            [javafx.scene.control ScrollPane]))
 
 (defn- remove-index [xs i]
@@ -27,9 +26,14 @@
 
 (defmethod event/handle ::show-popup [{:keys [index ^Event fx/event]}]
   (let [^Node source (some #(when (::result-tree-root (.getProperties ^Node %)) %) (ascendant-seq (.getSource event)))]
-    #(update-in % [:result-trees index] assoc
-                ::popup-window (.getWindow (.getScene source))
-                ::popup-bounds (.localToScreen source (.getBoundsInLocal source)))))
+    (fn [state]
+      (update-in state [:result-trees index]
+                 (fn [result-tree]
+                   (cond-> result-tree
+                     (< 1 (count (::focus-tree/order result-tree)))
+                     (assoc
+                       ::popup-window (.getWindow (.getScene source))
+                       ::popup-bounds (.localToScreen source (.getBoundsInLocal source)))))))))
 
 (defmethod event/handle ::hide-popup [{:keys [index]}]
   #(update-in % [:result-trees index] dissoc ::popup-window ::popup-bounds))
@@ -142,81 +146,65 @@
                                                 (- (.getHeight pane-b) (.getHeight viewport-b)))))))))
                   fx.lifecycle/dynamic)}))
 
-(defmethod event/handle ::on-popup-key-pressed [{:keys [^KeyEvent fx/event] :as e}]
-  (condp = (.getCode event)
-    KeyCode/ESCAPE (event/handle (assoc e ::event/type ::hide-popup))
-    KeyCode/ENTER (event/handle (assoc e ::event/type ::hide-popup))
-    KeyCode/UP (event/handle (assoc e ::event/type ::change-result-focus :fn focus-tree/focus-prev))
-    KeyCode/DOWN (if (.isShortcutDown event)
-                   (event/handle (assoc e ::event/type ::hide-popup))
-                   (event/handle (assoc e ::event/type ::change-result-focus :fn focus-tree/focus-next)))
-    KeyCode/BACK_SPACE (event/handle (assoc e ::event/type ::close-view))
-    KeyCode/DELETE (event/handle (assoc e ::event/type ::close-view))
+(defmethod event/handle ::on-popup-event [{:keys [fx/event] :as e}]
+  (if (instance? KeyEvent event)
+    (let [^KeyEvent event event]
+      (if (= KeyEvent/KEY_PRESSED (.getEventType event))
+        (do
+          (.consume event)
+          (condp = (.getCode event)
+            KeyCode/ESCAPE (event/handle (assoc e ::event/type ::hide-popup))
+            KeyCode/ENTER (event/handle (assoc e ::event/type ::hide-popup))
+            KeyCode/UP (event/handle (assoc e ::event/type ::change-result-focus :fn focus-tree/focus-prev))
+            KeyCode/DOWN (if (.isShortcutDown event)
+                           (event/handle (assoc e ::event/type ::hide-popup))
+                           (event/handle (assoc e ::event/type ::change-result-focus :fn focus-tree/focus-next)))
+            KeyCode/BACK_SPACE (event/handle (assoc e ::event/type ::close-view))
+            KeyCode/DELETE (event/handle (assoc e ::event/type ::close-view))
+            identity))
+        identity))
     identity))
 
 (defn- result-tree-popup [{::keys [popup-window ^Bounds popup-bounds result-tree views index]}]
-  (let [shadow-radius 10
-        shadow-offset-y 5
-        screen-min-y (-> (Screen/getScreensForRectangle (.getMinX popup-bounds)
-                                                        (.getMinY popup-bounds)
-                                                        (.getWidth popup-bounds)
-                                                        (.getHeight popup-bounds))
-                         ^Screen first
-                         .getVisualBounds
-                         .getMinY)
-        {::focus-tree/keys [depth id order]} result-tree]
-    {:fx/type action-popup/lifecycle
+  (let [{::focus-tree/keys [depth id order]} result-tree]
+    {:fx/type popup/view
+     :bounds popup-bounds
      :window popup-window
-     :event-handler action-popup/consume-popup-event
-     :anchor-location :window-bottom-left
-     :anchor-x (- (.getMinX popup-bounds) shadow-radius)
-     :anchor-y (+ (.getMinY popup-bounds) shadow-offset-y shadow-radius)
-     :auto-fix false
-     :auto-hide true
-     :on-auto-hide {::event/type ::hide-popup :index index}
-     :hide-on-escape false
-     :content
-     [{:fx/type fx/ext-let-refs
-       :refs (into {}
-                   (for [[view-index view-id] (map-indexed vector order)
-                         :let [form (get-in views [view-id :form])]]
-                     [view-id {:fx/type :h-box
-                               :style-class "reveal-view-result-tree-item"
-                               :pseudo-classes (if (= view-id id) #{:selected} #{})
-                               :on-mouse-entered {::event/type ::focus-tab :index index :view-index view-index}
-                               :on-mouse-clicked {::event/type ::select-tab :index index :view-index view-index}
-                               :children [{:fx/type view/summary
-                                           :max-length 128
-                                           :value (stream/as-is
-                                                    (stream/horizontal
-                                                      (stream/raw-string
-                                                        (apply str (repeat (get depth view-id) "·"))
-                                                        {:fill :util})
-                                                      (stream/stream form)))}]}]))
-       :desc
-       {:fx/type ext-with-scroll-to
-        :props {:scroll-to {:fx/type fx/ext-get-ref :ref id}}
-        :desc
-        {:fx/type :scroll-pane
-         :focus-traversable true
-         :on-key-pressed {::event/type ::on-popup-key-pressed :index index}
-         :style {:-fx-padding 5}
-         :style-class "reveal-view-result-tree"
-         :effect {:fx/type :drop-shadow
-                  :radius shadow-radius
-                  :offset-y shadow-offset-y
-                  :color "#0006"}
-         :fit-to-width true
-         :hbar-policy :never
-         :min-height 0
-         :max-width (.getWidth popup-bounds)
-         :min-width (.getWidth popup-bounds)
-         :max-height (- (.getMinY popup-bounds) screen-min-y)
-         :content {:fx/type :v-box
-                   :min-height :use-pref-size
-                   :children (for [view-id order]
-                               {:fx/type fx/ext-get-ref
-                                :ref view-id})}}}}]}))
+     :on-cancel {::event/type ::hide-popup :index index}
+     :position :top
+     :width (- (.getWidth popup-bounds) 20)
+     :desc {:fx/type fx/ext-let-refs
+            :refs (into {}
+                        (for [[view-index view-id] (map-indexed vector order)
+                              :let [form (get-in views [view-id :form])]]
+                          [view-id {:fx/type :h-box
+                                    :style-class "reveal-view-result-tree-item"
+                                    :pseudo-classes (if (= view-id id) #{:selected} #{})
+                                    :on-mouse-entered {::event/type ::focus-tab :index index :view-index view-index}
+                                    :on-mouse-clicked {::event/type ::select-tab :index index :view-index view-index}
+                                    :children [{:fx/type view/summary
+                                                :max-length 128
+                                                :value (stream/as-is
+                                                         (stream/horizontal
+                                                           (stream/raw-string
+                                                             (apply str (repeat (get depth view-id) "·"))
+                                                             {:fill :util})
+                                                           (stream/stream form)))}]}]))
+            :desc {:fx/type ext-with-scroll-to
+                   :props {:scroll-to {:fx/type fx/ext-get-ref :ref id}}
+                   :desc {:fx/type :scroll-pane
+                          :event-filter {::event/type ::on-popup-event :index index}
+                          :padding style/default-padding
+                          :focus-traversable true
+                          :style-class "reveal-view-result-tree"
+                          :fit-to-width true
+                          :hbar-policy :never
+                          :min-height 0
+                          :content {:fx/type :v-box
+                                    :min-height :use-pref-size
+                                    :children (for [view-id order]
+                                                {:fx/type fx/ext-get-ref
+                                                 :ref view-id})}}}}}))
 
 (defn- mark-as-tree-root! [^Node node]
   (.put (.getProperties node) ::result-tree-root true))
