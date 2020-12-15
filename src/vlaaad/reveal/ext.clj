@@ -4,7 +4,7 @@
             [clojure.core.specs.alpha :as specs]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.view :as view]
-            [vlaaad.reveal.popup :as popup]))
+            [vlaaad.reveal.action-popup :as action-popup]))
 
 ;; region streaming
 
@@ -284,7 +284,7 @@
    :value (the-ns 'clojure.core)
    :desc {:fx/type :label :text \"The clojure.core library\"}}
   ```"
-  popup/ext)
+  action-popup/ext)
 
 ;; endregion
 

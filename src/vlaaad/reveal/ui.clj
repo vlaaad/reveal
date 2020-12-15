@@ -4,7 +4,7 @@
             [vlaaad.reveal.event :as event]
             [vlaaad.reveal.focus-tree :as focus-tree]
             [vlaaad.reveal.stream :as stream]
-            [vlaaad.reveal.popup :as popup]
+            [vlaaad.reveal.action-popup :as action-popup]
             [vlaaad.reveal.view :as view]
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
@@ -165,9 +165,9 @@
                          .getVisualBounds
                          .getMinY)
         {::focus-tree/keys [depth id order]} result-tree]
-    {:fx/type popup/lifecycle
+    {:fx/type action-popup/lifecycle
      :window popup-window
-     :event-handler popup/consume-popup-event
+     :event-handler action-popup/consume-popup-event
      :anchor-location :window-bottom-left
      :anchor-x (- (.getMinX popup-bounds) shadow-radius)
      :anchor-y (+ (.getMinY popup-bounds) shadow-offset-y shadow-radius)

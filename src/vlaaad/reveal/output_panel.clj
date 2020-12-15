@@ -1,7 +1,7 @@
 (ns vlaaad.reveal.output-panel
   (:require [vlaaad.reveal.event :as event]
             [vlaaad.reveal.layout :as layout]
-            [vlaaad.reveal.popup :as popup]
+            [vlaaad.reveal.action-popup :as action-popup]
             [cljfx.api :as fx]
             [cljfx.lifecycle :as fx.lifecycle]
             [vlaaad.reveal.canvas :as canvas]
@@ -457,7 +457,7 @@
   (let [{:keys [canvas-width canvas-height document-width document-height]} layout]
     {:fx/type fx/ext-let-refs
      :refs (when popup
-             {::popup (assoc popup :fx/type popup/view
+             {::popup (assoc popup :fx/type action-popup/view
                                    :on-cancel {::event/type ::hide-popup :id id})})
      :desc {:fx/type :stack-pane
             :children (cond->

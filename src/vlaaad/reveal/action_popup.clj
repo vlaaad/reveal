@@ -1,4 +1,4 @@
-(ns vlaaad.reveal.popup
+(ns vlaaad.reveal.action-popup
   (:require [vlaaad.reveal.event :as event]
             [cljfx.fx.popup :as fx.popup]
             [vlaaad.reveal.search :as search]

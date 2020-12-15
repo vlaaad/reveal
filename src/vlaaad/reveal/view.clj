@@ -1,6 +1,6 @@
 (ns vlaaad.reveal.view
   (:require [vlaaad.reveal.output-panel :as output-panel]
-            [vlaaad.reveal.popup :as popup]
+            [vlaaad.reveal.action-popup :as action-popup]
             [vlaaad.reveal.event :as event]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.action :as action]
@@ -244,7 +244,7 @@
 (defn table [{:keys [items columns]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created initialize-table!
-   :desc {:fx/type popup/ext
+   :desc {:fx/type action-popup/ext
           :select select-bounds-and-value!
           :desc {:fx/type :table-view
                  :on-key-pressed {::event/type ::on-table-key-pressed}
@@ -355,7 +355,7 @@
   (cond-> numbered (not (number? numbered)) first))
 
 (defn bar-chart [{:keys [data]}]
-  {:fx/type popup/ext
+  {:fx/type action-popup/ext
    :select select-chart-node!
    :desc {:fx/type :bar-chart
           :style-class "reveal-chart"
@@ -405,7 +405,7 @@
       (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
 
 (defn line-chart [{:keys [data]}]
-  {:fx/type popup/ext
+  {:fx/type action-popup/ext
    :select select-chart-node!
    :desc {:fx/type :line-chart
           :style-class "reveal-chart"
@@ -473,7 +473,7 @@
        (every? scattered? x)))
 
 (defn scatter-chart [{:keys [data]}]
-  {:fx/type popup/ext
+  {:fx/type action-popup/ext
    :select select-chart-node!
    :desc {:fx/type :scatter-chart
           :style-class "reveal-chart"
