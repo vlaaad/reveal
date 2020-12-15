@@ -140,6 +140,12 @@
                     ":focused" {:-fx-background-color selection-color
                                 :-fx-text-fill symbol-color
                                 :-fx-border-color :transparent}}
+         ".tooltip" {:-fx-background-color unfocused-background-color
+                     :-fx-font-family font-family
+                     :-fx-font-size font-size
+                     :-fx-text-fill symbol-color
+                     :-fx-padding [3.5 7]
+                     :-fx-background-radius 0}
          ".cell" {:-fx-text-fill symbol-color
                   :-fx-background-color :transparent}
          ;; scroll bars

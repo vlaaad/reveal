@@ -26,14 +26,9 @@
 
 (defmethod event/handle ::show-popup [{:keys [index ^Event fx/event]}]
   (let [^Node source (some #(when (::result-tree-root (.getProperties ^Node %)) %) (ascendant-seq (.getSource event)))]
-    (fn [state]
-      (update-in state [:result-trees index]
-                 (fn [result-tree]
-                   (cond-> result-tree
-                     (< 1 (count (::focus-tree/order result-tree)))
-                     (assoc
-                       ::popup-window (.getWindow (.getScene source))
-                       ::popup-bounds (.localToScreen source (.getBoundsInLocal source)))))))))
+    #(update-in % [:result-trees index] assoc
+                ::popup-window (.getWindow (.getScene source))
+                ::popup-bounds (.localToScreen source (.getBoundsInLocal source)))))
 
 (defmethod event/handle ::hide-popup [{:keys [index]}]
   #(update-in % [:result-trees index] dissoc ::popup-window ::popup-bounds))
@@ -165,6 +160,9 @@
         identity))
     identity))
 
+(def shortcut-text
+  (delay (if (.startsWith (System/getProperty "os.name") "Mac") "⌘" "Ctrl")))
+
 (defn- result-tree-popup [{::keys [popup-window ^Bounds popup-bounds result-tree views index]}]
   (let [{::focus-tree/keys [depth id order]} result-tree]
     {:fx/type popup/view
@@ -210,7 +208,7 @@
   (.put (.getProperties node) ::result-tree-root true))
 
 (defn- result-tree-view [{:keys [views result-tree index]}]
-  (let [{::focus-tree/keys [id depth order]
+  (let [{::focus-tree/keys [id depth]
          ::keys [popup-window popup-bounds]} result-tree
         {:keys [form]} (get views id)]
     {:fx/type fx/ext-let-refs
@@ -235,6 +233,8 @@
                                              :style-class "reveal-view-header-button"
                                              :disable (not (focus-tree/has-prev? result-tree))
                                              :text "<"
+                                             :tooltip {:fx/type :tooltip
+                                                       :text (str @shortcut-text " ←")}
                                              :on-action {::event/type ::change-result-focus
                                                          :index index
                                                          :fn focus-tree/focus-prev}}
@@ -242,6 +242,8 @@
                                              :style-class "reveal-view-header-button"
                                              :disable (not (focus-tree/has-next? result-tree))
                                              :text ">"
+                                             :tooltip {:fx/type :tooltip
+                                                       :text (str @shortcut-text " →")}
                                              :on-action {::event/type ::change-result-focus
                                                          :index index
                                                          :fn focus-tree/focus-next}}
@@ -251,13 +253,14 @@
                                              :fit-to-width true
                                              :hbar-policy :never
                                              :vbar-policy :never
+                                             :tooltip {:fx/type :tooltip
+                                                       :text (str @shortcut-text " ↑")}
                                              :content
                                              {:fx/type :button
                                               :style-class "reveal-view-header-button"
                                               :alignment :baseline-left
                                               :min-width 0
                                               :max-width Double/MAX_VALUE
-                                              :disable (= 1 (count order))
                                               :graphic {:fx/type view/summary
                                                         :max-length 128
                                                         :value (stream/as-is

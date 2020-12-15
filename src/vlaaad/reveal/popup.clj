@@ -7,13 +7,10 @@
   (:import [javafx.stage Popup Window Screen]
            [java.util Collection]
            [javafx.geometry Bounds Rectangle2D]
-           [javafx.event Event]
-           [com.sun.javafx.event RedirectedEvent]))
+           [javafx.event Event]))
 
 (defn consume-popup-event [^Event e]
-  (if (instance? RedirectedEvent e)
-    (.consume (.getOriginalEvent ^RedirectedEvent e))
-    (.consume e)))
+  (.consume e))
 
 (def lifecycle
   (fx.lifecycle/wrap-on-delete
