@@ -203,7 +203,7 @@
 (defn- describe-cell [x]
   {:content-display :graphic-only
    :style-class "reveal-table-cell"
-   :graphic {:fx/type summary :value x}})
+   :graphic {:fx/type summary :value x :max-length 64}})
 
 (defn- initialize-table! [^TableView view]
   (.selectFirst (.getSelectionModel view))
@@ -255,6 +255,7 @@
                              :style-class "reveal-table-column"
                              :min-width 40
                              :graphic {:fx/type summary
+                                       :max-length 64
                                        :value (if (= header ::not-found) fn header)}
                              :cell-factory {:fx/cell-type :table-cell
                                             :describe describe-cell}
