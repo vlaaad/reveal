@@ -33,6 +33,11 @@
 (defmethod event/handle ::hide-popup [{:keys [index]}]
   #(update-in % [:result-trees index] dissoc ::popup-window ::popup-bounds))
 
+(defn- switch-focus-on-close [state from-index]
+  (-> state
+      (assoc ::focus (get-in state [:result-trees (max 0 (dec from-index)) ::focus-tree/id]))
+      (update ::focus-key (fnil inc 0))))
+
 (defmethod event/handle ::close-view [{:keys [index]}]
   (fn [state]
     (let [result-trees (:result-trees state)
@@ -42,6 +47,8 @@
       (-> (if new-tree
             (assoc-in state [:result-trees index] new-tree)
             (update state :result-trees remove-index index))
+          (cond-> (and (not new-tree) (< 1 (count result-trees)))
+            (switch-focus-on-close index))
           (dissoc id)
           (update :views dissoc id)))))
 
@@ -84,20 +91,23 @@
   (cons node (when (instance? Parent node)
                (mapcat descendant-seq (.getChildrenUnmodifiable ^Parent node)))))
 
+(defn focus! [node]
+  (fx/run-later
+    (let [^Node node (or (->> node
+                              descendant-seq
+                              (some #(when (.isFocusTraversable ^Node %) %)))
+                         node)]
+      (.requestFocus node))))
+
 (defn focus-when-on-scene! [^Node node]
   (if (some? (.getScene node))
-    (.requestFocus node)
+    (focus! node)
     (.addListener (.sceneProperty node)
                   (reify ChangeListener
                     (changed [this _ _ new-scene]
                       (when (some? new-scene)
                         (.removeListener (.sceneProperty node) this)
-                        (fx/run-later
-                          (let [^Node node (or (->> node
-                                                    descendant-seq
-                                                    (some #(when (.isFocusTraversable ^Node %) %)))
-                                               node)]
-                            (.requestFocus node)))))))))
+                        (focus! node)))))))
 
 (defn- switch-focus! [^Node from to]
   (when (.isFocused from)
@@ -316,7 +326,8 @@
                                                              :dispose dispose}
                                                  :text "Quit"}}]}]}}})
 
-(defn- view [{:keys [title queue showing views result-trees confirm-exit-showing dispose]}]
+(defn- view [{:keys [title queue showing views result-trees confirm-exit-showing dispose]
+              ::keys [focus focus-key]}]
   {:fx/type fx/ext-let-refs
    :refs (into {}
                (for [i (range (count result-trees))
@@ -327,47 +338,50 @@
                              :desc {:fx/type view/derefable
                                     :derefable (get-in views [id :future])}}}]))
    :desc {:fx/type fx/ext-let-refs
-          :refs {::stage {:fx/type :stage
-                          :title title
-                          :on-close-request {::event/type ::confirm-exit}
-                          :showing showing
-                          :width 400
-                          :height 500
-                          :icons ["vlaaad/reveal/logo-16.png"
-                                  "vlaaad/reveal/logo-32.png"
-                                  "vlaaad/reveal/logo-64.png"
-                                  "vlaaad/reveal/logo-256.png"
-                                  "vlaaad/reveal/logo-512.png"]
-                          :on-focused-changed {::event/type ::on-window-focused-changed}
-                          :scene {:fx/type :scene
-                                  :stylesheets [(:cljfx.css/url @style/style)]
-                                  :root {:fx/type :grid-pane
-                                         :style-class "reveal-ui"
-                                         :column-constraints [{:fx/type :column-constraints
-                                                               :hgrow :always}]
-                                         :row-constraints (let [n (inc (count result-trees))]
-                                                            (repeat n {:fx/type :row-constraints
-                                                                       :percent-height (/ 100 n)}))
-                                         :children
-                                         (into [{:fx/type view/queue
-                                                 :grid-pane/row 0
-                                                 :grid-pane/column 0
-                                                 :queue queue
-                                                 :id :output}]
-                                               (map-indexed
-                                                 (fn [i result-tree]
-                                                   {:fx/type result-tree-view
-                                                    :grid-pane/row (inc i)
-                                                    :grid-pane/column 0
-                                                    :views views
-                                                    :index i
-                                                    :result-tree result-tree}))
-                                               result-trees)}}}}
-          :desc {:fx/type fx/ext-let-refs
-                 :refs (when confirm-exit-showing
-                         {::confirm-exit {:fx/type confirm-exit-dialog
-                                          :dispose dispose}})
-                 :desc {:fx/type fx/ext-get-ref :ref ::stage}}}})
+          :refs (cond-> {::stage {:fx/type :stage
+                                  :title title
+                                  :on-close-request {::event/type ::confirm-exit}
+                                  :showing showing
+                                  :width 400
+                                  :height 500
+                                  :icons ["vlaaad/reveal/logo-16.png"
+                                          "vlaaad/reveal/logo-32.png"
+                                          "vlaaad/reveal/logo-64.png"
+                                          "vlaaad/reveal/logo-256.png"
+                                          "vlaaad/reveal/logo-512.png"]
+                                  :on-focused-changed {::event/type ::on-window-focused-changed}
+                                  :scene {:fx/type :scene
+                                          :stylesheets [(:cljfx.css/url @style/style)]
+                                          :root {:fx/type :grid-pane
+                                                 :style-class "reveal-ui"
+                                                 :column-constraints [{:fx/type :column-constraints
+                                                                       :hgrow :always}]
+                                                 :row-constraints (let [n (inc (count result-trees))]
+                                                                    (repeat n {:fx/type :row-constraints
+                                                                               :percent-height (/ 100 n)}))
+                                                 :children
+                                                 (into [{:fx/type view/queue
+                                                         :grid-pane/row 0
+                                                         :grid-pane/column 0
+                                                         :queue queue
+                                                         :id :output}]
+                                                       (map-indexed
+                                                         (fn [i result-tree]
+                                                           {:fx/type result-tree-view
+                                                            :grid-pane/row (inc i)
+                                                            :grid-pane/column 0
+                                                            :views views
+                                                            :index i
+                                                            :result-tree result-tree}))
+                                                       result-trees)}}}}
+                  confirm-exit-showing
+                  (assoc ::confirm-exit {:fx/type confirm-exit-dialog
+                                         :dispose dispose})
+                  focus
+                  (assoc [::focus focus-key] {:fx/type ext-focused-by-default
+                                              :desc {:fx/type fx/ext-get-ref
+                                                     :ref focus}}))
+          :desc {:fx/type fx/ext-get-ref :ref ::stage}}})
 
 (defn oneduce
   ([xf x]
