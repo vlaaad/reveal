@@ -9,7 +9,7 @@ if (!((invoke git rev-parse --abbrev-ref HEAD) -eq "master")) {
 }
 try { invoke git diff-index --quiet HEAD -- } catch { Throw "index is not clean" }
 
-$version = "1.1.$(invoke git rev-list HEAD --count)"
+$version = "1.2.$(invoke git rev-list HEAD --count)"
 
 clj -A:build -M -m version $version $(invoke git rev-parse HEAD)
 clj -Spom
