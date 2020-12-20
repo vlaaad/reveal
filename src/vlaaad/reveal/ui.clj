@@ -16,7 +16,8 @@
            [java.util.concurrent ArrayBlockingQueue]
            [java.util UUID]
            [javafx.geometry Bounds]
-           [javafx.scene.control ScrollPane]))
+           [javafx.scene.control ScrollPane]
+           [java.time LocalDate]))
 
 (defn- remove-index [xs i]
   (into (subvec xs 0 i) (subvec xs (inc i))))
@@ -327,7 +328,7 @@
                                                  :text "Quit"}}]}]}}})
 
 (defn- view [{:keys [title queue showing views result-trees confirm-exit-showing dispose]
-              ::keys [focus focus-key]}]
+              ::keys [focus focus-key christmas]}]
   {:fx/type fx/ext-let-refs
    :refs (into {}
                (for [i (range (count result-trees))
@@ -344,11 +345,17 @@
                                   :showing showing
                                   :width 400
                                   :height 500
-                                  :icons ["vlaaad/reveal/logo-16.png"
-                                          "vlaaad/reveal/logo-32.png"
-                                          "vlaaad/reveal/logo-64.png"
-                                          "vlaaad/reveal/logo-256.png"
-                                          "vlaaad/reveal/logo-512.png"]
+                                  :icons (if christmas
+                                           ["vlaaad/reveal/logo-xmas-16.png"
+                                            "vlaaad/reveal/logo-xmas-32.png"
+                                            "vlaaad/reveal/logo-xmas-64.png"
+                                            "vlaaad/reveal/logo-xmas-256.png"
+                                            "vlaaad/reveal/logo-xmas-512.png"]
+                                           ["vlaaad/reveal/logo-16.png"
+                                            "vlaaad/reveal/logo-32.png"
+                                            "vlaaad/reveal/logo-64.png"
+                                            "vlaaad/reveal/logo-256.png"
+                                            "vlaaad/reveal/logo-512.png"])
                                   :on-focused-changed {::event/type ::on-window-focused-changed}
                                   :scene {:fx/type :scene
                                           :stylesheets [(:cljfx.css/url @style/style)]
@@ -415,8 +422,12 @@
   ([{:keys [title]}]
    (let [*running! (agent true)
          value-queue (ArrayBlockingQueue. 1024)
+         now (LocalDate/now)
+         christmas (or (.isAfter now (LocalDate/of (.getYear now) 12 20))
+                       (.isBefore now (LocalDate/of (.getYear now) 1 2)))
          *state (atom {:queue value-queue
                        :views {}
+                       ::christmas christmas
                        :result-trees []
                        :title (cond-> "Reveal" title (str ": " title))
                        :showing true
