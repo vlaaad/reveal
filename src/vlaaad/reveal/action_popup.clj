@@ -1,9 +1,7 @@
 (ns vlaaad.reveal.action-popup
   (:require [vlaaad.reveal.event :as event]
             [vlaaad.reveal.popup :as popup]
-            [cljfx.fx.popup :as fx.popup]
             [vlaaad.reveal.search :as search]
-            [cljfx.composite :as fx.composite]
             [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.mutator :as fx.mutator]
             [vlaaad.reveal.style :as style]
@@ -15,21 +13,15 @@
             [vlaaad.reveal.action :as action]
             [cljfx.fx.node :as fx.node]
             [vlaaad.reveal.stream :as stream])
-  (:import [javafx.geometry Bounds Rectangle2D]
-           [javafx.stage Screen Popup Window]
-           [com.sun.javafx.event RedirectedEvent]
+  (:import [javafx.geometry Bounds]
+           [javafx.stage Popup]
            [javafx.event Event]
            [javafx.scene.input KeyCode KeyEvent ContextMenuEvent MouseEvent]
-           [java.util Collection List]
+           [java.util List]
            [javafx.beans.value ChangeListener]
            [javafx.scene Node]))
 
 (set! *warn-on-reflection* true)
-
-(defn consume-popup-event [^Event e]
-  (if (instance? RedirectedEvent e)
-    (.consume (.getOriginalEvent ^RedirectedEvent e))
-    (.consume e)))
 
 (def displayed-actions
   (some-fn :selected-actions :actions))
@@ -138,25 +130,6 @@
     #(update % id dissoc :selected-index)
     identity))
 
-(def lifecycle
-  (fx.lifecycle/wrap-on-delete
-    (fx.composite/describe Popup
-      :ctor []
-      :props (merge fx.popup/props
-                    (fx.composite/props Popup
-                      :window [(fx.mutator/setter
-                                 (fn [^Popup popup ^Window window]
-                                   (if window
-                                     (.show popup window)
-                                     (.hide popup))))
-                               fx.lifecycle/scalar]
-                      :stylesheets [(fx.mutator/setter
-                                      (fn [^Popup popup ^Collection styles]
-                                        (.setAll (.getStylesheets (.getScene popup)) styles)))
-                                    fx.lifecycle/scalar
-                                    :default []])))
-    #(.hide ^Popup %)))
-
 (defn focus-when-on-scene! [^Node node]
   (if (some? (.getScene node))
     (.requestFocus node)
@@ -240,6 +213,8 @@
                                                  :id id
                                                  :action action}
                               :on-mouse-clicked {::event/type ::on-action-clicked
+                                                 :view-id view-id
+                                                 :view-index view-index
                                                  :action action
                                                  :on-cancel on-cancel}}]))
                         actions)
