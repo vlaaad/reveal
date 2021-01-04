@@ -525,23 +525,6 @@
   (removeWatch [this key]
     (remove-watch *ref [this key])))
 
-(defn- observe! [id [ref fn] handler]
-  (handler {::event/type ::create-view-state :id id :state {:desc (fn @ref)}})
-  (let [watch-key (gensym "vlaaad.reveal.view/observable")]
-    (add-watch ref watch-key #(handler {::event/type ::create-view-state :id id :state {:desc (fn %4)}}))
-    #(do
-       (remove-watch ref watch-key)
-       (handler {::event/type ::dispose-state :id id}))))
-
-(defn- desc-view [m]
-  (:desc m))
-
-(defn observable-view [{:keys [ref fn]}]
-  {:fx/type rfx/ext-with-process
-   :start observe!
-   :args [ref fn]
-   :desc {:fx/type desc-view}})
-
 (def ext-try
   (reify fx.lifecycle/Lifecycle
     (create [_ {:keys [desc]} opts]
@@ -552,19 +535,45 @@
         (catch Exception e
           (with-meta
             {:exception e
+             :desc desc
              :child (fx.lifecycle/create fx.lifecycle/dynamic {:fx/type value :value e} opts)}
             {`fx.component/instance #(-> % :child fx.component/instance)}))))
-    (advance [_ component {:keys [desc]} opts]
+    (advance [this component {:keys [desc] :as this-desc} opts]
       (if-let [e (:exception component)]
-        (update component :child
-                #(fx.lifecycle/advance fx.lifecycle/dynamic % {:fx/type value :value e} opts))
+        (if (= (:desc component) desc)
+          (update component :child
+                  #(fx.lifecycle/advance fx.lifecycle/dynamic % {:fx/type value :value e} opts))
+          (do (fx.lifecycle/delete this component opts)
+              (fx.lifecycle/create this this-desc opts)))
         (try
           (update component :child
                   #(fx.lifecycle/advance fx.lifecycle/dynamic % desc opts))
           (catch Exception e
             (assoc component :exception e
+                             :desc desc
                              :child (fx.lifecycle/create fx.lifecycle/dynamic
                                                          {:fx/type value :value e}
                                                          opts))))))
     (delete [_ component opts]
       (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
+
+(defn- observe! [id ref handler]
+  (handler {::event/type ::create-view-state :id id :state {:val @ref}})
+  (let [watch-key (gensym "vlaaad.reveal.view/observable")]
+    (add-watch ref watch-key #(handler {::event/type ::create-view-state :id id :state {:val %4}}))
+    #(do
+       (remove-watch ref watch-key)
+       (handler {::event/type ::dispose-state :id id}))))
+
+(defn- observable-view-impl-try [{:keys [fn val]}]
+  (fn val))
+
+(defn- observable-view-impl [props]
+  {:fx/type ext-try
+   :desc (assoc props :fx/type observable-view-impl-try)})
+
+(defn observable-view [{:keys [ref fn]}]
+  {:fx/type rfx/ext-with-process
+   :start observe!
+   :args ref
+   :desc {:fx/type observable-view-impl :fn fn}})
