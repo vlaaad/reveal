@@ -9,14 +9,13 @@
 (def ui (r/ui))
 
 (defn submit-with-form [form value]
-  (ui (rx/stream-as-is
-        (rx/vertical
-          (rx/as form
-            (rx/raw-string (pr-str form) {:fill :util}))
-          (rx/horizontal
-            (rx/raw-string "=>" {:fill :util})
-            rx/separator
-            (rx/stream value))))))
+  (ui (rx/vertical
+        (rx/as form
+          (rx/raw-string (pr-str form) {:fill :util}))
+        (rx/horizontal
+          (rx/raw-string "=>" {:fill :util})
+          rx/separator
+          (rx/stream value)))))
 
 (comment
   ;; example usage

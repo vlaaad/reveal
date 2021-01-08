@@ -18,6 +18,9 @@
 
 (defrecord AnnotatedValue [value annotation])
 
+(defn as-is [sf]
+  (with-meta sf {::type ::as-is}))
+
 ;; region emitter ops
 
 (defn- =>
@@ -46,12 +49,12 @@
     (rf acc op)))
 
 (defn with-value [x ann sf]
-  (=> (op {:op ::push-value :value (->AnnotatedValue x ann)})
-      sf
-      (op {:op ::pop-value})))
+  (as-is (=> (op {:op ::push-value :value (->AnnotatedValue x ann)})
+             sf
+             (op {:op ::pop-value}))))
 
 (def separator
-  (op {:op ::separator}))
+  (as-is (op {:op ::separator})))
 
 (def ^:private newline
   (op {:op ::newline}))
@@ -65,9 +68,9 @@
        :style style}))
 
 (defn- block [block-type sf]
-  (=> (op {:op ::push-block :block block-type})
-      sf
-      (op {:op ::pop-block})))
+  (as-is (=> (op {:op ::push-block :block block-type})
+             sf
+             (op {:op ::pop-block}))))
 
 ;; endregion
 (defmulti stream-dispatch (fn stream-dispatch [x _]
@@ -84,9 +87,6 @@
    (with-value x (assoc ann ::hidden true) sf)))
 
 (defmethod stream-dispatch ::as-is [sf _] sf)
-
-(defn as-is [sf]
-  (with-meta sf {::type ::as-is}))
 
 (defn- flush-builder [^StringBuilder builder style]
   (fn [rf acc]
@@ -249,14 +249,14 @@
      (horizontally coll ann))))
 
 (defn override-style [sf f & args]
-  (fn [rf acc]
-    (let [rf (fn
-               ([acc] (rf acc))
-               ([acc input]
-                (rf acc (case (:op input)
-                          ::string (apply update input :style f args)
-                          input))))]
-      (sf rf acc))))
+  (as-is (fn [rf acc]
+           (let [rf (fn
+                      ([acc] (rf acc))
+                      ([acc input]
+                       (rf acc (case (:op input)
+                                 ::string (apply update input :style f args)
+                                 input))))]
+             (sf rf acc)))))
 
 (defn- emit-xf [rf]
   (fn

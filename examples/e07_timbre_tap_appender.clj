@@ -14,21 +14,20 @@
    {:println {:enabled? false}
     :reveal {:enabled? true
              :fn (fn [data]
-                   (tap> (rx/stream-as-is
-                           (rx/as data
-                             (rx/raw-string
-                               (format "[%1$tH:%1$tM:%1$tS.%1$tL %2$s:%3$s]: %4$s"
-                                       (:instant data)
-                                       (:?ns-str data)
-                                       (:?line data)
-                                       @(:msg_ data))
-                               {:fill ({:info :symbol
-                                        :report :symbol
-                                        :warn "#db8618"
-                                        :error :error
-                                        :fatal :error}
-                                       (:level data)
-                                       :util)})))))}}})
+                   (tap> (rx/as data
+                           (rx/raw-string
+                             (format "[%1$tH:%1$tM:%1$tS.%1$tL %2$s:%3$s]: %4$s"
+                                     (:instant data)
+                                     (:?ns-str data)
+                                     (:?line data)
+                                     @(:msg_ data))
+                             {:fill ({:info :symbol
+                                      :report :symbol
+                                      :warn "#db8618"
+                                      :error :error
+                                      :fatal :error}
+                                     (:level data)
+                                     :util)}))))}}})
 
 (comment
   (log/info "hi")

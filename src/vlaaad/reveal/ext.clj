@@ -33,15 +33,6 @@
   ([x sf] (stream/as x sf))
   ([x ann sf] (stream/as x ann sf)))
 
-(defn stream-as-is
-  "Returns streaming function that, when streamed as a value, is streamed as is
-
-  Streaming functions are ordinary functions, and functions are streamed by
-  default as their class names. This is a way to sidestep streaming value
-  formatting and just stream the sf"
-  [sf]
-  (stream/as-is sf))
-
 (defn raw-string
   "Returns streaming function that streams x as a string
 
@@ -297,5 +288,16 @@
 
   Deprecated: just return the description"
   identity)
+
+(defn ^:deprecated stream-as-is
+  "Returns streaming function that, when streamed as a value, is streamed as is
+
+  Streaming functions are ordinary functions, and functions are streamed by
+  default as their class names. This is a way to sidestep streaming value
+  formatting and just stream the sf
+
+  Deprecated: all public streaming functions are streamed as is by default"
+  [sf]
+  (stream/as-is sf))
 
 ;; endregion

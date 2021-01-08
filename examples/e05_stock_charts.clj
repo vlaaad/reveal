@@ -65,27 +65,26 @@
                         (assoc-in [:yields ticker] yields))))
                 {:divs {} :prices {} :yields {}}
                 tickers)]
-    (rx/stream-as-is
-      (rx/as
-        {:fx/type :h-box
-         :children [{:fx/type :v-box
-                     :children [{:fx/type :label
-                                 :text "Prices:"}
-                                {:fx/type rx/scatter-chart-view
-                                 :data prices}]}
-                    {:fx/type :v-box
-                     :children [{:fx/type :label
-                                 :text "Dividends:"}
-                                {:fx/type rx/scatter-chart-view
-                                 :data divs}]}
-                    {:fx/type :v-box
-                     :children [{:fx/type :label
-                                 :text "Yields:"}
-                                {:fx/type rx/scatter-chart-view
-                                 :data yields}]}]}
-        (rx/horizontal
-          (rx/raw-string "#charts" {:fill :object})
-          (rx/stream tickers))))))
+    (rx/as
+      {:fx/type :h-box
+       :children [{:fx/type :v-box
+                   :children [{:fx/type :label
+                               :text "Prices:"}
+                              {:fx/type rx/scatter-chart-view
+                               :data prices}]}
+                  {:fx/type :v-box
+                   :children [{:fx/type :label
+                               :text "Dividends:"}
+                              {:fx/type rx/scatter-chart-view
+                               :data divs}]}
+                  {:fx/type :v-box
+                   :children [{:fx/type :label
+                               :text "Yields:"}
+                              {:fx/type rx/scatter-chart-view
+                               :data yields}]}]}
+      (rx/horizontal
+        (rx/raw-string "#charts" {:fill :object})
+        (rx/stream tickers)))))
 
 ;; try it out:
 (comment

@@ -20,10 +20,8 @@
 (rx/defaction ::loom:successors [v ann]
   (when-let [g (::graph ann)]
     (fn []
-      ;; we want to stream this custom formatting as is, not as a function value
-      (rx/stream-as-is
-        ;; forward the graph to every successor
-        (rx/vertically (g/successors g v) {::graph g})))))
+      ;; forward the graph to every successor
+      (rx/vertically (g/successors g v) {::graph g}))))
 
 ;; define an action on a node to see its graph:
 
@@ -36,20 +34,16 @@
 (rx/defaction ::loom:edges [v]
   (when (satisfies? g/Graph v)
     (fn []
-      (rx/stream-as-is
-        (rx/vertically
-          (map (fn [[from to]]
-                 ;; since vertically works on values, not sfs, we want to make these sfs
-                 ;; streamed as is too
-                 (rx/stream-as-is
-                   (rx/horizontal
-                     ;; forward the graph
-                     (rx/stream from {::graph v})
-                     rx/separator
-                     (rx/raw-string "->" {:fill :util :selectable false})
-                     rx/separator
-                     (rx/stream to {::graph v}))))
-               (g/edges v)))))))
+      (rx/vertically
+        (map (fn [[from to]]
+               (rx/horizontal
+                 ;; forward the graph
+                 (rx/stream from {::graph v})
+                 rx/separator
+                 (rx/raw-string "->" {:fill :util :selectable false})
+                 rx/separator
+                 (rx/stream to {::graph v})))
+             (g/edges v))))))
 
 ;; graph of associations to explore:
 
