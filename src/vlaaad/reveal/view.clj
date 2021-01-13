@@ -11,7 +11,7 @@
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.component :as fx.component])
-  (:import [clojure.lang IRef]
+  (:import [clojure.lang IRef IFn]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
            [javafx.scene.control TableView TablePosition TableColumn$SortType]
            [javafx.scene Node]
@@ -557,23 +557,33 @@
     (delete [_ component opts]
       (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
 
-(defn- observe! [id ref handler]
-  (handler {::event/type ::create-view-state :id id :state {:val @ref}})
-  (let [watch-key (gensym "vlaaad.reveal.view/observable")]
-    (add-watch ref watch-key #(handler {::event/type ::create-view-state :id id :state {:val %4}}))
+(defn- subscribe! [id subscribe handler]
+  (let [notifier #(handler {::event/type ::create-view-state :id id :state {:val %}})
+        _ (notifier ::not-found)
+        unsubscribe (subscribe notifier)]
     #(do
-       (remove-watch ref watch-key)
+       (when (fn? unsubscribe) (unsubscribe))
        (handler {::event/type ::dispose-state :id id}))))
 
 (defn- observable-view-impl-try [{:keys [fn val]}]
-  (fn val))
+  (if (= val ::not-found)
+    {:fx/type :label :focus-traversable true :text "Waiting..."}
+    (fn val)))
 
 (defn- observable-view-impl [props]
   {:fx/type ext-try
    :desc (assoc props :fx/type observable-view-impl-try)})
 
-(defn observable-view [{:keys [ref fn]}]
+(defrecord RefSubscribe [ref]
+  IFn
+  (invoke [_ notify]
+    (notify @ref)
+    (let [watch-key (gensym "vlaaad.reveal.view/observable")]
+      (add-watch ref watch-key #(notify %4))
+      #(remove-watch ref watch-key))))
+
+(defn observable-view [{:keys [ref fn subscribe]}]
   {:fx/type rfx/ext-with-process
-   :start observe!
-   :args ref
+   :start subscribe!
+   :args (if ref (->RefSubscribe ref) subscribe)
    :desc {:fx/type observable-view-impl :fn fn}})

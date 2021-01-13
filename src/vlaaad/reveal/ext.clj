@@ -188,11 +188,27 @@
   (view/->Observable ref fn))
 
 (def observable-view
-  "Cljfx component fn that shows a custom view produced from values in a ref
+  "Cljfx component fn that shows a live view produced from some data source
 
   Expected keys:
-  - `:ref` (required) - an instance of IRef (e.g. Atom, Var, Ref, Agent etc.)
-  - `:fn` (required) - a function from value in a ref to view cljfx description"
+  - either (required):
+    - `:ref` - an instance of IRef (e.g. Atom, Var, Ref, Agent etc.)
+    - `:subscribe` - 1-arg function that performs subscribing, notification and
+      unsubscribing for some external data source. It receives a 1-arg function
+      used for notifying about new values that may be called immediately. When
+      executed, subscribe function should start the notification process. It has
+      to return 0-arg function that will be called when the view is disposed,
+      so it can unsubscribe from the external data source
+  - `:fn` (required) - a function from value in a ref to view cljfx description
+
+  Example:
+  ```
+  {:fx/type observable-view
+   :subscribe (fn [notify]
+                (add-tap notify)
+                #(remove-tap notify))
+   :fn (fn [v] {:fx/type value-view :value v})}
+  ```"
   view/observable-view)
 
 (def pie-chart-view
