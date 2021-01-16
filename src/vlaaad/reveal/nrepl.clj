@@ -19,7 +19,8 @@
         (ui
           (cond
             (not= value ::not-found)
-            (stream/as-is
+            (if (:vlaaad.reveal/command value)
+              value
               (stream/horizontal
                 (stream/as {:request request :message message}
                   (stream/vertical
@@ -30,35 +31,33 @@
                 (stream/stream value)))
 
             (not= out ::not-found)
-            (stream/as-is
-              (stream/as {:request request :message message}
-                (stream/raw-string (str/trim-newline out) {:fill :string})))
+            (stream/as {:request request :message message}
+              (stream/raw-string (str/trim-newline out) {:fill :string}))
 
             (not= err ::not-found)
-            (stream/as-is
-              (stream/as {:request request :message message}
-                (stream/raw-string (str/trim-newline err) {:fill :error})))
+            (stream/as {:request request :message message}
+              (stream/raw-string (str/trim-newline err) {:fill :error}))
 
             (not= throwable ::not-found)
-            (stream/as-is
-              (stream/horizontal
-                (stream/as {:request request :message message}
-                  (stream/vertical
-                    (stream/raw-string code {:fill :util})
-                    (stream/raw-string "=>" {:fill :util})))
-                stream/separator
-                stream/newrow
-                (stream/as throwable
-                  (stream/raw-string
-                    (.getSimpleName (class throwable))
-                    {:fill :error}))))
+            (stream/horizontal
+              (stream/as {:request request :message message}
+                (stream/vertical
+                  (stream/raw-string code {:fill :util})
+                  (stream/raw-string "=>" {:fill :util})))
+              stream/separator
+              stream/newrow
+              (stream/as throwable
+                (stream/raw-string
+                  (.getSimpleName (class throwable))
+                  {:fill :error})))
 
             :else
             {:request request :message message}))))))
 
 (defn- show-tap [ui value]
   (ui
-    (stream/as-is
+    (if (:vlaaad.reveal/command value)
+      value
       (stream/as {:tap value}
         (stream/horizontal
           (stream/raw-string "tap>" {:fill :util})

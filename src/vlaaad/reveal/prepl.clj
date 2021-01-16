@@ -6,31 +6,34 @@
             [clojure.string :as str]))
 
 (defn- prepl-output [x]
-  (stream/as-is
-    (if (:exception x)
-      (stream/as x
-        (cond-> (stream/raw-string (-> x :val m/ex-triage m/ex-str) {:fill :error})
-          (:form x)
-          (as-> $ (stream/vertical
-                    (stream/raw-string (:form x) {:fill :util})
-                    $))))
-      (case (:tag x)
-        :ret (stream/horizontal
+  (if (:exception x)
+    (stream/as x
+      (cond-> (stream/raw-string (-> x :val m/ex-triage m/ex-str) {:fill :error})
+        (:form x)
+        (as-> $ (stream/vertical
+                  (stream/raw-string (:form x) {:fill :util})
+                  $))))
+    (case (:tag x)
+      :ret (if (:vlaaad.reveal/command (:val x))
+             (:val x)
+             (stream/horizontal
                (stream/as x
                  (stream/vertical
                    (stream/raw-string (:form x) {:fill :util})
                    (stream/raw-string "=>" {:fill :util})))
                stream/separator
                stream/newrow
-               (stream/stream (:val x)))
-        :out (stream/as x (stream/raw-string (str/trim-newline (:val x)) {:fill :string}))
-        :err (stream/as x (stream/raw-string (str/trim-newline (:val x)) {:fill :error}))
-        :tap (stream/horizontal
+               (stream/stream (:val x))))
+      :out (stream/as x (stream/raw-string (str/trim-newline (:val x)) {:fill :string}))
+      :err (stream/as x (stream/raw-string (str/trim-newline (:val x)) {:fill :error}))
+      :tap (if (:vlaaad.reveal/command (:val x))
+             (:val x)
+             (stream/horizontal
                (stream/as x (stream/raw-string "tap>" {:fill :util}))
                stream/separator
                stream/newrow
-               (stream/stream (:val x)))
-        (stream/stream x)))))
+               (stream/stream (:val x))))
+      (stream/stream x))))
 
 (defn- wrap-out-fn [ui out-fn]
   (fn [x]

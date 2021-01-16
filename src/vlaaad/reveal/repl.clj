@@ -5,9 +5,11 @@
             [clojure.string :as str]))
 
 (defn- stream-read [form ui]
-  (ui (stream/as-is
-        (stream/as form
-          (stream/raw-string (pr-str form) {:fill :util})))))
+  (ui (stream/as form
+        (stream/raw-string
+          (binding [*print-namespace-maps* false]
+            (pr-str form))
+          {:fill :util}))))
 
 (defn- wrap-read [ui read]
   (fn [request-prompt request-exit]
@@ -21,7 +23,8 @@
 (defn- wrap-print [ui print]
   (fn [x]
     (ui
-      (stream/as-is
+      (if (:vlaaad.reveal/command x)
+        x
         (stream/horizontal
           (stream/raw-string "=>" {:fill :util})
           stream/separator
@@ -30,26 +33,26 @@
 
 (defn- wrap-caught [ui caught]
   (fn [ex]
-    (ui (stream/as-is
-          (stream/as ex
-            (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
-                               {:fill :error}))))
+    (ui (stream/as ex
+          (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
+                             {:fill :error})))
     (caught ex)))
 
 (defn- make-tap [ui]
   (fn [x]
-    (ui (stream/as-is
-          (stream/horizontal
-            (stream/raw-string "tap>" {:fill :util})
-            stream/separator
-            (stream/stream x))))))
+    (ui
+      (if (:vlaaad.reveal/command x)
+        x
+        (stream/horizontal
+          (stream/raw-string "tap>" {:fill :util})
+          stream/separator
+          (stream/stream x))))))
 
 (defn- make-print [ui out fill]
   (PrintWriter-on
     #(do
-       (ui (stream/as-is
-             (stream/as %
-               (stream/raw-string (str/replace % #"\r?\n$" "") {:fill fill}))))
+       (ui (stream/as %
+             (stream/raw-string (str/replace % #"\r?\n$" "") {:fill fill})))
        (binding [*out* out]
          (print %)
          (flush)))
@@ -79,9 +82,8 @@
                       (update :eval #(wrap-eval ui (or % eval)))
                       (update :print #(wrap-print ui (or % prn)))
                       (update :caught #(wrap-caught ui (or % m/repl-caught))))]
-    (ui (stream/as-is
-          (stream/as *clojure-version*
-            (stream/raw-string version {:fill :util}))))
+    (ui (stream/as *clojure-version*
+          (stream/raw-string version {:fill :util})))
     (println version)
     (add-tap tap)
     (try

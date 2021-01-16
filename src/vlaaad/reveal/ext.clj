@@ -134,7 +134,7 @@
 
   `action-id` is a ns-qualified keyword identifying this action
   `bindings` is a bindings vector that can have either 1 or 2 args: a selected
-  value and (if needed) annotation supplied by reveal streaming process
+  value and (if needed) annotation supplied by Reveal streaming process
   `body` is an action body that has access to `bindings`, should return 0-arg
   function for action to be available in the context menu"
   [action-id bindings & body]
@@ -292,6 +292,50 @@
    :desc {:fx/type :label :text \"The clojure.core library\"}}
   ```"
   action-popup/ext)
+
+;; endregion
+
+;; region commands
+
+(defn submit
+  "Returns UI command that submits the `value`"
+  [value]
+  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+   :vlaaad.reveal.event/type :vlaaad.reveal.ui/submit
+   :value value})
+
+(defn clear-output
+  "Returns UI command that clears the output panel"
+  []
+  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+   :vlaaad.reveal.event/type :vlaaad.reveal.output-panel/on-clear-lines
+   :id :output})
+
+(defn open-view
+  "Returns UI command that opens the `value` in a result panel
+
+  Optional kv-args:
+  - `:form` - objects that is shown in result panel's header
+  - `:new-result-panel` - open new result panel even if there already is one"
+  [value & {:keys [form new-result-panel]}]
+  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+   :vlaaad.reveal.event/type :vlaaad.reveal.ui/view
+   :value value
+   :form form
+   :new-result-panel new-result-panel})
+
+(defn all
+  "Returns UI command that executes a sequence of commands"
+  [& commands]
+  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+   :vlaaad.reveal.event/type :vlaaad.reveal.ui/all
+   :commands commands})
+
+(defn dispose
+  "Returns UI command that disposes Reveal window"
+  []
+  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+   :vlaaad.reveal.event/type :vlaaad.reveal.ui/quit})
 
 ;; endregion
 

@@ -17,7 +17,8 @@
            [java.util UUID]
            [javafx.geometry Bounds]
            [javafx.scene.control ScrollPane]
-           [java.time LocalDate]))
+           [java.time LocalDate]
+           [clojure.lang Namespace]))
 
 (defn- remove-index [xs i]
   (into (subvec xs 0 i) (subvec xs (inc i))))
@@ -193,12 +194,11 @@
                                     :on-mouse-clicked {::event/type ::select-tab :index index :view-index view-index}
                                     :children [{:fx/type view/summary
                                                 :max-length 128
-                                                :value (stream/as-is
-                                                         (stream/horizontal
-                                                           (stream/raw-string
-                                                             (apply str (repeat (get depth view-id) "·"))
-                                                             {:fill :util})
-                                                           (stream/stream form)))}]}]))
+                                                :value (stream/horizontal
+                                                         (stream/raw-string
+                                                           (apply str (repeat (get depth view-id) "·"))
+                                                           {:fill :util})
+                                                         (stream/stream form))}]}]))
             :desc {:fx/type ext-with-scroll-to
                    :props {:scroll-to {:fx/type fx/ext-get-ref :ref id}}
                    :desc {:fx/type :scroll-pane
@@ -274,12 +274,11 @@
                                               :max-width Double/MAX_VALUE
                                               :graphic {:fx/type view/summary
                                                         :max-length 128
-                                                        :value (stream/as-is
-                                                                 (stream/horizontal
-                                                                   (stream/raw-string
-                                                                     (apply str (repeat (get depth id) "·"))
-                                                                     {:fill :util})
-                                                                   (stream/stream form)))}
+                                                        :value (stream/horizontal
+                                                                 (stream/raw-string
+                                                                   (apply str (repeat (get depth id) "·"))
+                                                                   {:fill :util})
+                                                                 (stream/stream form))}
                                               :on-action {::event/type ::show-popup
                                                           :index index}}}])}
                               {:fx/type ext-focused-by-default
@@ -295,11 +294,14 @@
 (defmethod event/handle ::cancel-quit [_]
   #(dissoc % :confirm-exit-showing))
 
-(defmethod event/handle ::quit [{:keys [dispose]}]
-  (dispose)
-  #(dissoc % :confirm-exit-showing))
+(defmethod event/handle ::quit [_]
+  (let [done (atom false)]
+    (fn [state]
+      (when (compare-and-set! done false true)
+        ((:dispose state)))
+      (dissoc state :confirm-exit-showing))))
 
-(defn- confirm-exit-dialog [{:keys [dispose]}]
+(defn- confirm-exit-dialog [_]
   {:fx/type :stage
    :showing true
    :owner {:fx/type fx/ext-get-ref :ref ::stage}
@@ -323,11 +325,10 @@
                                           :text "Cancel"}
                                          {:fx/type ext-focused-by-default
                                           :desc {:fx/type :button
-                                                 :on-action {::event/type ::quit
-                                                             :dispose dispose}
+                                                 :on-action {::event/type ::quit}
                                                  :text "Quit"}}]}]}}})
 
-(defn- view [{:keys [title queue showing views result-trees confirm-exit-showing dispose]
+(defn- view [{:keys [title queue showing views result-trees confirm-exit-showing]
               ::keys [focus focus-key christmas]}]
   {:fx/type fx/ext-let-refs
    :refs (into {}
@@ -336,8 +337,7 @@
                  [id {:fx/type fx/ext-set-env
                       :env {::id id ::index i}
                       :desc {:fx/type view/ext-try
-                             :desc {:fx/type view/derefable
-                                    :derefable (get-in views [id :future])}}}]))
+                             :desc (get-in views [id :desc])}}]))
    :desc {:fx/type fx/ext-let-refs
           :refs (cond-> {::stage {:fx/type :stage
                                   :title title
@@ -382,8 +382,7 @@
                                                             :result-tree result-tree}))
                                                        result-trees)}}}}
                   confirm-exit-showing
-                  (assoc ::confirm-exit {:fx/type confirm-exit-dialog
-                                         :dispose dispose})
+                  (assoc ::confirm-exit {:fx/type confirm-exit-dialog})
                   focus
                   (assoc [::focus focus-key] {:fx/type ext-focused-by-default
                                               :desc {:fx/type fx/ext-get-ref
@@ -397,31 +396,73 @@
    (let [rf (xf (completing #(f %2)))]
      (rf (rf nil x)))))
 
-(defmethod event/handle ::execute-action [{:keys [action view-id view-index new-result-tree]}]
+(defmethod event/handle ::view [{:keys [value
+                                        form
+                                        new-result-panel
+
+                                        view-index
+                                        view-id]}]
   (let [id (UUID/randomUUID)
-        f (future ((:invoke action)))]
+        desc (view/->desc value)
+        form (or form (stream/horizontal
+                        (stream/raw-string "(" {:fill :util})
+                        (stream/raw-string "view" {:fill :symbol})
+                        stream/separator
+                        (stream/stream value)
+                        (stream/raw-string ")" {:fill :util})))]
     (fn [state]
       (let [result-trees (:result-trees state)
-            index (if new-result-tree (count result-trees) (or view-index 0))]
+            index (if new-result-panel (count result-trees) (or view-index 0))]
         (-> state
             (assoc :result-trees (update result-trees index focus-tree/add view-id id))
-            (assoc-in [:views id] {:form (:form action) :future f}))))))
+            (assoc-in [:views id] {:form form :desc desc}))))))
+
+(defmethod event/handle ::execute-action [{:keys [action] :as event}]
+  (event/handle
+    (assoc event
+      ::event/type ::view
+      :value {:fx/type view/derefable :derefable (event/daemon-future ((:invoke action)))}
+      :form (:form action))))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)
   false)
 
-(defn- put-on-queue [running ^ArrayBlockingQueue queue x]
+(defn- put-on-queue [^ArrayBlockingQueue queue x]
+  (.put queue ({nil ::view/nil} x x)))
+
+(defn- when-running [running f & args]
   (when running
-    (.put queue ({nil ::view/nil} x x)))
+    (apply f args))
   running)
+
+(def ^:dynamic *eval-env*)
+
+(defmethod event/handle ::submit [{:keys [value]}]
+  (let [done (atom false)]
+    (fn [state]
+      (when (compare-and-set! done false true)
+        (put-on-queue (:queue state) value))
+      state)))
+
+(defmethod event/handle ::all [{:keys [commands]}]
+  (reduce
+    #(comp
+       (event/handle
+         (if (::event/type %2)
+           %2
+           {::event/type ::submit :value %2}))
+       %1)
+    identity
+    commands))
 
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
   ([{:keys [title]}]
-   (let [*running! (agent true)
-         value-queue (ArrayBlockingQueue. 1024)
+   (let [value-queue (ArrayBlockingQueue. 1024)
+         *running (agent true :error-handler (fn [a ex]
+                                               (send-via event/daemon-executor a when-running put-on-queue value-queue ex)))
          now (LocalDate/now)
          christmas (or (.isAfter now (LocalDate/of (.getYear now) 12 20))
                        (.isBefore now (LocalDate/of (.getYear now) 1 2)))
@@ -436,9 +477,26 @@
          renderer (fx/create-renderer
                     :opts {:fx.opt/map-event-handler event-handler}
                     :middleware (fx/wrap-map-desc #'view))
+         process (fn process [x]
+                   (let [form (:vlaaad.reveal/command x ::not-found)]
+                     (case form
+                       :vlaaad.reveal.eval/event x
+                       ::not-found {::event/type ::submit :value x}
+                       (let [{:keys [ns env]
+                              :or {ns 'vlaaad.reveal.ext}} x]
+                         (binding [*ns* (or (when (instance? Namespace ns) ns)
+                                            (find-ns ns)
+                                            (do (require ns) (find-ns ns)))
+                                   *eval-env* env]
+                           (process (eval `(let [~@(->> env
+                                                        keys
+                                                        (mapcat
+                                                          (fn [sym]
+                                                            [sym `(get *eval-env* '~sym)])))]
+                                             ~form))))))))
          dispose! #(do
                      (fx/unmount-renderer *state renderer)
-                     (send-via event/daemon-executor *running! stop-queue value-queue))]
+                     (send-via event/daemon-executor *running stop-queue value-queue))]
      (fx/mount-renderer *state renderer)
      (swap! *state assoc :dispose dispose!)
      (fn
@@ -446,5 +504,5 @@
         (dispose!)
         nil)
        ([x]
-        (send-via event/daemon-executor *running! put-on-queue value-queue x)
+        (send-via event/daemon-executor *running when-running (comp event-handler process) x)
         x)))))

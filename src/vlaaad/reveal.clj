@@ -137,8 +137,17 @@
   "Create and show Reveal UI window
 
   Returns multi-arity function:
-  - when called with 1 arg, will add supplied value to main output panel
+  - when called with 1 arg:
+    - if the arg contains `:vlaaad.reveal/command` key, executes UI command
+    - otherwise, adds supplied value to main output panel
   - when called with 0 args, will close and dispose the window
+
+  Reveal command is either a value produced from command function in
+  [[vlaaad.reveal.ext]] ns or a map with these keys:
+  - `:vlaaad.reveal/command` - a code form that will be evaluated by Reveal
+  - `:env` (optional) - a map from symbols to arbitrary values that will be
+    resolvable in evaluated command form
+  - `:ns` (optional, default `'vlaaad.reveal.ext`) - ns used for evaluation
 
   Accepted args:
   - `:title` (optional) - window title"

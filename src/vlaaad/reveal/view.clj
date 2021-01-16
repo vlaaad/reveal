@@ -77,7 +77,7 @@
    :args value
    :desc {:fx/type output-panel/view}})
 
-(defn- ->desc [x]
+(defn ->desc [x]
   (if (:fx/type x) x {:fx/type value :value x}))
 
 (defn- watch! [id *ref handler]
@@ -143,11 +143,10 @@
                   #(handler {::event/type ::output-panel/on-add-lines
                              :fx/event %
                              :id id})
-                  (stream/as-is
-                    (stream/horizontal
-                      (stream/raw-string (format "%4d: " (vswap! *counter inc))
-                                         {:fill :util})
-                      (stream/stream ({::nil nil} x x))))))))]
+                  (stream/horizontal
+                    (stream/raw-string (format "%4d: " (vswap! *counter inc))
+                                       {:fill :util})
+                    (stream/stream ({::nil nil} x x)))))))]
     (submit! @*ref)
     (add-watch *ref watch-key #(submit! %4))
     #(do

@@ -60,7 +60,7 @@
                     (event/handle {::event/type :vlaaad.reveal.ui/execute-action
                                    :view-id view-id
                                    :view-index view-index
-                                   :new-result-tree (.isShortcutDown event)
+                                   :new-result-panel (.isShortcutDown event)
                                    :action action}))
     KeyCode/UP #(update % id move-selected-index dec)
     KeyCode/DOWN #(update % id move-selected-index inc)
@@ -75,7 +75,7 @@
     (event/handle {::event/type :vlaaad.reveal.ui/execute-action
                    :view-id view-id
                    :view-index view-index
-                   :new-result-tree (.isShortcutDown event)
+                   :new-result-panel (.isShortcutDown event)
                    :action action})
     (event/handle on-cancel)))
 
@@ -101,7 +101,7 @@
               (event/handle {::event/type :vlaaad.reveal.ui/execute-action
                              :view-id view-id
                              :view-index view-index
-                             :new-result-tree (.isShortcutDown event)
+                             :new-result-panel (.isShortcutDown event)
                              :action {:form (cond
                                               (= '*v form) (list 'identity value)
                                               (ident? form) (list form value)

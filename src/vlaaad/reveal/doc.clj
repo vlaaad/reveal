@@ -153,12 +153,14 @@
   (->sf [this]
     (stream/horizontal
       (stream/raw-string (.getOpeningMarker this) {:fill :util})
-      (if-let [var (ns-resolve *doc-ns* (symbol (str (.getChildChars this))))]
-        (stream/as var
-          (stream/raw-string
-            (.getChildChars this)
-            {:fill :object}))
-        (stream/raw-string (.getChildChars this) {:fill :string}))
+      (let [sym (symbol (str (.getChildChars this)))]
+        (if-let [target (or (ns-resolve *doc-ns* sym)
+                            (find-ns sym))]
+          (stream/as target
+            (stream/raw-string
+              (.getChildChars this)
+              {:fill :object}))
+          (stream/raw-string (.getChildChars this) {:fill :string})))
       (stream/raw-string (.getClosingMarker this) {:fill :util}))))
 
 (defn parse [docstring ns]
@@ -170,61 +172,57 @@
         indent (if (seq indented-lines) (apply min indented-lines) 0)
         re-indent (re-pattern (str "^\\s{" indent "}"))]
     (binding [*doc-ns* (the-ns ns)]
-      (stream/as-is
-        (->sf (.parse parser ^String (->> lines
-                                          (map #(str/replace % re-indent ""))
-                                          (str/join "\n"))))))))
+      (->sf (.parse parser ^String (->> lines
+                                        (map #(str/replace % re-indent ""))
+                                        (str/join "\n")))))))
 
 (defn- for-var [var]
   (let [m (meta var)]
-    (stream/as-is
-      (apply
-        stream/vertical
-        (concat
-          [(apply stream/horizontal
-                  (stream/stream var)
-                  (when (:macro m)
-                    [stream/separator
-                     (stream/raw-string "(macro)" {:fill :util})]))]
-          (when-let [arglists (:arglists m)]
-            (map stream/stream arglists))
-          (when-let [deprecated (:deprecated m)]
-            [stream/separator
-             (if (string? deprecated)
-               (stream/horizontal
-                 (stream/raw-string "Deprecated." {:fill :string})
-                 stream/separator
-                 (parse deprecated (:ns m)))
-               (stream/raw-string "Deprecated." {:fill :string}))])
-          (when-let [doc (:doc m)]
-            [stream/separator
-             (parse doc (:ns m))
-             stream/separator])
-          (when-let [forms (:forms m)]
-            (cons
-              (stream/raw-string "forms:" {:fill :util})
-              ;; todo format as code!
-              (map stream/stream forms)))
-          (when-let [spec (s/get-spec var)]
-            [(stream/raw-string "spec:" {:fill :util})
-             ;; todo format as code!
-             (stream/stream (s/describe spec))]))))))
+    (apply
+      stream/vertical
+      (concat
+        [(apply stream/horizontal
+                (stream/stream var)
+                (when (:macro m)
+                  [stream/separator
+                   (stream/raw-string "(macro)" {:fill :util})]))]
+        (when-let [arglists (:arglists m)]
+          (map stream/stream arglists))
+        (when-let [deprecated (:deprecated m)]
+          [stream/separator
+           (if (string? deprecated)
+             (stream/horizontal
+               (stream/raw-string "Deprecated." {:fill :string})
+               stream/separator
+               (parse deprecated (:ns m)))
+             (stream/raw-string "Deprecated." {:fill :string}))])
+        (when-let [doc (:doc m)]
+          [stream/separator
+           (parse doc (:ns m))
+           stream/separator])
+        (when-let [forms (:forms m)]
+          (cons
+            (stream/raw-string "forms:" {:fill :util})
+            ;; todo format as code!
+            (map stream/stream forms)))
+        (when-let [spec (s/get-spec var)]
+          [(stream/raw-string "spec:" {:fill :util})
+           ;; todo format as code!
+           (stream/stream (s/describe spec))])))))
 
 (defn- for-ns [ns]
-  (stream/as-is
-    (stream/vertical
-      (stream/stream ns)
-      stream/separator
-      (parse (:doc (meta ns)) ns))))
+  (stream/vertical
+    (stream/stream ns)
+    stream/separator
+    (parse (:doc (meta ns)) ns)))
 
 (defn- for-spec [k]
-  (stream/as-is
-    (stream/vertical
-      (stream/stream k)
-      stream/separator
-      (stream/raw-string "spec:" {:fill :util})
-      ;; todo format as code!
-      (stream/stream (s/describe k)))))
+  (stream/vertical
+    (stream/stream k)
+    stream/separator
+    (stream/raw-string "spec:" {:fill :util})
+    ;; todo format as code!
+    (stream/stream (s/describe k))))
 
 (defn fn->var [fn]
   (when-let [[_ str] (->> fn
@@ -280,9 +278,8 @@
             form (if (= :unknown *read-eval*)
                    (throw (IllegalStateException. "Unable to read source while *read-eval* is :unknown."))
                    (read read-opts (PushbackReader. pushback-reader)))]
-        (stream/as-is
-          (stream/as form
-            (stream/raw-string text {:fill :string})))))))
+        (stream/as form
+          (stream/raw-string text {:fill :string}))))))
 
 (action/defaction ::source [x]
   (cond

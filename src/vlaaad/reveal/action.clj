@@ -8,7 +8,8 @@
            [java.net URI URL]
            [java.io File]
            [java.lang.reflect Field Modifier]
-           [java.beans Introspector PropertyDescriptor]))
+           [java.beans Introspector PropertyDescriptor]
+           [java.util.concurrent Future]))
 
 (defonce ^:private *registry
   (atom {}))
@@ -40,13 +41,12 @@
                      (let [label (name id)]
                        {:id id
                         :label label
-                        :form (stream/as-is
-                                (stream/horizontal
-                                  (stream/raw-string "(" {:fill :util})
-                                  (stream/raw-string label {:fill :symbol})
-                                  stream/separator
-                                  (stream/stream value annotation)
-                                  (stream/raw-string ")" {:fill :util})))
+                        :form (stream/horizontal
+                                (stream/raw-string "(" {:fill :util})
+                                (stream/raw-string label {:fill :symbol})
+                                stream/separator
+                                (stream/stream value annotation)
+                                (stream/raw-string ")" {:fill :util}))
                         :invoke f}))
                    (catch Exception _))))
          (sort-by :label)
@@ -100,27 +100,26 @@
                         (sort-by ffirst)
                         (map (fn [[[name value] xs]]
                                (let [kinds (mapv last xs)]
-                                 (stream/as-is
-                                   (stream/vertical
-                                     (apply
-                                       stream/horizontal
-                                       (stream/as name
-                                         (stream/raw-string name {:fill :symbol}))
-                                       stream/separator
-                                       (->> kinds
-                                            (map (fn [kind]
-                                                   (stream/as kind
-                                                     (stream/raw-string (.getSimpleName (class kind))
-                                                                        {:fill :util}))))
-                                            (interpose stream/separator)))
-                                     (stream/horizontal
-                                       (stream/raw-string "  " {:selectable false})
-                                       (stream/stream value))))))))]
-        (stream/as-is
-          (stream/vertically sorted))))))
+                                 (stream/vertical
+                                   (apply
+                                     stream/horizontal
+                                     (stream/as name
+                                       (stream/raw-string name {:fill :symbol}))
+                                     stream/separator
+                                     (->> kinds
+                                          (map (fn [kind]
+                                                 (stream/as kind
+                                                   (stream/raw-string (.getSimpleName (class kind))
+                                                                      {:fill :util}))))
+                                          (interpose stream/separator)))
+                                   (stream/horizontal
+                                     (stream/raw-string "  " {:selectable false})
+                                     (stream/stream value)))))))]
+        (stream/vertically sorted)))))
 
 (defaction ::deref [v]
-  (when (instance? IDeref v)
+  (when (or (instance? IDeref v)
+            (instance? Future v))
     #(deref v)))
 
 (defaction ::meta [v]
