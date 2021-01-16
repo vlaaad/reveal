@@ -1,6 +1,4 @@
 (ns vlaaad.reveal.focus-tree
-  (:refer-clojure :exclude [next])
-  (:require [vlaaad.reveal.ext :as rx])
   (:import [java.util List]))
 
 (defn add [tree parent-id id]
