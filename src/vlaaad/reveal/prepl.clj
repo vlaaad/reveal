@@ -51,7 +51,7 @@
   ([k v & kvs] (remote-prepl (apply hash-map k v kvs)))
   ([{:keys [host port in-reader out-fn title]
      :or {in-reader *in*
-          out-fn (bound-fn* prn)}
+          out-fn prn}
      :as prepl-args}]
    {:pre [(some? port)]}
    (let [ui (ui/make :title (or title (str "remote-prepl on " (when host (str host ":")) port)))
@@ -60,7 +60,7 @@
                                                    #(binding [*default-data-reader-fn* tagged-literal]
                                                       (read-string %)))))]
      (try
-       (apply server/remote-prepl host port in-reader (wrap-out-fn ui out-fn)
+       (apply server/remote-prepl host port in-reader (wrap-out-fn ui (bound-fn* out-fn))
               (mapcat identity (dissoc prepl-args :host :port :in-reader :out-fn :title)))
        (finally (ui))))))
 
