@@ -418,11 +418,15 @@
             (assoc-in [:views id] {:form form :desc desc}))))))
 
 (defmethod event/handle ::execute-action [{:keys [action] :as event}]
-  (event/handle
-    (assoc event
-      ::event/type ::view
-      :value {:fx/type view/derefable :derefable (event/daemon-future ((:invoke action)))}
-      :form (:form action))))
+  (if (::ignore-action-result (meta (:invoke action)))
+    (do
+      (event/daemon-future ((:invoke action)))
+      identity)
+    (event/handle
+      (assoc event
+        ::event/type ::view
+        :value {:fx/type view/derefable :derefable (event/daemon-future ((:invoke action)))}
+        :form (:form action)))))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)
@@ -480,7 +484,7 @@
          process (fn process [x]
                    (let [form (:vlaaad.reveal/command x ::not-found)]
                      (case form
-                       :vlaaad.reveal.eval/event x
+                       :vlaaad.reveal.command/event x
                        ::not-found {::event/type ::submit :value x}
                        (let [{:keys [ns env]
                               :or {ns 'vlaaad.reveal.ext}} x]

@@ -2,7 +2,8 @@
   (:require [clojure.datafy :as d]
             [vlaaad.reveal.stream :as stream]
             [clojure.spec.alpha :as s]
-            [clojure.core.specs.alpha :as specs])
+            [clojure.core.specs.alpha :as specs]
+            [vlaaad.reveal.event :as event])
   (:import [clojure.lang IDeref]
            [java.awt Desktop]
            [java.net URI URL]
@@ -20,36 +21,41 @@
 
 (s/def ::id qualified-keyword?)
 
-(s/fdef def
+(s/fdef defaction
   :args (s/cat :id ::id
                :bindings (s/every ::specs/binding-form :kind vector? :min-count 1 :max-count 2)
                :body (s/+ any?))
   :ret ::id)
 
 (defmacro defaction [id bindings & body]
-  (let [fn-bindings (case (count bindings)
-                      1 (conj bindings (gensym "_"))
-                      2 bindings)]
-    `(register! ~id (fn ~(symbol (str (name id) "-action-body")) ~fn-bindings ~@body))))
+  (let [name (symbol (str (name id) "-action-body"))]
+    `(register! ~id (fn ~name ~@(case (count bindings)
+                                  1 `((~bindings ~@body)
+                                      ([~'value ~'annotation] (~name ~'value)))
+                                  2 `(([~'value] (~name ~'value nil))
+                                      (~bindings ~@body)))))))
 
 (defn collect [annotated-value]
-  (let [{:keys [value annotation]} annotated-value]
-    (->> @*registry
-         (keep (fn [[id check]]
-                 (try
-                   (when-let [f (check value annotation)]
-                     (let [label (name id)]
-                       {:id id
-                        :label label
-                        :form (stream/horizontal
-                                (stream/raw-string "(" {:fill :util})
-                                (stream/raw-string label {:fill :symbol})
-                                stream/separator
-                                (stream/stream value annotation)
-                                (stream/raw-string ")" {:fill :util}))
-                        :invoke f}))
-                   (catch Exception _))))
-         (sort-by :label)
+  (let [{:keys [value annotation]} annotated-value
+        actions (->> @*registry
+                     (keep (fn [[id check]]
+                             (try
+                               (when-let [f (check value annotation)]
+                                 (let [label (name id)]
+                                   {:id id
+                                    :label label
+                                    :form (stream/horizontal
+                                            (stream/raw-string "(" {:fill :util})
+                                            (stream/raw-string label {:fill :symbol})
+                                            stream/separator
+                                            (stream/stream value annotation)
+                                            (stream/raw-string ")" {:fill :util}))
+                                    :invoke f}))
+                               (catch Exception _)))))
+        freqs (->> actions (map :label) frequencies)]
+    (->> actions
+         (sort-by (juxt :label :id))
+         (map #(cond-> % (< 1 (freqs (:label %))) (assoc :label (str (symbol (:id %))))))
          (into []))))
 
 (defaction ::datafy [x]
@@ -127,20 +133,28 @@
     (constantly m)))
 
 (defaction ::browse:external [v]
-  ;; todo don't open result panel
   (cond
     (instance? URI v)
-    #(deref (future (.browse (Desktop/getDesktop) v)))
+    (with-meta #(deref (future (.browse (Desktop/getDesktop) v)))
+               {:vlaaad.reveal.ui/ignore-action-result true})
 
     (instance? URL v)
-    #(deref (future (.browse (Desktop/getDesktop) (.toURI ^URL v))))
+    (recur (.toURI ^URL v))
 
     (and (instance? File v) (.exists ^File v))
-    #(deref (future (.browse (Desktop/getDesktop) (.normalize (.toURI ^File v)))))
+    (recur (.normalize (.toURI ^File v)))
 
     (and (string? v) (re-matches #"^https?://.+" v))
-    #(deref (future (.browse (Desktop/getDesktop) (URI. v))))))
+    (recur (URI. v))))
 
 (defaction ::vec [v]
   (when (and v (.isArray (class v)))
     #(vec v)))
+
+(defn execute [id x ann]
+  (event/daemon-future
+    (if-let [action (@*registry id)]
+      (if-let [invoke (action x ann)]
+        (invoke)
+        (throw (ex-info "Action unavailable" {:action id :value x :annotation ann})))
+      (throw (ex-info "Action does not exist" {:action id})))))

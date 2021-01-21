@@ -117,11 +117,11 @@
    :args ref
    :desc {:fx/type output-panel/view}})
 
-(action/defaction ::view [v]
+(action/defaction ::action/view [v]
   (when (:fx/type v)
     (constantly v)))
 
-(action/defaction ::watch:latest [v]
+(action/defaction ::action/watch:latest [v]
   (when (instance? IRef v)
     (constantly {:fx/type ref-watch-latest :ref v})))
 
@@ -161,7 +161,7 @@
    :args ref
    :desc {:fx/type output-panel/view}})
 
-(action/defaction ::watch:all [v]
+(action/defaction ::action/watch:all [v]
   (when (instance? IRef v)
     (constantly {:fx/type ref-watch-all :ref v})))
 
@@ -261,7 +261,7 @@
                              :cell-value-factory #(try (fn (peek %)) (catch Throwable e e))})
                  :items (into [] (map-indexed vector) items)}}})
 
-(action/defaction ::view:table [v]
+(action/defaction ::action/view:table [v]
   (when (and (some? v)
              (not (string? v))
              (seqable? v))
@@ -284,7 +284,7 @@
                     :else
                     [{:header 'item :fn identity}])}))))
 
-(action/defaction ::browse:internal [v]
+(action/defaction ::action/browse:internal [v]
   (when (or (and (instance? URI v)
                  (or (#{"http" "https"} (.getScheme ^URI v))
                      (and (= "file" (.getScheme ^URI v))
@@ -326,7 +326,7 @@
             :name (stream/str-summary k)
             :pie-value v})})
 
-(action/defaction ::view:pie-chart [x]
+(action/defaction ::action/view:pie-chart [x]
   (when (labeled? x number? :min 2)
     (constantly {:fx/type pie-chart :data x})))
 
@@ -376,7 +376,7 @@
                                                     :series series}}
                                    :desc {:fx/type :region}}})})}})
 
-(action/defaction ::view:bar-chart [x]
+(action/defaction ::action/view:bar-chart [x]
   (when-let [data (cond
                     (labeled? x numbered?)
                     {x x}
@@ -442,7 +442,7 @@
                                                                   :series series}}
                                                  :desc {:fx/type :region}}})))}})}})
 
-(action/defaction ::view:line-chart [x]
+(action/defaction ::action/view:line-chart [x]
   (when-let [data (cond
                     (numbereds? x)
                     {x x}
@@ -495,7 +495,7 @@
                                                     :series series}}
                                    :desc {:fx/type :region}}})})}})
 
-(action/defaction ::view:scatter-chart [x]
+(action/defaction ::action/view:scatter-chart [x]
   (when-let [data (cond
                     (labeled? x scattereds?)
                     x
@@ -504,7 +504,7 @@
                     {x x})]
     (constantly {:fx/type scatter-chart :data data})))
 
-(action/defaction ::view:color [v]
+(action/defaction ::action/view:color [v]
   (when-let [color (cond
                      (instance? Color v) v
                      (string? v) (Color/valueOf v)
@@ -512,7 +512,7 @@
     (constantly {:fx/type :region
                  :background {:fills [{:fill color}]}})))
 
-(action/defaction ::view:value [x ann]
+(action/defaction ::action/view:value [x ann]
   (when (::stream/hidden ann)
     (constantly {:fx/type value :value x})))
 

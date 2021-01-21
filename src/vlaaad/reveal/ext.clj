@@ -1,7 +1,6 @@
 (ns vlaaad.reveal.ext
   (:require [vlaaad.reveal.action :as action]
             [clojure.spec.alpha :as s]
-            [clojure.core.specs.alpha :as specs]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.view :as view]
             [vlaaad.reveal.action-popup :as action-popup]))
@@ -115,13 +114,9 @@
 
 ;; region actions
 
-(s/def ::action-id qualified-keyword?)
+(s/def ::action-id ::action/id)
 
-(s/fdef defaction
-  :args (s/cat :action-id ::action-id
-               :bindings (s/every ::specs/binding-form :kind vector? :min-count 1 :max-count 2)
-               :body (s/+ any?))
-  :ret ::action-id)
+(s/def defaction `action/defaction)
 
 (defmacro defaction
   "Define action for execution in the context of some selected value
@@ -132,13 +127,25 @@
   for execution. Any other evaluation results, including thrown exceptions, are
   ignored.
 
-  `action-id` is a ns-qualified keyword identifying this action
+  `action` is a ns-qualified keyword identifying this action
   `bindings` is a bindings vector that can have either 1 or 2 args: a selected
   value and (if needed) annotation supplied by Reveal streaming process
   `body` is an action body that has access to `bindings`, should return 0-arg
   function for action to be available in the context menu"
-  [action-id bindings & body]
-  `(action/defaction ~action-id ~bindings ~@body))
+  [action bindings & body]
+  `(action/defaction ~action ~bindings ~@body))
+
+(defn execute-action
+  "Asynchronously execute registered action on a value
+
+  Returns future with action execution result
+
+  `action` is a ns-qualified keyword identifying action to execute. All
+  built-in actions have `vlaaad.reveal.action` ns."
+  ([action value]
+   (execute-action action value nil))
+  ([action value annotation]
+   (action/execute action value annotation)))
 
 ;; endregion
 
@@ -293,6 +300,18 @@
   ```"
   action-popup/ext)
 
+(defn action-view
+  "Cljfx component fn that shows a view produced by action executed on a value
+
+  Expected keys:
+  - `:action` (required) - action id, ns-qualified keyword. All built-in actions
+    have `vlaaad.reveal.action` ns
+  - `:value` (required) - a value to execute action on
+  - `:annotation` (optional) - value annotation expected by action"
+  [{:keys [action value annotation]}]
+  {:fx/type derefable-view
+   :derefable (execute-action action value annotation)})
+
 ;; endregion
 
 ;; region commands
@@ -300,14 +319,14 @@
 (defn submit
   "Returns UI command that submits the `value`"
   [value]
-  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+  {:vlaaad.reveal/command :vlaaad.reveal.command/event
    :vlaaad.reveal.event/type :vlaaad.reveal.ui/submit
    :value value})
 
 (defn clear-output
   "Returns UI command that clears the output panel"
   []
-  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+  {:vlaaad.reveal/command :vlaaad.reveal.command/event
    :vlaaad.reveal.event/type :vlaaad.reveal.output-panel/on-clear-lines
    :id :output})
 
@@ -318,7 +337,7 @@
   - `:form` - objects that is shown in result panel's header
   - `:new-result-panel` - open new result panel even if there already is one"
   [value & {:keys [form new-result-panel]}]
-  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+  {:vlaaad.reveal/command :vlaaad.reveal.command/event
    :vlaaad.reveal.event/type :vlaaad.reveal.ui/view
    :value value
    :form form
@@ -327,14 +346,14 @@
 (defn all
   "Returns UI command that executes a sequence of commands"
   [& commands]
-  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+  {:vlaaad.reveal/command :vlaaad.reveal.command/event
    :vlaaad.reveal.event/type :vlaaad.reveal.ui/all
    :commands commands})
 
 (defn dispose
   "Returns UI command that disposes Reveal window"
   []
-  {:vlaaad.reveal/command :vlaaad.reveal.eval/event
+  {:vlaaad.reveal/command :vlaaad.reveal.command/event
    :vlaaad.reveal.event/type :vlaaad.reveal.ui/quit})
 
 ;; endregion
