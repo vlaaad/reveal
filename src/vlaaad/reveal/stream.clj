@@ -5,7 +5,7 @@
   (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn
                          ISeq MultiFn IRef Var Volatile Namespace IRecord Delay
                          IBlockingDeref TaggedLiteral Reduced ReaderConditional
-                         IPersistentCollection BigInt]
+                         IPersistentCollection BigInt PersistentQueue]
            [java.util.regex Pattern]
            [java.io File FileNotFoundException]
            [java.net URL URI]
@@ -114,7 +114,10 @@
               (case ch
                 \newline ((=> (flush-builder builder style) newline) rf acc)
                 \tab (do (.append builder "    ") acc)
-                \return ((flush+util builder style "\\r") rf acc)
+                \return (cond
+                          (== i (dec len)) ((flush+util builder style "\\r") rf acc)
+                          (= \newline (.charAt str (inc i))) acc
+                          :else ((flush+util builder style "\\r") rf acc))
                 \formfeed ((flush+util builder style "\\f") rf acc)
                 \backspace ((flush+util builder style "\\b") rf acc)
                 (do (.append builder ch) acc)))))))))
@@ -149,8 +152,10 @@
                   (case ch
                     \newline ((=> (flush-builder builder style) newline) rf acc)
                     \tab (do (.append builder "    ") acc)
-                    ;; todo except if followed by newline...
-                    \return ((flush+util builder style "\\r") rf acc)
+                    \return (cond
+                              (== i (dec len)) ((flush+util builder style "\\r") rf acc)
+                              (= \newline (.charAt str (inc i))) acc
+                              :else ((flush+util builder style "\\r") rf acc))
                     \formfeed ((flush+util builder style "\\f") rf acc)
                     \backspace ((flush+util builder style "\\b") rf acc)
                     (do (.append builder ch) acc)))))))))))
@@ -832,6 +837,12 @@
     (raw-string "#inst" {:fill :object})
     separator
     (stream (str instant))))
+
+(defstream PersistentQueue [q]
+  (horizontal
+    (raw-string "#reveal/queue(" {:fill :object})
+    (items q)
+    (raw-string ")" {:fill :object})))
 
 (defmacro ^:private when-class [class-name & body]
   `(try
