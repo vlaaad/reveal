@@ -19,7 +19,7 @@
         (ui
           (cond
             (not= value ::not-found)
-            (if (:vlaaad.reveal/command value)
+            (if (ui/command? value)
               value
               (stream/horizontal
                 (stream/as {:request request :message message}
@@ -56,7 +56,7 @@
 
 (defn- show-tap [ui value]
   (ui
-    (if (:vlaaad.reveal/command value)
+    (if (ui/command? value)
       value
       (stream/as {:tap value}
         (stream/horizontal

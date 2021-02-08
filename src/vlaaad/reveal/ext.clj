@@ -3,6 +3,7 @@
             [clojure.spec.alpha :as s]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.view :as view]
+            [vlaaad.reveal.ui :as ui]
             [vlaaad.reveal.action-popup :as action-popup]))
 
 ;; region streaming
@@ -315,6 +316,11 @@
 ;; endregion
 
 ;; region commands
+
+(defn command?
+  "Check if x is a valid command (i.e. contains `:vlaaad.reveal/command` key)"
+  [x]
+  (ui/command? x))
 
 (defn submit
   "Returns UI command that submits the `value`"

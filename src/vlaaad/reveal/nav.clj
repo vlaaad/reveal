@@ -33,6 +33,14 @@
         row ((coordinate nav id) 0)]
     (= row (dec (count grid)))))
 
+(defn in-last-grid? [nav cursor]
+  (loop [id (id nav cursor)]
+    (if-let [p (parent nav id)]
+      (recur p)
+      (let [grid (grid nav nil)
+            row ((coordinate nav id) 0)]
+        (= row (dec (count grid)))))))
+
 (defn add-lines [nav start-y lines]
   (let [id->grid (volatile! (transient (::id->grid nav {})))
         id->coordinate (volatile! (transient (::id->coordinate nav {})))

@@ -460,6 +460,12 @@
     identity
     commands))
 
+(defn command? [x]
+  (try
+    (not= (:vlaaad.reveal/command x ::not-found) ::not-found)
+    ;; sorted maps with non-keyword keys throw class cast exceptions
+    (catch Exception _ false)))
+
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
@@ -482,22 +488,23 @@
                     :opts {:fx.opt/map-event-handler event-handler}
                     :middleware (fx/wrap-map-desc #'view))
          process (fn process [x]
-                   (let [form (:vlaaad.reveal/command x ::not-found)]
-                     (case form
-                       :vlaaad.reveal.command/event x
-                       ::not-found {::event/type ::submit :value x}
-                       (let [{:keys [ns env]
-                              :or {ns 'vlaaad.reveal.ext}} x]
-                         (binding [*ns* (or (when (instance? Namespace ns) ns)
-                                            (find-ns ns)
-                                            (do (require ns) (find-ns ns)))
-                                   *eval-env* env]
-                           (process (eval `(let [~@(->> env
-                                                        keys
-                                                        (mapcat
-                                                          (fn [sym]
-                                                            [sym `(get *eval-env* '~sym)])))]
-                                             ~form))))))))
+                   (if (command? x)
+                     (let [form (:vlaaad.reveal/command x)]
+                       (if (= :vlaaad.reveal.command/event form)
+                         x
+                         (let [{:keys [ns env]
+                                :or {ns 'vlaaad.reveal.ext}} x]
+                           (binding [*ns* (or (when (instance? Namespace ns) ns)
+                                              (find-ns ns)
+                                              (do (require ns) (find-ns ns)))
+                                     *eval-env* env]
+                             (process (eval `(let [~@(->> env
+                                                          keys
+                                                          (mapcat
+                                                            (fn [sym]
+                                                              [sym `(get *eval-env* '~sym)])))]
+                                               ~form)))))))
+                     {::event/type ::submit :value x}))
          dispose! #(do
                      (fx/unmount-renderer *state renderer)
                      (send-via event/daemon-executor *running stop-queue value-queue))]

@@ -14,7 +14,7 @@
                   (stream/raw-string (:form x) {:fill :util})
                   $))))
     (case (:tag x)
-      :ret (if (:vlaaad.reveal/command (:val x))
+      :ret (if (ui/command? (:val x))
              (:val x)
              (stream/horizontal
                (stream/as x
@@ -26,7 +26,7 @@
                (stream/stream (:val x))))
       :out (stream/as x (stream/raw-string (str/trim-newline (:val x)) {:fill :string}))
       :err (stream/as x (stream/raw-string (str/trim-newline (:val x)) {:fill :error}))
-      :tap (if (:vlaaad.reveal/command (:val x))
+      :tap (if (ui/command? (:val x))
              (:val x)
              (stream/horizontal
                (stream/as x (stream/raw-string "tap>" {:fill :util}))

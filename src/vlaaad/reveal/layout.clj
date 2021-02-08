@@ -607,11 +607,13 @@
       (let [nav (:nav with-lines)]
         (make
           (cond
-            (not (:cursor layout))
+            (or (not (:cursor layout))
+                (and (not (:focused layout))
+                     (not (nav/in-last-grid? (:nav layout) (:cursor layout)))))
             (set-cursor with-lines (nav/cursor nav (get (peek (nav/grid nav nil)) 0))
                         :scroll :nav)
 
-            (and (:cursor layout) (nav/at-last-row? (:nav layout) (:cursor layout)))
+            (nav/at-last-row? (:nav layout) (:cursor layout))
             (nav-cursor-end with-lines true)
 
             :else

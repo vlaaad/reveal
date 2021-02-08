@@ -23,7 +23,7 @@
 (defn- wrap-print [ui print]
   (fn [x]
     (ui
-      (if (:vlaaad.reveal/command x)
+      (if (ui/command? x)
         x
         (stream/horizontal
           (stream/raw-string "=>" {:fill :util})
@@ -41,7 +41,7 @@
 (defn- make-tap [ui]
   (fn [x]
     (ui
-      (if (:vlaaad.reveal/command x)
+      (if (ui/command? x)
         x
         (stream/horizontal
           (stream/raw-string "tap>" {:fill :util})
