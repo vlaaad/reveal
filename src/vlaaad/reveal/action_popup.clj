@@ -105,7 +105,7 @@
                              :action {:form (cond
                                               (= '*v form) (list 'identity value)
                                               (ident? form) (list form value)
-                                              :else (walk/prewalk-replace
+                                              :else (walk/postwalk-replace
                                                       {'*v value}
                                                       form))
                                       :invoke (fn []
