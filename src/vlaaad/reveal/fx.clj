@@ -1,7 +1,9 @@
 (ns vlaaad.reveal.fx
   (:require [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.component :as fx.component])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           [java.util.function UnaryOperator]
+           [javafx.scene.control TextFormatter$Change]))
 
 (def ext-with-process
   "Extension lifecycle that provides \"local mutable state\" capability
@@ -44,3 +46,51 @@
       (when-let [stop-fn (:stop-fn component)]
         (stop-fn))
       (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
+
+(defn- format! [^TextFormatter$Change change]
+  (when (.isContentChange change)
+    (let [range-start (.getRangeStart change)
+          range-end (.getRangeEnd change)
+          control-text (.getControlText change)
+          inputs-char (and (pos? range-start)
+                           (= \\ (.charAt control-text (dec range-start))))
+          move-right? (fn [char]
+                        (and (not (.isDeleted change))
+                             (< range-end (.length control-text))
+                             (= char (.charAt control-text range-end))))
+          move-right! (fn []
+                        (.setText change "")
+                        (.selectRange change (inc range-end) (inc range-end)))]
+      (cond
+        (not (.isAdded change))
+        (when (and (= 1 (- range-end range-start))
+                   (< range-end (.length control-text)))
+          (let [deleted-char (.charAt control-text range-start)
+                next-char (.charAt control-text range-end)]
+            (case [deleted-char next-char]
+              ([\" \"] [\{ \}] [\[ \]] [\( \)])
+              (.setRange change range-start (inc range-end))
+              nil)))
+
+        inputs-char
+        nil
+
+        :else
+        (case (.getText change)
+          "\"" (if (move-right? \") (move-right!) (.setText change "\"\""))
+          "[" (.setText change "[]")
+          "]" (when (move-right? \]) (move-right!))
+          "{" (.setText change "{}")
+          "}" (when (move-right? \}) (move-right!))
+          "(" (.setText change "()")
+          ")" (when (move-right? \)) (move-right!))
+          nil)))))
+
+(def code-text-formatter-filter
+  (reify UnaryOperator
+    (apply [_ v]
+      (doto v format!))))
+
+(def code-text-formatter
+  {:fx/type :text-formatter
+   :filter code-text-formatter-filter})

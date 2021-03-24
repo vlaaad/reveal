@@ -178,6 +178,7 @@
      :on-cancel on-cancel
      :desc {:fx/type fx/ext-let-refs
             :refs (into {::text-field {:fx/type :text-field
+                                       :text-formatter rfx/code-text-formatter
                                        :style-class "reveal-text-field"
                                        :text text
                                        :on-focused-changed {::event/type ::on-text-focused
