@@ -52,8 +52,14 @@
     (let [range-start (.getRangeStart change)
           range-end (.getRangeEnd change)
           control-text (.getControlText change)
-          inputs-char (and (pos? range-start)
-                           (= \\ (.charAt control-text (dec range-start))))
+          look-back (fn [start pred]
+                      (loop [matches 0]
+                        (let [i (- start matches)]
+                          (cond
+                            (neg? i) matches
+                            (pred (.charAt control-text i)) (recur (inc matches))
+                            :else matches))))
+          inputs-char (odd? (look-back (dec range-start) #{\\}))
           move-right? (fn [char]
                         (and (not (.isDeleted change))
                              (< range-end (.length control-text))
@@ -84,6 +90,27 @@
           "}" (when (move-right? \}) (move-right!))
           "(" (.setText change "()")
           ")" (when (move-right? \)) (move-right!))
+          "\n" (let [spaces
+                     (loop [i (dec range-start)
+                            stack 0]
+                       (cond
+                         (neg? stack) (inc (look-back i (complement #{\newline})))
+                         (neg? i) 0
+                         :else (let [ch (.charAt control-text i)]
+                                 (recur
+                                   (dec i)
+                                   (cond
+                                     (and (#{\[ \{ \(} ch) (even? (look-back (dec i) #{\\})))
+                                     (dec stack)
+
+                                     (and (#{\] \} \)} ch) (even? (look-back (dec i) #{\\})))
+                                     (inc stack)
+
+                                     :else
+                                     stack)))))]
+                 (doto change
+                   (.setText (str \newline (apply str (repeat spaces \space))))
+                   (.selectRange (+ spaces range-start 1) (+ spaces range-start 1))))
           nil)))))
 
 (def code-text-formatter-filter
