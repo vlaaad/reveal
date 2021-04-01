@@ -151,6 +151,7 @@
          ;; scroll bars
          ".table-cell" {:-fx-background-color :transparent}
          ".scroll-pane" {:-fx-background-color :transparent
+                         :-fx-padding 0
                          "> .viewport" {:-fx-background-color :transparent}
                          "> .corner" {:-fx-background-color :transparent}}
          ".virtual-flow > .corner" {:-fx-background-color :transparent}

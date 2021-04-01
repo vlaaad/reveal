@@ -52,9 +52,13 @@
                     ^Window window
                     on-cancel
                     position
+                    alignment
+                    consume-events
                     desc
                     width]
-             :or {width 300}}]
+             :or {width 300
+                  alignment :center
+                  consume-events true}}]
   (let [^Screen screen (first (Screen/getScreensForRectangle (.getMinX bounds)
                                                              (.getMinY bounds)
                                                              (.getWidth bounds)
@@ -73,9 +77,11 @@
         space-below (- (.getMaxY screen-bounds) (.getMaxY bounds))
         space-above (- (.getMinY bounds) (.getMinY screen-bounds))
         popup-at-the-bottom (case position :bottom true :top false)
-        pref-anchor-x (-> (.getMinX bounds)
-                          (+ (* (.getWidth bounds) 0.5))
-                          (- (* popup-width 0.5)))
+        pref-anchor-x (case alignment
+                        :left (- (.getMinX bounds) shadow-radius)
+                        :center (-> (.getMinX bounds)
+                                    (+ (* (.getWidth bounds) 0.5))
+                                    (- (* popup-width 0.5))))
         visible-start-x (+ pref-anchor-x shadow-radius)
         visible-end-x (+ pref-anchor-x popup-width (- shadow-radius))
         anchor-fix-x (cond
@@ -89,46 +95,49 @@
                        0)
         arrow-width 10
         arrow-height 10
-        arrow-x (- (* width 0.5) anchor-fix-x)
+        arrow-x (case alignment
+                  :center (- (* width 0.5) anchor-fix-x)
+                  :left (- (* 0.5 shadow-radius) anchor-fix-x))
         max-content-height (- (if popup-at-the-bottom space-below space-above)
                               arrow-height)]
-    {:fx/type lifecycle
-     :window window
-     :stylesheets [(:cljfx.css/url @style/style)]
-     :anchor-location (if popup-at-the-bottom :window-top-left :window-bottom-left)
-     :anchor-x (+ pref-anchor-x anchor-fix-x)
-     :anchor-y (if popup-at-the-bottom
-                 (- (.getMaxY bounds) shadow-radius (- shadow-offset-y))
-                 (+ (.getMinY bounds) shadow-radius shadow-offset-y))
-     :auto-fix false
-     :hide-on-escape false
-     :auto-hide true
-     :on-auto-hide on-cancel
-     :event-handler consume-popup-event
-     :content [{:fx/type :v-box
-                :pref-width width
-                :max-width width
-                :effect {:fx/type :drop-shadow
-                         :radius shadow-radius
-                         :offset-y shadow-offset-y
-                         :color "#0006"}
-                :children (-> []
-                              (cond-> popup-at-the-bottom
-                                (conj {:fx/type :polygon
-                                       :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                                       :fill @style/popup-color
-                                       :points [0 arrow-height
-                                                arrow-width arrow-height
-                                                (* arrow-width 0.5) 0]}))
-                              (conj
-                                {:fx/type :stack-pane
-                                 :style-class "reveal-popup"
-                                 :max-height max-content-height
-                                 :children [desc]})
-                              (cond-> (not popup-at-the-bottom)
-                                (conj {:fx/type :polygon
-                                       :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                                       :fill @style/popup-color
-                                       :points [0 0
-                                                arrow-width 0
-                                                (* arrow-width 0.5) arrow-height]})))}]}))
+    (cond-> {:fx/type lifecycle
+             :window window
+             :stylesheets [(:cljfx.css/url @style/style)]
+             :anchor-location (if popup-at-the-bottom :window-top-left :window-bottom-left)
+             :anchor-x (+ pref-anchor-x anchor-fix-x)
+             :anchor-y (if popup-at-the-bottom
+                         (- (.getMaxY bounds) shadow-radius (- shadow-offset-y))
+                         (+ (.getMinY bounds) shadow-radius shadow-offset-y))
+             :auto-fix false
+             :hide-on-escape false
+             :auto-hide true
+             :on-auto-hide on-cancel
+             :content [{:fx/type :v-box
+                        :pref-width width
+                        :max-width width
+                        :effect {:fx/type :drop-shadow
+                                 :radius shadow-radius
+                                 :offset-y shadow-offset-y
+                                 :color "#0006"}
+                        :children (-> []
+                                      (cond-> popup-at-the-bottom
+                                        (conj {:fx/type :polygon
+                                               :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
+                                               :fill @style/popup-color
+                                               :points [0 arrow-height
+                                                        arrow-width arrow-height
+                                                        (* arrow-width 0.5) 0]}))
+                                      (conj
+                                        {:fx/type :stack-pane
+                                         :style-class "reveal-popup"
+                                         :max-height max-content-height
+                                         :children [desc]})
+                                      (cond-> (not popup-at-the-bottom)
+                                        (conj {:fx/type :polygon
+                                               :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
+                                               :fill @style/popup-color
+                                               :points [0 0
+                                                        arrow-width 0
+                                                        (* arrow-width 0.5) arrow-height]})))}]}
+      consume-events
+      (assoc :event-handler consume-popup-event))))
