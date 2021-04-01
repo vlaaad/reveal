@@ -79,8 +79,7 @@
         (do (.consume event)
             (event/handle (assoc e ::event/type ::hide-popup)))
 
-        (and (= KeyCode/ESCAPE code)
-             (not (::consumes-escape (.getProperties ^Node (.getTarget event)))))
+        (= KeyCode/ESCAPE code)
         (do
           (.consume event)
           (event/handle (assoc e ::event/type ::close-view)))
@@ -202,7 +201,7 @@
             :desc {:fx/type ext-with-scroll-to
                    :props {:scroll-to {:fx/type fx/ext-get-ref :ref id}}
                    :desc {:fx/type :scroll-pane
-                          :event-filter {::event/type ::on-popup-event :index index}
+                          :event-handler {::event/type ::on-popup-event :index index}
                           :padding style/default-padding
                           :focus-traversable true
                           :style-class "reveal-view-result-tree"
@@ -233,7 +232,7 @@
      :desc {:fx/type fx/ext-on-instance-lifecycle
             :on-created mark-as-tree-root!
             :desc {:fx/type :v-box
-                   :event-filter {::event/type ::on-view-event :index index}
+                   :event-handler {::event/type ::on-view-event :index index}
                    :children [{:fx/type :h-box
                                :style-class "reveal-view-header"
                                :alignment :center

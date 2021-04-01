@@ -112,26 +112,22 @@
         (cond-> layout cursor layout/reset-anchor))
 
       KeyCode/UP
-      (do
-        (.consume event)
-        (assoc this
-          :layout
-          (cond
-            shortcut layout
-            (and alt cursor) (layout/nav-cursor-up layout with-anchor)
-            (and with-anchor (not= cursor anchor)) (layout/cursor-to-start-of-selection layout)
-            :else (layout/move-cursor-vertically layout with-anchor dec))))
+      (assoc this
+        :layout
+        (cond
+          shortcut layout
+          (and alt cursor) (do (.consume event) (layout/nav-cursor-up layout with-anchor))
+          (and with-anchor (not= cursor anchor)) (do (.consume event) (layout/cursor-to-start-of-selection layout))
+          :else (do (.consume event) (layout/move-cursor-vertically layout with-anchor dec))))
 
       KeyCode/DOWN
-      (do
-        (.consume event)
-        (assoc this
-          :layout
-          (cond
-            shortcut layout
-            (and alt cursor) (layout/nav-cursor-down layout with-anchor)
-            (and with-anchor (not= cursor anchor)) (layout/cursor-to-end-of-selection layout)
-            :else (layout/move-cursor-vertically layout with-anchor inc))))
+      (assoc this
+        :layout
+        (cond
+          shortcut layout
+          (and alt cursor) (do (.consume event) (layout/nav-cursor-down layout with-anchor))
+          (and with-anchor (not= cursor anchor)) (do (.consume event) (layout/cursor-to-end-of-selection layout))
+          :else (do (.consume event) (layout/move-cursor-vertically layout with-anchor inc))))
 
       KeyCode/LEFT
       (assoc this
@@ -218,7 +214,6 @@
   #(update % id dissoc :popup))
 
 (defn init-text-field-created! [^Node node]
-  (.put (.getProperties node) :vlaaad.reveal.ui/consumes-escape true)
   (if (some? (.getScene node))
     (.requestFocus node)
     (.addListener (.sceneProperty node)
@@ -288,6 +283,7 @@
                            #(update % id hide-search))
         KeyCode/ENTER (do (let [output (search-event->output event)]
                             (fx/run-later (focus! output)))
+                          (.consume event)
                           #(update % id select-highlight))
         KeyCode/TAB (do (.consume event) identity)
         KeyCode/UP (do (.consume event) #(update % id jump-to-prev-match))
