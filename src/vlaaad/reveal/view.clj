@@ -205,6 +205,15 @@
    :graphic {:fx/type summary :value x :max-length 64}})
 
 (defn- initialize-table! [^TableView view]
+  (let [dispatcher (.getEventDispatcher view)]
+    (.setEventDispatcher view
+      (reify EventDispatcher
+        (dispatchEvent [_ e next]
+          (if (and (instance? KeyEvent e)
+                   (.isShortcutDown ^KeyEvent e)
+                   (#{KeyCode/UP KeyCode/DOWN KeyCode/LEFT KeyCode/RIGHT} (.getCode ^KeyEvent e)))
+            e
+            (.dispatchEvent dispatcher e next))))))
   (.selectFirst (.getSelectionModel view))
   (.setCellSelectionEnabled (.getSelectionModel view) true))
 
@@ -240,38 +249,26 @@
             (.putString (stream/->str (.getCellData (.getTableColumn pos) (.getRow pos)))))))))
   identity)
 
-(def ^:private table-event-dispatcher
-  (reify EventDispatcher
-    (dispatchEvent [_ e next]
-      (if (and (instance? KeyEvent e)
-               (.isShortcutDown ^KeyEvent e)
-               (#{KeyCode/UP KeyCode/DOWN KeyCode/LEFT KeyCode/RIGHT} (.getCode ^KeyEvent e)))
-        e
-        (.dispatchEvent next e)))))
-
 (defn table [{:keys [items columns]}]
-  {:fx/type :stack-pane
-   :event-dispatcher table-event-dispatcher
-   :children
-   [{:fx/type fx/ext-on-instance-lifecycle
-     :on-created initialize-table!
-     :desc {:fx/type action-popup/ext
-            :select select-bounds-and-value!
-            :desc {:fx/type :table-view
-                   :on-key-pressed {::event/type ::on-table-key-pressed}
-                   :style-class "reveal-table"
-                   :columns (for [{:keys [header fn]
-                                   :or {header ::not-found}} columns]
-                              {:fx/type :table-column
-                               :style-class "reveal-table-column"
-                               :min-width 40
-                               :graphic {:fx/type summary
-                                         :max-length 64
-                                         :value (if (= header ::not-found) fn header)}
-                               :cell-factory {:fx/cell-type :table-cell
-                                              :describe describe-cell}
-                               :cell-value-factory #(try (fn (peek %)) (catch Throwable e e))})
-                   :items (into [] (map-indexed vector) items)}}}]})
+  {:fx/type fx/ext-on-instance-lifecycle
+   :on-created initialize-table!
+   :desc {:fx/type action-popup/ext
+          :select select-bounds-and-value!
+          :desc {:fx/type :table-view
+                 :on-key-pressed {::event/type ::on-table-key-pressed}
+                 :style-class "reveal-table"
+                 :columns (for [{:keys [header fn]
+                                 :or {header ::not-found}} columns]
+                            {:fx/type :table-column
+                             :style-class "reveal-table-column"
+                             :min-width 40
+                             :graphic {:fx/type summary
+                                       :max-length 64
+                                       :value (if (= header ::not-found) fn header)}
+                             :cell-factory {:fx/cell-type :table-cell
+                                            :describe describe-cell}
+                             :cell-value-factory #(try (fn (peek %)) (catch Throwable e e))})
+                 :items (into [] (map-indexed vector) items)}}})
 
 (action/defaction ::action/view:table [v]
   (when (and (some? v)
