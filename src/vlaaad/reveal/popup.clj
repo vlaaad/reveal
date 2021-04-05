@@ -48,17 +48,33 @@
         space-above (- (.getMinY bounds) (.getMinY screen-bounds))]
     (< space-above space-below)))
 
-(defn view [{:keys [^Bounds bounds
-                    ^Window window
-                    on-cancel
-                    position
-                    alignment
-                    event-handler
-                    desc
-                    width]
-             :or {width 300
-                  alignment :center
-                  event-handler consume-popup-event}}]
+(defn view
+  "Cljfx popup view
+
+   Required args:
+   - :bounds - screen bounds for popup target
+   - :window - target window
+   - :on-cancel - event map
+   - :position - :top or :bottom
+   - :desc - content description
+
+   Optional:
+   - :alignment - :center (default) or :left
+   - :width (default 300)
+   - :event-handler (default consumes all events)
+
+   All other props are forwarded to :popup component description"
+  [{:keys [^Bounds bounds
+           on-cancel
+           position
+           alignment
+           event-handler
+           desc
+           width]
+    :or {width 300
+         alignment :center
+         event-handler consume-popup-event}
+    :as props}]
   (let [^Screen screen (first (Screen/getScreensForRectangle (.getMinX bounds)
                                                              (.getMinY bounds)
                                                              (.getWidth bounds)
@@ -100,43 +116,44 @@
                   :left (- (* 0.5 shadow-radius) anchor-fix-x))
         max-content-height (- (if popup-at-the-bottom space-below space-above)
                               arrow-height)]
-    {:fx/type lifecycle
-     :window window
-     :stylesheets [(:cljfx.css/url @style/style)]
-     :anchor-location (if popup-at-the-bottom :window-top-left :window-bottom-left)
-     :anchor-x (+ pref-anchor-x anchor-fix-x)
-     :anchor-y (if popup-at-the-bottom
-                 (- (.getMaxY bounds) shadow-radius (- shadow-offset-y))
-                 (+ (.getMinY bounds) shadow-radius shadow-offset-y))
-     :auto-fix false
-     :hide-on-escape false
-     :auto-hide true
-     :on-auto-hide on-cancel
-     :event-handler event-handler
-     :content [{:fx/type :v-box
-                :pref-width width
-                :max-width width
-                :effect {:fx/type :drop-shadow
-                         :radius shadow-radius
-                         :offset-y shadow-offset-y
-                         :color "#0006"}
-                :children (-> []
-                              (cond-> popup-at-the-bottom
-                                (conj {:fx/type :polygon
-                                       :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                                       :fill @style/popup-color
-                                       :points [0 arrow-height
-                                                arrow-width arrow-height
-                                                (* arrow-width 0.5) 0]}))
-                              (conj
-                                {:fx/type :stack-pane
-                                 :style-class "reveal-popup"
-                                 :max-height max-content-height
-                                 :children [desc]})
-                              (cond-> (not popup-at-the-bottom)
-                                (conj {:fx/type :polygon
-                                       :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
-                                       :fill @style/popup-color
-                                       :points [0 0
-                                                arrow-width 0
-                                                (* arrow-width 0.5) arrow-height]})))}]}))
+    (into
+      {:fx/type lifecycle
+       :stylesheets [(:cljfx.css/url @style/style)]
+       :anchor-location (if popup-at-the-bottom :window-top-left :window-bottom-left)
+       :anchor-x (+ pref-anchor-x anchor-fix-x)
+       :anchor-y (if popup-at-the-bottom
+                   (- (.getMaxY bounds) shadow-radius (- shadow-offset-y))
+                   (+ (.getMinY bounds) shadow-radius shadow-offset-y))
+       :auto-fix false
+       :hide-on-escape false
+       :auto-hide true
+       :on-auto-hide on-cancel
+       :event-handler event-handler
+       :content [{:fx/type :v-box
+                  :pref-width width
+                  :max-width width
+                  :effect {:fx/type :drop-shadow
+                           :radius shadow-radius
+                           :offset-y shadow-offset-y
+                           :color "#0006"}
+                  :children (-> []
+                                (cond-> popup-at-the-bottom
+                                  (conj {:fx/type :polygon
+                                         :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
+                                         :fill @style/popup-color
+                                         :points [0 arrow-height
+                                                  arrow-width arrow-height
+                                                  (* arrow-width 0.5) 0]}))
+                                (conj
+                                  {:fx/type :stack-pane
+                                   :style-class "reveal-popup"
+                                   :max-height max-content-height
+                                   :children [desc]})
+                                (cond-> (not popup-at-the-bottom)
+                                  (conj {:fx/type :polygon
+                                         :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
+                                         :fill @style/popup-color
+                                         :points [0 0
+                                                  arrow-width 0
+                                                  (* arrow-width 0.5) arrow-height]})))}]}
+      (dissoc props :bounds :on-cancel :position :alignment :desc :width :event-handler))))
