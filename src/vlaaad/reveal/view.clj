@@ -77,8 +77,14 @@
    :args value
    :desc {:fx/type output-panel/view}})
 
+(defn- view? [x]
+  (try
+    (not= (:fx/type x ::not-found) ::not-found)
+    ;; sorted maps with non-keyword keys throw class cast exceptions
+    (catch Exception _ false)))
+
 (defn ->desc [x]
-  (if (:fx/type x) x {:fx/type value :value x}))
+  (if (view? x) x {:fx/type value :value x}))
 
 (defn- watch! [id *ref handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make {:autoscroll false})})
