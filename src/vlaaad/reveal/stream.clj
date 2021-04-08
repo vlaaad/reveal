@@ -12,7 +12,8 @@
            [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar]
            [clojure.core Eduction]
            [java.text SimpleDateFormat DateFormat]
-           [java.time Instant]))
+           [java.time Instant]
+           [java.util.concurrent Future]))
 
 (set! *warn-on-reflection* true)
 
@@ -757,9 +758,10 @@
       (.startsWith class-name "clojure.core$future_call$reify")
       (horizontal
         (raw-string "#reveal/future[" {:fill :object})
-        (if (realized? *blocking-deref)
-          (stream @*blocking-deref)
-          (raw-string "..." {:fill :util}))
+        (cond
+          (.isCancelled ^Future *blocking-deref) (raw-string "cancelled" {:fill :util})
+          (realized? *blocking-deref) (stream @*blocking-deref)
+          :else (raw-string "pending" {:fill :util}))
         separator
         (identity-hash-code *blocking-deref)
         (raw-string "]" {:fill :object}))
