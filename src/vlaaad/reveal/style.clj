@@ -148,6 +148,15 @@
                      :-fx-background-radius 0}
          ".cell" {:-fx-text-fill symbol-color
                   :-fx-background-color :transparent}
+         ".menu-item" {:-fx-padding [3.5 7]
+                       "> .label" {:-fx-text-fill symbol-color}
+                       ":focused" {:-fx-background-color selection-color
+                                   "> .label" {:-fx-text-fill symbol-color}}}
+         ".context-menu" {:-fx-background-color popup-color
+                          :-fx-padding default-padding
+                          :-fx-effect "dropshadow(gaussian, #0006, 10, 0, 0, 5)"
+                          " .separator > .line" {:-fx-border-insets [3.5 -7]}}
+         ".separator" {"> .line" {:-fx-border-color [background-color :transparent :transparent :transparent]}}
          ;; scroll bars
          ".table-cell" {:-fx-background-color :transparent}
          ".scroll-pane" {:-fx-background-color :transparent
