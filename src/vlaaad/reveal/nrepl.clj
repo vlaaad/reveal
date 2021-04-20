@@ -51,8 +51,10 @@
                   (.getSimpleName (class throwable))
                   {:fill :error})))
 
-            :else
-            {:request request :message message}))))))
+            (= "true" (System/getProperty "vlaaad.reveal.nrepl.verbose"))
+            (stream/as
+              {:request request :message message}
+              (stream/raw-string "(unrecognized nrepl message)" {:fill :util}))))))))
 
 (defn- show-tap [ui value]
   (ui
