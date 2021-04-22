@@ -326,7 +326,7 @@
   "Returns UI command that submits the `value`"
   [value]
   {:vlaaad.reveal/command :vlaaad.reveal.command/event
-   :vlaaad.reveal.event/type :vlaaad.reveal.ui/submit
+   :vlaaad.reveal.event/type ::ui/submit
    :value value})
 
 (defn clear-output
@@ -344,23 +344,29 @@
   - `:new-result-panel` - open new result panel even if there already is one"
   [value & {:keys [form new-result-panel]}]
   {:vlaaad.reveal/command :vlaaad.reveal.command/event
-   :vlaaad.reveal.event/type :vlaaad.reveal.ui/view
+   :vlaaad.reveal.event/type ::ui/view
    :value value
    :form form
    :new-result-panel new-result-panel})
+
+(defn close-all-views
+  "Returns UI command that closes all open views in every result panel"
+  []
+  {:vlaaad.reveal/command :vlaaad.reveal.command/event
+   :vlaaad.reveal.event/type ::ui/close-all-views})
 
 (defn all
   "Returns UI command that executes a sequence of commands"
   [& commands]
   {:vlaaad.reveal/command :vlaaad.reveal.command/event
-   :vlaaad.reveal.event/type :vlaaad.reveal.ui/all
+   :vlaaad.reveal.event/type ::ui/all
    :commands commands})
 
 (defn dispose
   "Returns UI command that disposes Reveal window"
   []
   {:vlaaad.reveal/command :vlaaad.reveal.command/event
-   :vlaaad.reveal.event/type :vlaaad.reveal.ui/quit})
+   :vlaaad.reveal.event/type ::ui/quit})
 
 ;; endregion
 

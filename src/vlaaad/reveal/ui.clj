@@ -51,8 +51,13 @@
             (update state :result-trees remove-index index))
           (cond-> (and (not new-tree) (< 1 (count result-trees)))
             (switch-focus-on-close index))
-          (dissoc id)
           (update :views dissoc id)))))
+
+(defmethod event/handle ::close-all-views [_]
+  (fn [state]
+    (-> state
+        (assoc :result-trees [] :views {})
+        (dissoc ::focus ::focus-key))))
 
 (defmethod event/handle ::on-view-event [{:keys [^Event fx/event index] :as e}]
   (if (and (instance? KeyEvent event)
