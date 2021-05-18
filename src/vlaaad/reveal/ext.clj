@@ -156,28 +156,52 @@
   "Cljfx component fn that shows a value using the streaming system
 
   Expected keys:
-  - `:value` (required) - any value"
+  - `:value` (required) - any value
+
+  Example:
+  ```
+  {:fx/type value-view
+   :value (range 100)}
+  ```"
   view/value)
 
 (def ref-watch-latest-view
   "Cljfx component fn that shows a continuously updated view of a ref state
 
   Expected keys:
-  - `:ref` (required) - an instance of IRef (e.g. Atom, Var, Ref, Agent)"
+  - `:ref` (required) - an instance of IRef (e.g. Atom, Var, Ref, Agent)
+
+  Example:
+  ```
+  {:fx/type ref-watch-latest-view
+   :ref #'inc}
+  ```"
   view/ref-watch-latest)
 
 (def ref-watch-all-view
   "Cljfx component fn that shows a log of all ref states
 
   Expected keys:
-  - `:ref` (required) - an instance of IRef (e.g. Atom, Var, Ref, Agent, etc.)"
+  - `:ref` (required) - an instance of IRef (e.g. Atom, Var, Ref, Agent, etc.)
+
+  Example:
+  ```
+  {:fx/type ref-watch-all-view
+   :ref #'inc}
+  ```"
   view/ref-watch-all)
 
 (def derefable-view
   "Cljfx component fn that asynchronously derefs a value and then shows it
 
   Expected keys:
-  - `:derefable` (required) - a (blocking) derefable (e.g. future, promise)"
+  - `:derefable` (required) - a (blocking) derefable (e.g. future, promise)
+
+  Example:
+  ```
+  {:fx/type derefable-view
+   :derefable (future (Thread/sleep 10000))}
+  ```"
   view/derefable)
 
 (def table-view
@@ -187,11 +211,24 @@
   - `:items` (required) - a collection of items to show
   - `:columns` (required) - collection of columns that are maps with these keys:
     - `:fn` (required) - a function from item to value for this column
-    - `:header` (optional, defaults to `:fn`'s value) - column header"
+    - `:header` (optional, defaults to `:fn`'s value) - column header
+
+  Example:
+  ```
+  {:fx/type table-view
+   :columns [{:fn identity} {:fn first}]
+   :items [[:a 1] {:a 1} \"a=1\"]}
+  ```"
   view/table)
 
 (defn observable
-  "Returns an instance of IRef that wraps another `ref` with `fn` transform"
+  "Returns an instance of IRef that wraps another `ref` with `fn` transform
+
+  Example use:
+  ```
+  {:fx/type ref-watch-latest-view
+   :ref (observable #'foo (juxt identity meta))}
+  ```"
   [ref fn]
   (view/->Observable ref fn))
 
@@ -308,7 +345,14 @@
   - `:action` (required) - action id, ns-qualified keyword. All built-in actions
     have `vlaaad.reveal.action` ns
   - `:value` (required) - a value to execute action on
-  - `:annotation` (optional) - value annotation expected by action"
+  - `:annotation` (optional) - value annotation expected by action
+
+  Example:
+  ```
+  {:fx/type action-view
+   :action :vlaaad.reveal.action/doc
+   :value #'clojure.core/ns}
+  ```"
   [{:keys [action value annotation]}]
   {:fx/type derefable-view
    :derefable (execute-action action value annotation)})
