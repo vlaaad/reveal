@@ -32,4 +32,14 @@
                    :extra-deps {org.clojure/data.xml {:mvn/version "0.2.0-alpha6"}
                                 clj-commons/pomegranate {:mvn/version "1.2.0"}}}
            :depstar {:extra-deps {seancorfield/depstar {:mvn/version "0.2.1"}}
-                     :main-opts ["-m" "hf.depstar.jar"]}}}
+                     :main-opts ["-m" "hf.depstar.jar"]}
+           :jar {:extra-deps {seancorfield/depstar {:mvn/version "2.0.193"}}
+                 :exec-fn hf.depstar/uberjar
+                 :exec-args {:jar "target/reveal.jar"
+                             :no-pom true}}
+           :uberjar {:extra-deps {seancorfield/depstar {:mvn/version "2.0.193"}}
+                     :exec-fn hf.depstar/uberjar
+                     :exec-args {:jar "target/reveal-uber.jar"
+                                 :aot true
+                                 :main-class vlaaad.reveal
+                                 :no-pom true}}}}

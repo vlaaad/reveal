@@ -1,6 +1,9 @@
 (ns vlaaad.reveal
   (:require [clojure.string :as str]
-            [clojure.edn :as edn]))
+            [clojure.edn :as edn]
+            [vlaaad.reveal.ext] ;; this causes uberjar creation being stuck with no cpu usage
+            )
+  (:gen-class))
 
 (defn- update-some [m k f & args]
   (let [v (get m k ::not-found)]
