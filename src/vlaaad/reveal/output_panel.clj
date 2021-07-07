@@ -18,8 +18,13 @@
            [org.apache.commons.lang3 StringUtils]
            [java.util.concurrent Semaphore]))
 
+(defn- update-if-exists [state id f & args]
+  (if (contains? state id)
+    (apply update state id f args)
+    state))
+
 (defmethod event/handle ::on-scroll [{:keys [id ^ScrollEvent fx/event]}]
-  #(update-in % [id :layout] layout/scroll-by (.getDeltaX event) (.getDeltaY event)))
+  #(update-if-exists % id update :layout layout/scroll-by (.getDeltaX event) (.getDeltaY event)))
 
 (defmethod event/handle ::on-width-changed [{:keys [id fx/event]}]
   #(update-in % [id :layout] layout/set-canvas-width event))
@@ -43,11 +48,6 @@
 
 (defmethod event/handle ::on-mouse-released [{:keys [id]}]
   #(update-in % [id :layout] layout/stop-gesture))
-
-(defn- update-if-exists [state id f & args]
-  (if (contains? state id)
-    (apply update state id f args)
-    state))
 
 (defmethod event/handle ::on-focus-changed [{:keys [id fx/event]}]
   #(update-if-exists % id update :layout layout/set-focused event))
