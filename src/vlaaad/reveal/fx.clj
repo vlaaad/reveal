@@ -1,12 +1,13 @@
 (ns vlaaad.reveal.fx
   (:require [cljfx.lifecycle :as fx.lifecycle]
-            [cljfx.component :as fx.component])
+            [cljfx.component :as fx.component]
+            [vlaaad.reveal.event :as event])
   (:import [java.util UUID]
            [java.util.function UnaryOperator]
            [javafx.scene.control TextFormatter$Change]))
 
 (def ext-with-process
-  "Extension lifecycle that provides \"local mutable state\" capability
+  "Extension lifecycle that provides \"local mutable state\" capability with a process
 
   Expected props:
   - `:id` (optional) — state identifier
@@ -46,6 +47,41 @@
       (when-let [stop-fn (:stop-fn component)]
         (stop-fn))
       (fx.lifecycle/delete fx.lifecycle/dynamic (:child component) opts))))
+
+(defmethod event/handle ::init-local-state [{:keys [id local-state]}]
+  #(assoc % id {:id id :local-state local-state}))
+
+(defmethod event/handle ::update-local-state [{:keys [id fn]}]
+  #(cond-> % (contains? % id) (update-in [id :local-state] fn)))
+
+(defmethod event/handle ::dispose-local-state [{:keys [id]}]
+  #(dissoc % id))
+
+(defn- init-local-state! [id initial-state handler]
+  (handler {::event/type ::init-local-state :id id :local-state initial-state})
+  #(handler {::event/type ::dispose-local-state :id id}))
+
+(defn- local-state-view [{:keys [id desc local-state]}]
+  (assoc desc :local-state local-state
+              :on-local-state-changed {::event/type ::update-local-state
+                                       :id id}))
+
+(defn ext-with-local-state
+  "Extension lifecycle that provides simple \"local mutable state\" capability
+
+  Expected props
+  - :initial-state (optional, default nil) - initial state, resets the accumulated
+    local state if changed
+  - :desc (required) - cljfx desc map, will receive 2 additional properties:
+    - :local-state with current local state value
+    - :on-local-state-changed map event that expect extra :fn key when dispatched,
+      which should be a function that transforms the local state to another value"
+  [{:keys [initial-state desc]}]
+  {:fx/type ext-with-process
+   :args initial-state
+   :start init-local-state!
+   :desc {:fx/type local-state-view
+          :desc desc}})
 
 (defn- format! [^TextFormatter$Change change]
   (when (.isContentChange change)
