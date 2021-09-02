@@ -302,7 +302,6 @@
    :children [{:fx/type fx/ext-on-instance-lifecycle
                :on-created init-text-field-created!
                :desc {:fx/type :text-field
-                      :style-class "reveal-text-field"
                       :prompt-text "Find..."
                       :event-filter {::event/type ::on-search-event-filter :id id}
                       :on-focused-changed {::event/type ::on-search-focus-changed :id id}

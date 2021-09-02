@@ -32,6 +32,7 @@
   (delay
     (let [util-color (color :util)
           symbol-color (color :symbol)
+          scalar-color (color :scalar)
           unfocused-background-color (case @theme :dark "#333" :light "#f2f2f2")
           background-color (case @theme :dark "#232325" :light "#fafafa")
           scroll-bar-size 10
@@ -55,16 +56,6 @@
                                ":hover" {:-fx-text-fill symbol-color}
                                "-selected" {:-fx-background-color selection-color
                                             :-fx-text-fill symbol-color}}}
-            "-text-field" {:-fx-font-family font-family
-                           :-fx-text-fill symbol-color
-                           :-fx-font-size font-size
-                           :-fx-background-color background-color
-                           :-fx-highlight-fill selection-color
-                           :-fx-highlight-text-fill symbol-color
-                           :-fx-padding [7 7]
-                           ":focused" {:-fx-border-color selection-color
-                                       :-fx-border-width [0 0 2 0]
-                                       :-fx-padding [7 7 5 7]}}
             "-search" {:-fx-background-color popup-color
                        :-fx-padding default-padding}
             "-summary" {:-fx-font-family font-family
@@ -129,6 +120,23 @@
                    ":has-popup:focused" {:-fx-border-width [0 0 2 0]
                                          :-fx-padding [0 0 -2 0]
                                          :-fx-border-color selection-color}}
+         ".text-field" {:-fx-font-family font-family
+                        :-fx-text-fill symbol-color
+                        :-fx-font-size font-size
+                        :-fx-background-color background-color
+                        :-fx-highlight-fill selection-color
+                        :-fx-highlight-text-fill symbol-color
+                        :-fx-prompt-text-fill util-color
+                        :-fx-background-radius 0
+                        :-fx-padding [7 7]
+                        ":focused" {:-fx-border-color selection-color
+                                    :-fx-border-width [0 0 2 0]
+                                    :-fx-padding [7 7 5 7]}}
+         ".hyperlink" {:-fx-font-family font-family
+                       :-fx-text-fill scalar-color
+                       :-fx-padding 0
+                       :-fx-font-size font-size
+                       ":focused" {:-fx-border-color scalar-color}}
          ".button" {:-fx-text-fill util-color
                     :-fx-font-family font-family
                     :-fx-font-size font-size

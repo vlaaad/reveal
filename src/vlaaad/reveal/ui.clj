@@ -343,55 +343,62 @@
                       :desc {:fx/type view/ext-try
                              :desc (get-in views [id :desc])}}]))
    :desc {:fx/type fx/ext-let-refs
-          :refs (cond-> {::stage {:fx/type :stage
-                                  :title title
-                                  :on-close-request {::event/type ::confirm-exit}
-                                  :showing showing
-                                  :width 400
-                                  :height 500
-                                  :icons (if christmas
-                                           ["vlaaad/reveal/logo-xmas-16.png"
-                                            "vlaaad/reveal/logo-xmas-32.png"
-                                            "vlaaad/reveal/logo-xmas-64.png"
-                                            "vlaaad/reveal/logo-xmas-256.png"
-                                            "vlaaad/reveal/logo-xmas-512.png"]
-                                           ["vlaaad/reveal/logo-16.png"
-                                            "vlaaad/reveal/logo-32.png"
-                                            "vlaaad/reveal/logo-64.png"
-                                            "vlaaad/reveal/logo-256.png"
-                                            "vlaaad/reveal/logo-512.png"])
-                                  :on-focused-changed {::event/type ::on-window-focused-changed}
-                                  :scene {:fx/type :scene
-                                          :stylesheets [(:cljfx.css/url @style/style)]
-                                          :root {:fx/type :grid-pane
-                                                 :style-class "reveal-ui"
-                                                 :column-constraints [{:fx/type :column-constraints
-                                                                       :hgrow :always}]
-                                                 :row-constraints (let [n (inc (count result-trees))]
-                                                                    (repeat n {:fx/type :row-constraints
-                                                                               :percent-height (/ 100 n)}))
-                                                 :children
-                                                 (into [{:fx/type view/queue
-                                                         :grid-pane/row 0
-                                                         :grid-pane/column 0
-                                                         :queue queue
-                                                         :id :output}]
-                                                       (map-indexed
-                                                         (fn [i result-tree]
-                                                           {:fx/type result-tree-view
-                                                            :grid-pane/row (inc i)
-                                                            :grid-pane/column 0
-                                                            :views views
-                                                            :index i
-                                                            :result-tree result-tree}))
-                                                       result-trees)}}}}
-                  confirm-exit-showing
-                  (assoc ::confirm-exit {:fx/type confirm-exit-dialog})
+          :refs (cond->
+                  {::stage {:fx/type :stage
+                            :title title
+                            :on-close-request {::event/type ::confirm-exit}
+                            :showing showing
+                            :width 400
+                            :height 500
+                            :icons (if christmas
+                                     ["vlaaad/reveal/logo-xmas-16.png"
+                                      "vlaaad/reveal/logo-xmas-32.png"
+                                      "vlaaad/reveal/logo-xmas-64.png"
+                                      "vlaaad/reveal/logo-xmas-256.png"
+                                      "vlaaad/reveal/logo-xmas-512.png"]
+                                     ["vlaaad/reveal/logo-16.png"
+                                      "vlaaad/reveal/logo-32.png"
+                                      "vlaaad/reveal/logo-64.png"
+                                      "vlaaad/reveal/logo-256.png"
+                                      "vlaaad/reveal/logo-512.png"])
+                            :on-focused-changed {::event/type ::on-window-focused-changed}
+                            :scene
+                            {:fx/type :scene
+                             :stylesheets [(:cljfx.css/url @style/style)]
+                             :root
+                             {:fx/type :stack-pane
+                              :children
+                              [{:fx/type :grid-pane
+                                :style-class "reveal-ui"
+                                :column-constraints [{:fx/type :column-constraints
+                                                      :hgrow :always}]
+                                :row-constraints (let [n (inc (count result-trees))]
+                                                   (repeat n {:fx/type :row-constraints
+                                                              :percent-height (/ 100 n)}))
+                                :children
+                                (into [{:fx/type view/queue
+                                        :grid-pane/row 0
+                                        :grid-pane/column 0
+                                        :queue queue
+                                        :id :output}]
+                                      (map-indexed
+                                        (fn [i result-tree]
+                                          {:fx/type result-tree-view
+                                           :grid-pane/row (inc i)
+                                           :grid-pane/column 0
+                                           :views views
+                                           :index i
+                                           :result-tree result-tree}))
+                                      result-trees)}]}}}}
                   focus
                   (assoc [::focus focus-key] {:fx/type ext-focused-by-default
                                               :desc {:fx/type fx/ext-get-ref
                                                      :ref focus}}))
-          :desc {:fx/type fx/ext-get-ref :ref ::stage}}})
+          :desc {:fx/type fx/ext-let-refs
+                 :refs (cond-> {}
+                         confirm-exit-showing
+                         (assoc ::confirm-exit {:fx/type confirm-exit-dialog}))
+                 :desc {:fx/type fx/ext-get-ref :ref ::stage}}}})
 
 (defn oneduce
   ([xf x]
