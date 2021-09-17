@@ -28,6 +28,14 @@ Not being limited to text, Reveal uses judicious syntax highlighting to aid
 in differentiating various objects: text `java.lang.Integer` looks differently 
 depending on whether it was produced from a symbol or a class.
 
+## Reveal Pro
+
+Reveal aims to be an extensible tool suitable for helping with development of 
+any Clojure program. [Reveal Pro](https://vlaaad.github.io/reveal-pro) provides 
+a set of extensions that improve developer experience by providing more tools, 
+so you can focus on your problem with data and knowledge you need, available 
+as soon as you need it.
+
 ## Documentation
 
 You can find overview, setup instructions and more at 
