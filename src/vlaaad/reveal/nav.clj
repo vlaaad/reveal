@@ -14,6 +14,9 @@
 (defn cursor [nav id]
   (get-in nav [::id->first-cursor id]))
 
+(defn last-cursor [nav id]
+  (get-in nav [::id->last-cursor id]))
+
 (defn coordinate [nav id]
   (get-in nav [::id->coordinate id]))
 

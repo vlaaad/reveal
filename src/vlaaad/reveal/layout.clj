@@ -394,7 +394,7 @@
                     :or {anchor true
                          align true
                          scroll :text}}]
-  (if cursor
+  (let [cursor (or cursor (:cursor layout))]
     (-> layout
         (assoc :cursor cursor)
         (cond->
@@ -405,8 +405,7 @@
           (assoc :anchor (if (cursor/cursor? anchor) anchor cursor))
 
           scroll
-          (ensure-cursor-visible scroll)))
-    layout))
+          (ensure-cursor-visible scroll)))))
 
 (defn scroll-by [layout dx dy]
   (-> layout
@@ -525,6 +524,12 @@
     (when-not (= start-cursor cursor)
       start-cursor)))
 
+(defn- end-cursor [nav cursor]
+  (let [id (nav/id nav cursor)
+        end-cursor (nav/last-cursor nav id)]
+    (when-not (= end-cursor cursor)
+      end-cursor)))
+
 (defn- grid-movement-cursor [nav cursor row-direction col-direction]
   (let [id (nav/id nav cursor)
         parent-id (nav/parent nav id)
@@ -577,11 +582,18 @@
                 :scroll :nav)))
 
 (defn nav-cursor-left [layout with-anchor]
-  (let [{:keys [cursor nav]} layout]
-    (set-cursor layout (or (start-cursor nav cursor)
-                           (grid-movement-cursor nav cursor identity dec)
-                           (out-cursor nav cursor))
-                :anchor with-anchor
+  (let [{:keys [cursor nav anchor]} layout
+        cursor (or (start-cursor nav cursor)
+                   (grid-movement-cursor nav cursor identity dec)
+                   (out-cursor nav cursor)
+                   cursor)]
+    (set-cursor layout cursor
+                :anchor (if-not with-anchor
+                          (let [end (end-cursor nav cursor)]
+                            (if (pos? (compare end anchor))
+                              end
+                              anchor))
+                          with-anchor)
                 :scroll :nav)))
 
 (defn nav-cursor-down [layout with-anchor]
