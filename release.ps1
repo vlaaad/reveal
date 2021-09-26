@@ -17,7 +17,7 @@ clj -Spom
 invoke git tag $version
 invoke git push
 invoke git push free-remote $version
-clj -A:depstar "$version.jar"
+clj -M:depstar "$version.jar"
 clj -A:build -M -m deploy "$version.jar" (Read-Host -Prompt "Username") (Read-Host -Prompt "Token" -AsSecureString | ConvertFrom-SecureString -AsPlainText)
 rm "$version.jar"
 invoke git checkout -- pom.xml
