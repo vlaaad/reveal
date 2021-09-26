@@ -372,9 +372,13 @@
                                 :style-class "reveal-ui"
                                 :column-constraints [{:fx/type :column-constraints
                                                       :hgrow :always}]
-                                :row-constraints (let [n (inc (count result-trees))]
-                                                   (repeat n {:fx/type :row-constraints
-                                                              :percent-height (/ 100 n)}))
+                                :row-constraints (let [n (inc (count result-trees))
+                                                       priority 2.25
+                                                       total (inc (* priority (dec n)))]
+                                                   (->> (repeat (dec n) (* priority (/ 100 total)))
+                                                        (cons (/ 100 total))
+                                                        (map #(hash-map :fx/type :row-constraints
+                                                                        :percent-height %))))
                                 :children
                                 (into [{:fx/type view/queue
                                         :grid-pane/row 0
