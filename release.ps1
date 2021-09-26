@@ -4,6 +4,7 @@ function invoke {
     try { & $exe $argsForExe } catch { Throw }
     if ($LASTEXITCODE) { Throw "$exe indicated failure (exit code $LASTEXITCODE; full command: $Args)." }
 }
+Write-Output "Deploying FREE version"
 if (!((invoke git rev-parse --abbrev-ref HEAD) -eq "free")) {
     throw "not on free"
 }
