@@ -3,7 +3,8 @@
             [vlaaad.reveal.stream :as stream]
             [clojure.spec.alpha :as s]
             [clojure.core.specs.alpha :as specs]
-            [vlaaad.reveal.event :as event])
+            [vlaaad.reveal.event :as event]
+            [clojure.main :as m])
   (:import [clojure.lang IDeref]
            [java.awt Desktop]
            [java.net URI URL]
@@ -82,10 +83,14 @@
                        (keep
                          (fn [^PropertyDescriptor descriptor]
                            (when-let [read-meth (.getReadMethod descriptor)]
-                             (.setAccessible read-meth true)
-                             [(.getName descriptor)
-                              (.invoke read-meth x (object-array 0))
-                              descriptor]))))
+                             (try
+                               (.setAccessible read-meth true)
+                               [(.getName descriptor)
+                                (try
+                                  [(.invoke read-meth x (object-array 0)) nil]
+                                  (catch Exception e [nil e]))
+                                descriptor]
+                               (catch Throwable _ nil))))))
             fields (->> x
                         (class)
                         (iterate #(.getSuperclass ^Class %))
@@ -97,14 +102,15 @@
                             (try
                               (.setAccessible field true)
                               [(.getName field)
-                               (.get field x)
+                               (try
+                                 [(.get field x) nil]
+                                 (catch Exception e [nil e]))
                                field]
-                              (catch Throwable _
-                                nil)))))
+                              (catch Throwable _ nil)))))
             sorted (->> (concat fields props)
                         (group-by (juxt first second))
                         (sort-by ffirst)
-                        (map (fn [[[name value] xs]]
+                        (map (fn [[[name [value error]] xs]]
                                (let [kinds (mapv last xs)]
                                  (stream/vertical
                                    (apply
@@ -120,7 +126,14 @@
                                           (interpose stream/separator)))
                                    (stream/horizontal
                                      (stream/raw-string "  " {:selectable false})
-                                     (stream/stream value)))))))]
+                                     (if error
+                                       (stream/as
+                                         error
+                                         (let [{:clojure.error/keys [cause class]} (-> error
+                                                                                       Throwable->map
+                                                                                       m/ex-triage)]
+                                           (stream/raw-string (or cause class) {:fill :error})))
+                                       (stream/stream value))))))))]
         (stream/vertically sorted)))))
 
 (defaction ::deref [v]
