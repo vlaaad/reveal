@@ -212,6 +212,7 @@
   - `:columns` (required) - collection of columns that are maps with these keys:
     - `:fn` (required) - a function from item to value for this column
     - `:header` (optional, defaults to `:fn`'s value) - column header
+    - `:columns` (optional) - nested columns
 
   Example:
   ```
