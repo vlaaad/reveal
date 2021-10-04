@@ -241,9 +241,10 @@
       (let [^TableView table (.getTarget event)
             sm (.getSelectionModel table)
             col (.getTableColumn ^TablePosition (first (.getSelectedCells sm)))]
-        (.setSortType col sort-type)
-        (.setAll (.getSortOrder table) [col])
-        (.clearAndSelect sm 0 col)))
+        (when (.isSortable col)
+          (.setSortType col sort-type)
+          (.setAll (.getSortOrder table) [col])
+          (.clearAndSelect sm 0 col))))
 
     (and (.isShortcutDown event) (= KeyCode/C (.getCode event)))
     (let [^TableView table (.getTarget event)
@@ -255,6 +256,26 @@
             (.putString (stream/->str (.getCellData (.getTableColumn pos) (.getRow pos)))))))))
   identity)
 
+(defn- make-column [{:keys [header fn columns]
+                     :or {header ::not-found}
+                     :as props}]
+  (into {:fx/type :table-column
+         :style-class "reveal-table-column"
+         :min-width 40
+         :graphic {:fx/type summary
+                   :max-length 64
+                   :value (if (= header ::not-found) fn header)}
+         :cell-factory {:fx/cell-type :table-cell
+                        :describe describe-cell}
+         :cell-value-factory #(try (fn (peek %)) (catch Throwable e e))
+         :columns (mapv #(-> %
+                             (update :fn comp fn)
+                             (cond-> (= ::not-found (:header % ::not-found))
+                               (assoc :header (:fn %)))
+                             (make-column))
+                        columns)}
+        (dissoc props :header :fn :columns)))
+
 (defn table [{:keys [items columns]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created initialize-table!
@@ -263,41 +284,33 @@
           :desc {:fx/type :table-view
                  :on-key-pressed {::event/type ::on-table-key-pressed}
                  :style-class "reveal-table"
-                 :columns (for [{:keys [header fn]
-                                 :or {header ::not-found}} columns]
-                            {:fx/type :table-column
-                             :style-class "reveal-table-column"
-                             :min-width 40
-                             :graphic {:fx/type summary
-                                       :max-length 64
-                                       :value (if (= header ::not-found) fn header)}
-                             :cell-factory {:fx/cell-type :table-cell
-                                            :describe describe-cell}
-                             :cell-value-factory #(try (fn (peek %)) (catch Throwable e e))})
+                 :columns (mapv make-column columns)
                  :items (into [] (map-indexed vector) items)}}})
+
+(defn- infer-columns [sample]
+  (and (seq sample)
+       (condp every? sample
+         map? (for [k (->> sample (mapcat keys) distinct)]
+                {:header k :fn #(get % k)})
+         map-entry? [{:header 'key :fn key} {:header 'val :fn val}]
+         indexed? (for [i (->> sample (map count) (reduce max) range)]
+                    {:header i :fn #(nth % i (stream/as nil (stream/raw-string "nil" {:fill :util})))})
+         nil)))
+
+(defn- recursive-columns [sample depth]
+  (when (pos? depth)
+    (seq (for [col (infer-columns sample)]
+           (assoc col :columns (recursive-columns (map (:fn col) sample) (dec depth)))))))
 
 (action/defaction ::action/view:table [v]
   (when (and (some? v)
              (not (string? v))
              (seqable? v))
     (fn []
-      (let [head (first v)]
-        {:fx/type table
-         :items v
-         :columns (cond
-                    (map? head)
-                    (for [k (keys head)]
-                      {:header k :fn #(get % k)})
-
-                    (map-entry? head)
-                    [{:header 'key :fn key} {:header 'val :fn val}]
-
-                    (indexed? head)
-                    (for [i (range (count head))]
-                      {:header i :fn #(nth % i)})
-
-                    :else
-                    [{:header 'item :fn identity}])}))))
+      {:fx/type table
+       :items v
+       :columns (or (recursive-columns (take 10 v) 3)
+                    [{:header 'item :fn identity}])})))
 
 (action/defaction ::action/browse:internal [v]
   (when (or (and (instance? URI v)

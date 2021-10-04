@@ -8,15 +8,16 @@
 (def scroll-bar-color (delay (case @theme :dark "#fff6" :light "#0006")))
 (def inactive-scroll-bar-color (delay (case @theme :dark "#eee3" :light "#3333")))
 (def selection-color (delay (case @theme :dark "#005dd1" :light "#64e3fc")))
-(def unfocused-selection-color (delay (case @theme :dark "#555" :light "#e3e3e3")))
-(def popup-color (delay (case @theme :dark "#3b3b44" :light "#eee")))
+(def unfocused-selection-color (delay (case @theme :dark "#555555" :light "#e3e3e3")))
+(def popup-color (delay (case @theme :dark "#3b3b44" :light "#eeeeee")))
 (def search-color (delay (case @theme :dark "#aec1d0" :light "#32383d")))
+(def background-color (delay (case @theme :dark "#232325" :light "#fafafa")))
 (def search-shade-color (delay (str @search-color "55")))
 (def default-padding 5)
 
 (def ^:private colors
   (delay
-    {:util (case @theme :dark "#888" :light "#999")
+    {:util (case @theme :dark "#888888" :light "#999999")
      :symbol (case @theme :dark "#aec1d0" :light "#424b51")
      :object (case @theme :dark "#f7b940" :light "#c46003")
      :string (case @theme :dark "#22aeaa" :light "#018480")
@@ -34,7 +35,7 @@
           symbol-color (color :symbol)
           scalar-color (color :scalar)
           unfocused-background-color (case @theme :dark "#333" :light "#f2f2f2")
-          background-color (case @theme :dark "#232325" :light "#fafafa")
+          background-color @background-color
           scroll-bar-size 10
           font-family (str \" (.getFamily (font/font)) \")
           font-size (.getSize (font/font))
@@ -68,9 +69,10 @@
                           :-fx-padding [3 4 3 4]
                           :-fx-shape "\"M 0 0 h 7 l -3.5 4 z\""}
                " .filler" {:-fx-background-color unfocused-background-color}
-               "-column" {:-fx-padding 0
+               "-column" {:-fx-padding -1
                           :-fx-background-color unfocused-background-color
-                          :-fx-border-color [:transparent unfocused-selection-color :transparent :transparent]}
+                          :-fx-border-color [:transparent unfocused-selection-color :transparent :transparent]
+                          " .label" {:-fx-padding [0 2]}}
                "-cell" {:-fx-border-color [:transparent unfocused-selection-color :transparent :transparent]
                         :-fx-padding 0
                         ":selected" {:-fx-background-color unfocused-selection-color}}
@@ -157,7 +159,7 @@
          ".cell" {:-fx-text-fill symbol-color
                   :-fx-background-color :transparent}
          ".menu-item" {:-fx-padding [3.5 7]
-                       "> .label" {:-fx-text-fill symbol-color}
+                       "> .label" {:-fx-text-fill util-color}
                        ":focused" {:-fx-background-color selection-color
                                    "> .label" {:-fx-text-fill symbol-color}}}
          ".context-menu" {:-fx-background-color popup-color
@@ -172,6 +174,19 @@
                          "> .viewport" {:-fx-background-color :transparent}
                          "> .corner" {:-fx-background-color :transparent}}
          ".virtual-flow > .corner" {:-fx-background-color :transparent}
+         ".split-pane" {:-fx-background-color :transparent
+                        ">.split-pane-divider"
+                        {:-fx-background-color :transparent
+                         ":hover" {">.vertical-grabber" {:-fx-background-color scroll-bar-color}
+                                   ">.horizontal-grabber" {:-fx-background-color scroll-bar-color}}
+                         ">.vertical-grabber" {:-fx-pref-width 50
+                                               :-fx-pref-height 3
+                                               :-fx-background-radius 3
+                                               :-fx-background-color inactive-scroll-bar-color}
+                         ">.horizontal-grabber" {:-fx-pref-width 3
+                                                 :-fx-pref-height 50
+                                                 :-fx-background-radius 3
+                                                 :-fx-background-color inactive-scroll-bar-color}}}
          ".scroll-bar" {:-fx-background-color :transparent
                         "> .thumb" {:-fx-background-color "#eee3"
                                     :-fx-background-insets 0
