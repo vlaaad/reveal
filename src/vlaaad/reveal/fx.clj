@@ -1,10 +1,13 @@
 (ns vlaaad.reveal.fx
   (:require [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.component :as fx.component]
-            [vlaaad.reveal.event :as event])
+            [vlaaad.reveal.event :as event]
+            [cljfx.mutator :as fx.mutator]
+            [cljfx.prop :as fx.prop])
   (:import [java.util UUID]
            [java.util.function UnaryOperator]
-           [javafx.scene.control TextFormatter$Change]))
+           [javafx.scene.control TextFormatter$Change]
+           [javafx.scene Node]))
 
 (def ext-with-process
   "Extension lifecycle that provides \"local mutable state\" capability with a process
@@ -157,3 +160,14 @@
 (def code-text-formatter
   {:fx/type :text-formatter
    :filter code-text-formatter-filter})
+
+(defn property-prop [key]
+  (fx.prop/make
+    (fx.mutator/setter
+      (fn [^Node node x]
+        (let [props (.getProperties node)]
+          (if (= ::undefined x)
+            (.remove props key)
+            (.put props key x)))))
+    fx.lifecycle/scalar
+    :default ::undefined))

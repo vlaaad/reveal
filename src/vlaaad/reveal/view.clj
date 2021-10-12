@@ -10,7 +10,8 @@
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle]
-            [cljfx.component :as fx.component])
+            [cljfx.component :as fx.component]
+            [clojure.main :as m])
   (:import [clojure.lang IRef IFn]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
            [javafx.scene.control TableView TablePosition TableColumn$SortType]
@@ -231,7 +232,21 @@
                                                    (PseudoClass/getPseudoClass "selected"))
                                     %)))]
         {:bounds (.localToScreen cell (.getBoundsInLocal cell))
+         :annotation {::row-value #(deref
+                                     (fx/on-fx-thread
+                                       (-> view .getSelectionModel .getSelectedItem second)))
+                      ::table-value #(deref
+                                       (fx/on-fx-thread
+                                         (-> view .getProperties (.get ::items))))}
          :value (.getCellData (.getTableColumn pos) (.getRow pos))}))))
+
+(action/defaction ::action/view:row-value [x ann]
+  (when-let [f (::row-value ann)]
+    f))
+
+(action/defaction ::action/view:table-value [x ann]
+  (when-let [f (::table-value ann)]
+    f))
 
 (defmethod event/handle ::on-table-key-pressed [{:keys [^KeyEvent fx/event]}]
   (cond
@@ -267,7 +282,13 @@
                    :value (if (= header ::not-found) fn header)}
          :cell-factory {:fx/cell-type :table-cell
                         :describe describe-cell}
-         :cell-value-factory #(try (fn (peek %)) (catch Throwable e e))
+         :cell-value-factory #(try
+                                (fn (peek %))
+                                (catch Throwable e
+                                  (let [{:clojure.error/keys [cause class]}
+                                        (-> e Throwable->map m/ex-triage)]
+                                    (stream/as e
+                                      (stream/raw-string (or cause class) {:fill :error})))))
          :columns (mapv #(-> %
                              (update :fn comp fn)
                              (cond-> (= ::not-found (:header % ::not-found))
@@ -276,25 +297,51 @@
                         columns)}
         (dissoc props :header :fn :columns)))
 
+(def ext-with-items-prop
+  (fx/make-ext-with-props
+    {::items (rfx/property-prop ::items)}))
+
 (defn table [{:keys [items columns]}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created initialize-table!
    :desc {:fx/type action-popup/ext
           :select select-bounds-and-value!
-          :desc {:fx/type :table-view
-                 :on-key-pressed {::event/type ::on-table-key-pressed}
-                 :style-class "reveal-table"
-                 :columns (mapv make-column columns)
-                 :items (into [] (map-indexed vector) items)}}})
+          :desc {:fx/type ext-with-items-prop
+                 :props {::items items}
+                 :desc {:fx/type :table-view
+                        :on-key-pressed {::event/type ::on-table-key-pressed}
+                        :style-class "reveal-table"
+                        :columns (mapv make-column columns)
+                        :items (into [] (map-indexed vector) items)}}}})
+
+(def ^:private no-val
+  (stream/as nil (stream/raw-string "-" {:fill :util})))
 
 (defn- infer-columns [sample]
   (and (seq sample)
        (condp every? sample
-         map? (for [k (->> sample (mapcat keys) distinct)]
-                {:header k :fn #(get % k)})
-         map-entry? [{:header 'key :fn key} {:header 'val :fn val}]
-         indexed? (for [i (->> sample (map count) (reduce max) range)]
-                    {:header i :fn #(nth % i (stream/as nil (stream/raw-string "nil" {:fill :util})))})
+         (some-fn map? nil?)
+         (let [all-keys (mapcat keys sample)
+               columns (distinct all-keys)
+               column-count (count columns)
+               cells (* (count sample) column-count)]
+           (when (and (<= (/ cells 2) (count all-keys))
+                      (<= 1 column-count 16))
+             (for [k columns]
+               {:header k :fn #(get % k no-val)})))
+
+         map-entry?
+         [{:header 'key :fn key} {:header 'val :fn val}]
+
+         sequential?
+         (let [counts (map count sample)
+               column-count (apply max counts)
+               cell-count (* (count sample) column-count)]
+           (when (and (<= (/ cell-count 2) (reduce + counts))
+                      (<= 1 column-count 16))
+             (for [i (range column-count)]
+               {:header i :fn #(nth % i no-val)})))
+
          nil)))
 
 (defn- recursive-columns [sample depth]
@@ -309,7 +356,7 @@
     (fn []
       {:fx/type table
        :items v
-       :columns (or (recursive-columns (take 10 v) 3)
+       :columns (or (recursive-columns (take 16 v) 4)
                     [{:header 'item :fn identity}])})))
 
 (action/defaction ::action/browse:internal [v]

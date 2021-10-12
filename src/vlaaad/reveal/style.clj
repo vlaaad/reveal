@@ -72,7 +72,8 @@
                "-column" {:-fx-padding -1
                           :-fx-background-color unfocused-background-color
                           :-fx-border-color [:transparent unfocused-selection-color :transparent :transparent]
-                          " .label" {:-fx-padding [0 2]}}
+                          " .label" {:-fx-padding [0 2]
+                                     :-fx-alignment :top-left}}
                "-cell" {:-fx-border-color [:transparent unfocused-selection-color :transparent :transparent]
                         :-fx-padding 0
                         ":selected" {:-fx-background-color unfocused-selection-color}}
