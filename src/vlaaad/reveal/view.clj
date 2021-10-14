@@ -301,18 +301,20 @@
   (fx/make-ext-with-props
     {::items (rfx/property-prop ::items)}))
 
-(defn table [{:keys [items columns]}]
+(defn table [{:keys [items columns] :as props}]
   {:fx/type fx/ext-on-instance-lifecycle
    :on-created initialize-table!
    :desc {:fx/type action-popup/ext
           :select select-bounds-and-value!
           :desc {:fx/type ext-with-items-prop
                  :props {::items items}
-                 :desc {:fx/type :table-view
-                        :on-key-pressed {::event/type ::on-table-key-pressed}
-                        :style-class "reveal-table"
-                        :columns (mapv make-column columns)
-                        :items (into [] (map-indexed vector) items)}}}})
+                 :desc (into
+                         {:fx/type :table-view
+                          :on-key-pressed {::event/type ::on-table-key-pressed}
+                          :style-class "reveal-table"
+                          :columns (mapv make-column columns)
+                          :items (into [] (map-indexed vector) items)}
+                         (dissoc props :items :columns))}}})
 
 (def ^:private no-val
   (stream/as nil (stream/raw-string "-" {:fill :util})))
