@@ -193,7 +193,9 @@
                :focus-traversable true
                :text "Loading..."}
     ::value (->desc (:value props))
-    ::exception (->desc (:exception props))))
+    ::exception (->desc (stream/override-style
+                          (stream/stream (:exception props))
+                          assoc :fill :error))))
 
 (defn derefable [{:keys [derefable]}]
   {:fx/type rfx/ext-with-process

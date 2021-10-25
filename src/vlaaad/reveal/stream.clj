@@ -759,9 +759,18 @@
       (horizontal
         (raw-string "#reveal/future[" {:fill :object})
         (cond
-          (.isCancelled ^Future *blocking-deref) (raw-string "cancelled" {:fill :util})
-          (realized? *blocking-deref) (stream @*blocking-deref)
-          :else (raw-string "pending" {:fill :util}))
+          (.isCancelled ^Future *blocking-deref)
+          (raw-string "cancelled" {:fill :util})
+
+          (realized? *blocking-deref)
+          (let [[val err] (try [@*blocking-deref nil]
+                               (catch Exception e [nil e]))]
+            (if err
+              (override-style (stream err) assoc :fill :error)
+              (stream val)))
+
+          :else
+          (raw-string "pending" {:fill :util}))
         separator
         (identity-hash-code *blocking-deref)
         (raw-string "]" {:fill :object}))
