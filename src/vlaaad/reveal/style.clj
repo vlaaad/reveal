@@ -183,16 +183,16 @@
                          ">.vertical-grabber" {:-fx-pref-width 50
                                                :-fx-pref-height 3
                                                :-fx-background-radius 3
-                                               :-fx-background-color inactive-scroll-bar-color}
+                                               :-fx-background-color @inactive-scroll-bar-color}
                          ">.horizontal-grabber" {:-fx-pref-width 3
                                                  :-fx-pref-height 50
                                                  :-fx-background-radius 3
-                                                 :-fx-background-color inactive-scroll-bar-color}}}
+                                                 :-fx-background-color @inactive-scroll-bar-color}}}
          ".scroll-bar" {:-fx-background-color :transparent
-                        "> .thumb" {:-fx-background-color "#eee3"
+                        "> .thumb" {:-fx-background-color @inactive-scroll-bar-color
                                     :-fx-background-insets 0
                                     :-fx-background-radius scroll-bar-size
-                                    ":pressed" {:-fx-background-color "#fff6"}}
+                                    ":pressed" {:-fx-background-color @scroll-bar-color}}
                         ":horizontal" {"> .increment-button > .increment-arrow" {:-fx-pref-height scroll-bar-size}
                                        "> .decrement-button > .decrement-arrow" {:-fx-pref-height scroll-bar-size}}
                         ":vertical" {"> .increment-button > .increment-arrow" {:-fx-pref-width scroll-bar-size}
