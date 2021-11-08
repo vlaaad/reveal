@@ -67,7 +67,7 @@
           (stream/stream value))))))
 
 (defn middleware [f]
-  (let [ui (ui/make)]
+  (let [ui (ui/make-queue)]
     (add-tap #(show-tap ui %))
     (fn [request]
       (-> request

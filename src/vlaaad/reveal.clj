@@ -154,7 +154,7 @@
   ([] (ui {}))
   ([k v & kvs] (ui (apply hash-map k v kvs)))
   ([args]
-   ((requiring-resolve 'vlaaad.reveal.ui/make) args)))
+   ((requiring-resolve 'vlaaad.reveal.ui/make-queue) args)))
 
 (defn- ^{:cli "Display help for a specific command"} help [command]
   (let [doc (or (:cli (meta ((ns-interns 'vlaaad.reveal) command)))

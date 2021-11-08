@@ -332,8 +332,14 @@
                                                  :on-action {::event/type ::quit}
                                                  :text "Quit"}}]}]}}})
 
-(defn- view [{:keys [title queue showing views result-trees confirm-exit-showing]
-              ::keys [focus focus-key christmas]}]
+(def christmas
+  (delay
+    (let [now (LocalDate/now)]
+      (or (.isAfter now (LocalDate/of (.getYear now) 12 20))
+          (.isBefore now (LocalDate/of (.getYear now) 1 2))))))
+
+(defn- view [{:keys [title desc showing views result-trees confirm-exit-showing]
+              ::keys [focus focus-key]}]
   {:fx/type fx/ext-let-refs
    :refs (into {}
                (for [i (range (count result-trees))
@@ -350,7 +356,7 @@
                             :showing showing
                             :width 400
                             :height 500
-                            :icons (if christmas
+                            :icons (if @christmas
                                      ["vlaaad/reveal/logo-xmas-16.png"
                                       "vlaaad/reveal/logo-xmas-32.png"
                                       "vlaaad/reveal/logo-xmas-64.png"
@@ -380,11 +386,9 @@
                                                         (map #(hash-map :fx/type :row-constraints
                                                                         :percent-height %))))
                                 :children
-                                (into [{:fx/type view/queue
-                                        :grid-pane/row 0
-                                        :grid-pane/column 0
-                                        :queue queue
-                                        :id :output}]
+                                (into [(assoc desc
+                                         :grid-pane/row 0
+                                         :grid-pane/column 0)]
                                       (map-indexed
                                         (fn [i result-tree]
                                           {:fx/type result-tree-view
@@ -443,34 +447,17 @@
         :value {:fx/type view/derefable :derefable (event/daemon-future ((:invoke action)))}
         :form (:form action)))))
 
-(defn- stop-queue [_ ^ArrayBlockingQueue queue]
-  (.clear queue)
-  false)
-
-(defn- put-on-queue [^ArrayBlockingQueue queue x]
-  (.put queue ({nil ::view/nil} x x)))
-
-(defn- when-running [running f & args]
-  (when running
-    (apply f args))
-  running)
-
 (def ^:dynamic *eval-env*)
 
-(defmethod event/handle ::submit [{:keys [value]}]
-  (let [done (atom false)]
-    (fn [state]
-      (when (compare-and-set! done false true)
-        (put-on-queue (:queue state) value))
-      state)))
+(defmethod event/handle ::nop [_] identity)
+
+(def ^:private nop-event {::event/type ::nop})
 
 (defmethod event/handle ::all [{:keys [commands]}]
   (reduce
     #(comp
        (event/handle
-         (if (::event/type %2)
-           %2
-           {::event/type ::submit :value %2}))
+         (if (::event/type %2) %2 nop-event))
        %1)
     identity
     commands))
@@ -481,19 +468,16 @@
     ;; sorted maps with non-keyword keys throw class cast exceptions
     (catch Exception _ false)))
 
+(defn- nop [])
+
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
-  ([{:keys [title]}]
-   (let [value-queue (ArrayBlockingQueue. 1024)
-         *running (agent true :error-handler (fn [a ex]
-                                               (send-via event/daemon-executor a when-running put-on-queue value-queue ex)))
-         now (LocalDate/now)
-         christmas (or (.isAfter now (LocalDate/of (.getYear now) 12 20))
-                       (.isBefore now (LocalDate/of (.getYear now) 1 2)))
-         *state (atom {:queue value-queue
+  ([{:keys [title value dispose]
+     :or {dispose nop}}]
+   (let [desc (view/->desc value)
+         *state (atom {:desc desc
                        :views {}
-                       ::christmas christmas
                        :result-trees []
                        :title (cond-> "Reveal" title (str ": " title))
                        :showing true
@@ -519,16 +503,70 @@
                                                             (fn [sym]
                                                               [sym `(get *eval-env* '~sym)])))]
                                                ~form)))))))
-                     {::event/type ::submit :value x}))
+                     nop-event))
          dispose! #(do
                      (fx/unmount-renderer *state renderer)
-                     (send-via event/daemon-executor *running stop-queue value-queue))]
+                     (dispose)
+                     nil)]
      (fx/mount-renderer *state renderer)
      (swap! *state assoc :dispose dispose!)
+     {:dispose dispose!
+      :execute (comp event-handler process)})))
+
+(defn- stop-queue [_ ^ArrayBlockingQueue queue]
+  (.clear queue)
+  false)
+
+(defn- put-on-queue [^ArrayBlockingQueue queue x]
+  (.put queue ({nil ::view/nil} x x)))
+
+(defn- when-running [running f & args]
+  (when running
+    (apply f args))
+  running)
+
+(defmethod event/handle ::submit [{:keys [value]}]
+  (let [done (atom false)]
+    (fn [state]
+      (when (compare-and-set! done false true)
+        (when-let [q (-> state :desc :queue)]
+          (put-on-queue q value)))
+      state)))
+
+(defn- execute-or-submit [execute x]
+  (execute
+    (if (command? x)
+      x
+      {:vlaaad.reveal/command :vlaaad.reveal.command/event
+       ::event/type ::submit
+       :value x})))
+
+(defn make-queue
+  ([] (make-queue {}))
+  ([k v & kvs] (make-queue (apply hash-map k v kvs)))
+  ([{:as opts}]
+   (let [value-queue (ArrayBlockingQueue. 1024)
+         *running (agent
+                    true
+                    :error-handler
+                    (fn [a ex]
+                      (send-via event/daemon-executor a when-running put-on-queue value-queue ex)))
+         ui (make (assoc opts
+                    :value {:fx/type view/queue
+                            :queue value-queue
+                            :id :output}
+                    :dispose #(send-via event/daemon-executor *running stop-queue value-queue)))
+         {:keys [execute dispose]} ui]
      (fn
-       ([]
-        (dispose!)
-        nil)
+       ([] (dispose))
        ([x]
-        (send-via event/daemon-executor *running when-running (comp event-handler process) x)
+        (send-via event/daemon-executor *running when-running execute-or-submit execute x)
         x)))))
+
+;; TODO:
+;; 2. make window more interactive mutably:
+;;    - pause/resume (temporary),
+;;    - show/hide (resetting the state) - no dispose? or using dispose? or no show hide, but only dispose????
+;; 3. allow different window types (window, tmp popup (hide on esc), popup (hide on ctrl+w))
+;; 4. make persistent bounds
+;; 5. make overlay that manages multiple popups

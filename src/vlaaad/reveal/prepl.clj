@@ -41,7 +41,7 @@
     (out-fn x)))
 
 (defn prepl [in-reader out-fn & {:keys [stdin]}]
-  (let [ui (ui/make)]
+  (let [ui (ui/make-queue)]
     (try
       (server/prepl in-reader (wrap-out-fn ui out-fn) :stdin stdin)
       (finally (ui)))))
@@ -54,7 +54,7 @@
           out-fn prn}
      :as prepl-args}]
    {:pre [(some? port)]}
-   (let [ui (ui/make :title (or title (str "remote-prepl on " (when host (str host ":")) port)))
+   (let [ui (ui/make-queue :title (or title (str "remote-prepl on " (when host (str host ":")) port)))
          prepl-args (update prepl-args :valf (fn [valf]
                                                (or valf
                                                    #(binding [*default-data-reader-fn* tagged-literal]
@@ -70,7 +70,7 @@
   ([{:keys [valf title]
      :or {valf pr-str
           title "io-prepl"}}]
-   (let [ui (ui/make :title title)
+   (let [ui (ui/make-queue :title title)
          out *out*
          lock (Object.)]
      (try

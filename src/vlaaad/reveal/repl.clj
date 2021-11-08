@@ -72,7 +72,7 @@
   (apply require m/repl-requires))
 
 (defn repl [args]
-  (let [ui (ui/make :title (:title args "repl"))
+  (let [ui (ui/make-queue :title (:title args "repl"))
         tap (make-tap ui)
         version (str "Clojure " (clojure-version))
         repl-args (-> args
