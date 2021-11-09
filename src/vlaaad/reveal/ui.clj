@@ -394,10 +394,11 @@
                             :result-tree result-tree}))
                        result-trees)}}})
 
-(defn- window [{:keys [title showing confirm-exit-showing close-difficulty]
+(defn- window [{:keys [title showing confirm-exit-showing close-difficulty always-on-top]
                 :as props}]
   {:fx/type fx/ext-let-refs
    :refs {::stage {:fx/type :stage
+                   :always-on-top always-on-top
                    :title title
                    :on-close-request {::event/type ::confirm-exit
                                       :close-difficulty close-difficulty}
@@ -492,9 +493,10 @@
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
-  ([{:keys [title value dispose close-difficulty]
+  ([{:keys [title value dispose close-difficulty always-on-top]
      :or {dispose nop
-          close-difficulty :hard}}]
+          close-difficulty :hard
+          always-on-top false}}]
    (let [desc (view/->desc value)
          *state (atom {:desc desc
                        :views {}
@@ -502,6 +504,7 @@
                        :title (cond-> "Reveal" title (str ": " title))
                        :showing true
                        :close-difficulty close-difficulty
+                       :always-on-top always-on-top
                        :dispose (constantly nil)})
          event-handler (event/->MapEventHandler *state)
          renderer (fx/create-renderer
@@ -599,16 +602,18 @@
   (def ui (make :value (range 100)))
   ((:hide ui))
   ;; moves window to a different place...
-  ((:show ui)))
+  ((:show ui))
 
-(make :value 1
-      :title "foo"
-      :close-difficulty :easy)
+  (make
+    :value 1
+    :title "foo"
+    :close-difficulty :easy
+    :always-on-top true))
 
-;; 3. allow different window types
+;; 3. allow different window options:
 ;;    - decorations:
 ;;      - full (window title and default buttons)
-;;      - minimal (popup with title, yet resizable!)
-;;      - none (only content)
+;;      - minimal (popup with small title, movable and resizable)
+;;      - none (only content, resizable)
 ;; 4. make persistent bounds
 ;; 5. make overlay that manages multiple popups
