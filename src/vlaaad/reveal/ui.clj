@@ -291,13 +291,6 @@
                                :desc {:fx/type fx/ext-get-ref
                                       :ref id}}]}}}))
 
-(defmethod event/handle ::confirm-exit [{:keys [^Event fx/event]}]
-  (.consume event)
-  #(assoc % :confirm-exit-showing true))
-
-(defmethod event/handle ::cancel-quit [_]
-  #(dissoc % :confirm-exit-showing))
-
 (defmethod event/handle ::quit [_]
   (let [done (atom false)]
     (fn [state]
@@ -305,13 +298,36 @@
         ((:dispose state)))
       (dissoc state :confirm-exit-showing))))
 
-(defn- confirm-exit-dialog [_]
+(defmethod event/handle ::confirm-exit [{:keys [^Event fx/event close-difficulty]}]
+  (.consume event)
+  (if (= close-difficulty :hard)
+    #(assoc % :confirm-exit-showing true)
+    (event/handle {::event/type ::quit})))
+
+(defmethod event/handle ::handle-scene-key-press [{:keys [^KeyEvent fx/event close-difficulty] :as e}]
+  (cond
+    (and (= KeyCode/W (.getCode event))
+         (.isShortcutDown event))
+    (event/handle (assoc e ::event/type ::confirm-exit))
+
+    (and (= :easy close-difficulty)
+         (= KeyCode/ESCAPE (.getCode event)))
+    (do (.consume event)
+        (event/handle {::event/type ::quit}))
+
+    :else
+    identity))
+
+(defmethod event/handle ::cancel-quit [_]
+  #(dissoc % :confirm-exit-showing))
+
+(defn- confirm-exit-dialog [{:keys [title]}]
   {:fx/type :stage
    :showing true
    :owner {:fx/type fx/ext-get-ref :ref ::stage}
    :on-close-request {::event/type ::cancel-quit}
    :modality :window-modal
-   :title "Quit Reveal?"
+   :title "Close window?"
    :scene {:fx/type :scene
            :stylesheets [(:cljfx.css/url @style/style)]
            :accelerators {[:escape] {::event/type ::cancel-quit}}
@@ -320,7 +336,7 @@
                   :spacing style/default-padding
                   :padding style/default-padding
                   :children [{:fx/type :label
-                              :text "Are you sure you want to quit Reveal?"}
+                              :text (str "Are you sure you want to close \"" title "\"?")}
                              {:fx/type :h-box
                               :spacing 5
                               :alignment :center-right
@@ -330,7 +346,7 @@
                                          {:fx/type ext-focused-by-default
                                           :desc {:fx/type :button
                                                  :on-action {::event/type ::quit}
-                                                 :text "Quit"}}]}]}}})
+                                                 :text "Close"}}]}]}}})
 
 (def christmas
   (delay
@@ -378,12 +394,13 @@
                             :result-tree result-tree}))
                        result-trees)}}})
 
-(defn- window [{:keys [title showing confirm-exit-showing]
+(defn- window [{:keys [title showing confirm-exit-showing close-difficulty]
                 :as props}]
   {:fx/type fx/ext-let-refs
    :refs {::stage {:fx/type :stage
                    :title title
-                   :on-close-request {::event/type ::confirm-exit}
+                   :on-close-request {::event/type ::confirm-exit
+                                      :close-difficulty close-difficulty}
                    :showing showing
                    :width 400
                    :height 500
@@ -400,12 +417,14 @@
                              "vlaaad/reveal/logo-512.png"])
                    :on-focused-changed {::event/type ::on-window-focused-changed}
                    :scene {:fx/type :scene
-                           :stylesheets [(:cljfx.css/url @style/style)]
+                           :on-key-pressed {::event/type ::handle-scene-key-press
+                                            :close-difficulty close-difficulty}
                            :root (assoc props :fx/type view)}}}
    :desc {:fx/type fx/ext-let-refs
           :refs (cond-> {}
                   confirm-exit-showing
-                  (assoc ::confirm-exit {:fx/type confirm-exit-dialog}))
+                  (assoc ::confirm-exit {:fx/type confirm-exit-dialog
+                                         :title title}))
           :desc {:fx/type fx/ext-get-ref :ref ::stage}}})
 
 (defn oneduce
@@ -473,14 +492,16 @@
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
-  ([{:keys [title value dispose]
-     :or {dispose nop}}]
+  ([{:keys [title value dispose close-difficulty]
+     :or {dispose nop
+          close-difficulty :hard}}]
    (let [desc (view/->desc value)
          *state (atom {:desc desc
                        :views {}
                        :result-trees []
                        :title (cond-> "Reveal" title (str ": " title))
                        :showing true
+                       :close-difficulty close-difficulty
                        :dispose (constantly nil)})
          event-handler (event/->MapEventHandler *state)
          renderer (fx/create-renderer
@@ -580,8 +601,14 @@
   ;; moves window to a different place...
   ((:show ui)))
 
+(make :value 1
+      :title "foo"
+      :close-difficulty :easy)
 
-
-;; 3. allow different window types (window, tmp popup (hide on esc), popup (hide on ctrl+w))
+;; 3. allow different window types
+;;    - decorations:
+;;      - full (window title and default buttons)
+;;      - minimal (popup with title, yet resizable!)
+;;      - none (only content)
 ;; 4. make persistent bounds
 ;; 5. make overlay that manages multiple popups
