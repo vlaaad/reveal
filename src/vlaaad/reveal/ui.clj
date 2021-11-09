@@ -504,13 +504,15 @@
                                                               [sym `(get *eval-env* '~sym)])))]
                                                ~form)))))))
                      nop-event))
-         dispose! #(do
-                     (fx/unmount-renderer *state renderer)
-                     (dispose)
-                     nil)]
+         dispose-delay (delay
+                         (fx/unmount-renderer *state renderer)
+                         (dispose))
+         dispose! #(do @dispose-delay nil)]
      (fx/mount-renderer *state renderer)
      (swap! *state assoc :dispose dispose!)
      {:dispose dispose!
+      :show #(do (swap! *state assoc :showing true) nil)
+      :hide #(do (swap! *state assoc :showing false) nil)
       :execute (comp event-handler process)})))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
@@ -565,8 +567,21 @@
 
 ;; TODO:
 ;; 2. make window more interactive mutably:
-;;    - pause/resume (temporary),
-;;    - show/hide (resetting the state) - no dispose? or using dispose? or no show hide, but only dispose????
+;;    - watch on-disposed
+;; options:
+;; - make popup a map and add API fns
+;; - make popup a map with a bunch of fns
+;; - commands - useful from remote reveal repls!
+
+
+(comment
+  (def ui (make :value (range 100)))
+  ((:hide ui))
+  ;; moves window to a different place...
+  ((:show ui)))
+
+
+
 ;; 3. allow different window types (window, tmp popup (hide on esc), popup (hide on ctrl+w))
 ;; 4. make persistent bounds
 ;; 5. make overlay that manages multiple popups
