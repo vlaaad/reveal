@@ -338,8 +338,7 @@
       (or (.isAfter now (LocalDate/of (.getYear now) 12 20))
           (.isBefore now (LocalDate/of (.getYear now) 1 2))))))
 
-(defn- view [{:keys [title desc showing views result-trees confirm-exit-showing]
-              ::keys [focus focus-key]}]
+(defn- view [{:keys [desc views result-trees] ::keys [focus focus-key]}]
   {:fx/type fx/ext-let-refs
    :refs (into {}
                (for [i (range (count result-trees))
@@ -349,64 +348,65 @@
                       :desc {:fx/type view/ext-try
                              :desc (get-in views [id :desc])}}]))
    :desc {:fx/type fx/ext-let-refs
-          :refs (cond->
-                  {::stage {:fx/type :stage
-                            :title title
-                            :on-close-request {::event/type ::confirm-exit}
-                            :showing showing
-                            :width 400
-                            :height 500
-                            :icons (if @christmas
-                                     ["vlaaad/reveal/logo-xmas-16.png"
-                                      "vlaaad/reveal/logo-xmas-32.png"
-                                      "vlaaad/reveal/logo-xmas-64.png"
-                                      "vlaaad/reveal/logo-xmas-256.png"
-                                      "vlaaad/reveal/logo-xmas-512.png"]
-                                     ["vlaaad/reveal/logo-16.png"
-                                      "vlaaad/reveal/logo-32.png"
-                                      "vlaaad/reveal/logo-64.png"
-                                      "vlaaad/reveal/logo-256.png"
-                                      "vlaaad/reveal/logo-512.png"])
-                            :on-focused-changed {::event/type ::on-window-focused-changed}
-                            :scene
-                            {:fx/type :scene
-                             :stylesheets [(:cljfx.css/url @style/style)]
-                             :root
-                             {:fx/type :stack-pane
-                              :children
-                              [{:fx/type :grid-pane
-                                :style-class "reveal-ui"
-                                :column-constraints [{:fx/type :column-constraints
-                                                      :hgrow :always}]
-                                :row-constraints (let [n (inc (count result-trees))
-                                                       priority 2.25
-                                                       total (inc (* priority (dec n)))]
-                                                   (->> (repeat (dec n) (* priority (/ 100 total)))
-                                                        (cons (/ 100 total))
-                                                        (map #(hash-map :fx/type :row-constraints
-                                                                        :percent-height %))))
-                                :children
-                                (into [(assoc desc
-                                         :grid-pane/row 0
-                                         :grid-pane/column 0)]
-                                      (map-indexed
-                                        (fn [i result-tree]
-                                          {:fx/type result-tree-view
-                                           :grid-pane/row (inc i)
-                                           :grid-pane/column 0
-                                           :views views
-                                           :index i
-                                           :result-tree result-tree}))
-                                      result-trees)}]}}}}
-                  focus
-                  (assoc [::focus focus-key] {:fx/type ext-focused-by-default
-                                              :desc {:fx/type fx/ext-get-ref
-                                                     :ref focus}}))
-          :desc {:fx/type fx/ext-let-refs
-                 :refs (cond-> {}
-                         confirm-exit-showing
-                         (assoc ::confirm-exit {:fx/type confirm-exit-dialog}))
-                 :desc {:fx/type fx/ext-get-ref :ref ::stage}}}})
+          :refs (when focus
+                  {[::focus focus-key] {:fx/type ext-focused-by-default
+                                        :desc {:fx/type fx/ext-get-ref
+                                               :ref focus}}})
+          :desc {:fx/type :grid-pane
+                 :stylesheets [(:cljfx.css/url @style/style)]
+                 :style-class "reveal-ui"
+                 :column-constraints [{:fx/type :column-constraints
+                                       :hgrow :always}]
+                 :row-constraints (let [n (inc (count result-trees))
+                                        priority 2.25
+                                        total (inc (* priority (dec n)))]
+                                    (->> (repeat (dec n) (* priority (/ 100 total)))
+                                         (cons (/ 100 total))
+                                         (map #(hash-map :fx/type :row-constraints
+                                                         :percent-height %))))
+                 :children
+                 (into [(assoc desc
+                          :grid-pane/row 0
+                          :grid-pane/column 0)]
+                       (map-indexed
+                         (fn [i result-tree]
+                           {:fx/type result-tree-view
+                            :grid-pane/row (inc i)
+                            :grid-pane/column 0
+                            :views views
+                            :index i
+                            :result-tree result-tree}))
+                       result-trees)}}})
+
+(defn- window [{:keys [title showing confirm-exit-showing]
+                :as props}]
+  {:fx/type fx/ext-let-refs
+   :refs {::stage {:fx/type :stage
+                   :title title
+                   :on-close-request {::event/type ::confirm-exit}
+                   :showing showing
+                   :width 400
+                   :height 500
+                   :icons (if @christmas
+                            ["vlaaad/reveal/logo-xmas-16.png"
+                             "vlaaad/reveal/logo-xmas-32.png"
+                             "vlaaad/reveal/logo-xmas-64.png"
+                             "vlaaad/reveal/logo-xmas-256.png"
+                             "vlaaad/reveal/logo-xmas-512.png"]
+                            ["vlaaad/reveal/logo-16.png"
+                             "vlaaad/reveal/logo-32.png"
+                             "vlaaad/reveal/logo-64.png"
+                             "vlaaad/reveal/logo-256.png"
+                             "vlaaad/reveal/logo-512.png"])
+                   :on-focused-changed {::event/type ::on-window-focused-changed}
+                   :scene {:fx/type :scene
+                           :stylesheets [(:cljfx.css/url @style/style)]
+                           :root (assoc props :fx/type view)}}}
+   :desc {:fx/type fx/ext-let-refs
+          :refs (cond-> {}
+                  confirm-exit-showing
+                  (assoc ::confirm-exit {:fx/type confirm-exit-dialog}))
+          :desc {:fx/type fx/ext-get-ref :ref ::stage}}})
 
 (defn oneduce
   ([xf x]
@@ -485,7 +485,7 @@
          event-handler (event/->MapEventHandler *state)
          renderer (fx/create-renderer
                     :opts {:fx.opt/map-event-handler event-handler}
-                    :middleware (fx/wrap-map-desc #'view))
+                    :middleware (fx/wrap-map-desc #'window))
          process (fn process [x]
                    (if (command? x)
                      (let [form (:vlaaad.reveal/command x)]
