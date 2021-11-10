@@ -18,7 +18,8 @@
            [javafx.geometry Bounds]
            [javafx.scene.control ScrollPane]
            [java.time LocalDate]
-           [clojure.lang Namespace]))
+           [clojure.lang Namespace]
+           [javafx.stage Stage]))
 
 (defn- remove-index [xs i]
   (into (subvec xs 0 i) (subvec xs (inc i))))
@@ -315,6 +316,9 @@
     (do (.consume event)
         (event/handle {::event/type ::quit}))
 
+    (= KeyCode/F11 (.getCode event))
+    #(update % :maximized not)
+
     :else
     identity))
 
@@ -394,33 +398,44 @@
                             :result-tree result-tree}))
                        result-trees)}}})
 
-(defn- window [{:keys [title showing confirm-exit-showing close-difficulty always-on-top]
+(def ^:private ext-with-notifying-maximize
+  (fx/make-ext-with-props
+    {:maximized (fx.prop/make (fx.mutator/setter
+                                (fn [^Stage stage maximized]
+                                  (binding [fx.lifecycle/*in-progress?* false]
+                                    (.setMaximized stage maximized))))
+                              fx.lifecycle/scalar
+                              :default false)}))
+
+(defn- window [{:keys [title showing confirm-exit-showing close-difficulty always-on-top maximized]
                 :as props}]
   {:fx/type fx/ext-let-refs
-   :refs {::stage {:fx/type :stage
-                   :always-on-top always-on-top
-                   :title title
-                   :on-close-request {::event/type ::confirm-exit
-                                      :close-difficulty close-difficulty}
-                   :showing showing
-                   :width 400
-                   :height 500
-                   :icons (if @christmas
-                            ["vlaaad/reveal/logo-xmas-16.png"
-                             "vlaaad/reveal/logo-xmas-32.png"
-                             "vlaaad/reveal/logo-xmas-64.png"
-                             "vlaaad/reveal/logo-xmas-256.png"
-                             "vlaaad/reveal/logo-xmas-512.png"]
-                            ["vlaaad/reveal/logo-16.png"
-                             "vlaaad/reveal/logo-32.png"
-                             "vlaaad/reveal/logo-64.png"
-                             "vlaaad/reveal/logo-256.png"
-                             "vlaaad/reveal/logo-512.png"])
-                   :on-focused-changed {::event/type ::on-window-focused-changed}
-                   :scene {:fx/type :scene
-                           :on-key-pressed {::event/type ::handle-scene-key-press
-                                            :close-difficulty close-difficulty}
-                           :root (assoc props :fx/type view)}}}
+   :refs {::stage {:fx/type ext-with-notifying-maximize
+                   :props {:maximized maximized}
+                   :desc {:fx/type :stage
+                          :always-on-top always-on-top
+                          :title title
+                          :on-close-request {::event/type ::confirm-exit
+                                             :close-difficulty close-difficulty}
+                          :showing showing
+                          :width 400
+                          :height 500
+                          :icons (if @christmas
+                                   ["vlaaad/reveal/logo-xmas-16.png"
+                                    "vlaaad/reveal/logo-xmas-32.png"
+                                    "vlaaad/reveal/logo-xmas-64.png"
+                                    "vlaaad/reveal/logo-xmas-256.png"
+                                    "vlaaad/reveal/logo-xmas-512.png"]
+                                   ["vlaaad/reveal/logo-16.png"
+                                    "vlaaad/reveal/logo-32.png"
+                                    "vlaaad/reveal/logo-64.png"
+                                    "vlaaad/reveal/logo-256.png"
+                                    "vlaaad/reveal/logo-512.png"])
+                          :on-focused-changed {::event/type ::on-window-focused-changed}
+                          :scene {:fx/type :scene
+                                  :on-key-pressed {::event/type ::handle-scene-key-press
+                                                   :close-difficulty close-difficulty}
+                                  :root (assoc props :fx/type view)}}}}
    :desc {:fx/type fx/ext-let-refs
           :refs (cond-> {}
                   confirm-exit-showing
@@ -505,6 +520,7 @@
                        :showing true
                        :close-difficulty close-difficulty
                        :always-on-top always-on-top
+                       :maximized false
                        :dispose (constantly nil)})
          event-handler (event/->MapEventHandler *state)
          renderer (fx/create-renderer
