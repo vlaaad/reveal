@@ -630,6 +630,6 @@
 ;;    - decorations:
 ;;      - full (window title and default buttons)
 ;;      - minimal (popup with small title, movable and resizable)
-;;      - none (only content, resizable)
+;;      - none (only content, resizable? movable? needed? or minimal is enough?)
 ;; 4. make persistent bounds
 ;; 5. make overlay that manages multiple popups
