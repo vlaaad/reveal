@@ -42,7 +42,10 @@
           smaller-font-size (int (* font-size 0.85))
           selection-color @selection-color
           unfocused-selection-color @unfocused-selection-color
-          popup-color @popup-color]
+          popup-color @popup-color
+          char-width (font/char-width)
+          scroll-bar-color @scroll-bar-color
+          inactive-scroll-bar-color @inactive-scroll-bar-color]
       (css/register ::main
         {".reveal"
            {"-ui" {:-fx-background-color background-color}
@@ -140,14 +143,15 @@
                        :-fx-padding 0
                        :-fx-font-size font-size
                        ":focused" {:-fx-border-color scalar-color}}
-         ".button" {:-fx-text-fill util-color
+         ".button" {:-fx-text-fill symbol-color
                     :-fx-font-family font-family
                     :-fx-font-size font-size
                     :-fx-background-color :transparent
                     :-fx-background-radius 0
                     :-fx-border-width 1
                     :-fx-border-color unfocused-selection-color
-                    ":hover" {:-fx-text-fill symbol-color}
+                    ":hover" {:-fx-background-color unfocused-selection-color
+                              ":focused" {:-fx-background-color selection-color}}
                     ":focused" {:-fx-background-color selection-color
                                 :-fx-text-fill symbol-color
                                 :-fx-border-color :transparent}}
@@ -168,6 +172,17 @@
                           :-fx-effect "dropshadow(gaussian, #0006, 10, 0, 0, 5)"
                           " .separator > .line" {:-fx-border-insets [3.5 -7]}}
          ".separator" {"> .line" {:-fx-border-color [background-color :transparent :transparent :transparent]}}
+         ".tree-view" {:-fx-background-color :transparent
+                       :-fx-padding 0
+                       ":focused > .virtual-flow > .clipped-container > .sheet > .tree-cell"
+                       {":filled:selected" {:-fx-background-color selection-color}}}
+         ".tree-cell" {:-fx-text-fill util-color
+                       :-fx-graphic-text-gap char-width
+                       :-fx-font-size font-size
+                       :-fx-font-family font-family
+                       :-fx-padding 1
+                       ":enabled" {:-fx-text-fill symbol-color}
+                       "> .tree-disclosure-node > .arrow" {:-fx-background-color util-color}}
          ;; scroll bars
          ".table-cell" {:-fx-background-color :transparent}
          ".scroll-pane" {:-fx-background-color :transparent
@@ -183,16 +198,16 @@
                          ">.vertical-grabber" {:-fx-pref-width 50
                                                :-fx-pref-height 3
                                                :-fx-background-radius 3
-                                               :-fx-background-color @inactive-scroll-bar-color}
+                                               :-fx-background-color inactive-scroll-bar-color}
                          ">.horizontal-grabber" {:-fx-pref-width 3
                                                  :-fx-pref-height 50
                                                  :-fx-background-radius 3
-                                                 :-fx-background-color @inactive-scroll-bar-color}}}
+                                                 :-fx-background-color inactive-scroll-bar-color}}}
          ".scroll-bar" {:-fx-background-color :transparent
-                        "> .thumb" {:-fx-background-color @inactive-scroll-bar-color
+                        "> .thumb" {:-fx-background-color inactive-scroll-bar-color
                                     :-fx-background-insets 0
                                     :-fx-background-radius scroll-bar-size
-                                    ":pressed" {:-fx-background-color @scroll-bar-color}}
+                                    ":pressed" {:-fx-background-color scroll-bar-color}}
                         ":horizontal" {"> .increment-button > .increment-arrow" {:-fx-pref-height scroll-bar-size}
                                        "> .decrement-button > .decrement-arrow" {:-fx-pref-height scroll-bar-size}}
                         ":vertical" {"> .increment-button > .increment-arrow" {:-fx-pref-width scroll-bar-size}
