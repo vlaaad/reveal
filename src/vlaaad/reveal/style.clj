@@ -60,7 +60,7 @@
                             "-title" {:-fx-font-family font-family
                                       :-fx-text-fill symbol-color
                                       :-fx-font-size smaller-font-size
-                                      :-fx-cursor :move}}
+                                      ":draggable" {:-fx-cursor :move}}}
             "-ui" {:-fx-background-color background-color}
             "-popup" {:-fx-background-color popup-color
                       "-scroll-pane" {:-fx-hbar-policy :never

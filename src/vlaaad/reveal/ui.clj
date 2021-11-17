@@ -440,24 +440,30 @@
                      (+ (:height %))
                      (- new-height)))))
 
-(defn- undecorated-view-wrapper [{:keys [title] :as props}]
+(defn- undecorated-view-wrapper [{:keys [title maximized] :as props}]
   {:fx/type :v-box
    :style-class "reveal-undecorated-wrapper"
    :children [{:fx/type :h-box
                :alignment :center
                :padding {:left 2 :right 2}
-               :children [{:fx/type :label
-                           :h-box/hgrow :always
-                           ;; TODO not draggable/resizable when maximized!
-                           :on-mouse-pressed {::event/type ::start-window-drag}
-                           :on-mouse-dragged {::event/type ::drag-window}
-                           :max-width ##Inf
-                           :style-class "reveal-undecorated-title"
-                           :text (short-title title)}
-                          {:fx/type :region
-                           :style-class "reveal-undecorated-resize"
-                           :on-mouse-pressed {::event/type ::start-window-resize}
-                           :on-mouse-dragged {::event/type ::resize-window}}]}
+               :children (if maximized
+                           [{:fx/type :label
+                             :h-box/hgrow :always
+                             :max-width ##Inf
+                             :style-class "reveal-undecorated-title"
+                             :text (short-title title)}]
+                           [{:fx/type :label
+                             :h-box/hgrow :always
+                             :on-mouse-pressed {::event/type ::start-window-drag}
+                             :on-mouse-dragged {::event/type ::drag-window}
+                             :max-width ##Inf
+                             :style-class "reveal-undecorated-title"
+                             :pseudo-classes #{:draggable}
+                             :text (short-title title)}
+                            {:fx/type :region
+                             :style-class "reveal-undecorated-resize"
+                             :on-mouse-pressed {::event/type ::start-window-resize}
+                             :on-mouse-dragged {::event/type ::resize-window}}])}
               (assoc props :fx/type view
                            :v-box/vgrow :always)]})
 
@@ -703,13 +709,5 @@
     :always-on-top true
     :decorations false))
 
-;; 3. allow different window options:
-;;    - decorations:
-;;      - minimal
-;;        - [x] small title
-;;        - [x] movable
-;;        - [x] resizable
-;;        - [ ] non-movable/resizable when maximized
-;;        - [x] shorter title
 ;; 4. make persistent bounds
 ;; 5. make overlay that manages multiple popups
