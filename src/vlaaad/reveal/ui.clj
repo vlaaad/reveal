@@ -325,6 +325,13 @@
 (defmethod event/handle ::cancel-quit [_]
   #(dissoc % :confirm-exit-showing))
 
+(defn- full-title [title]
+  (cond-> "Reveal"
+    title (str ": " title)))
+
+(defn- short-title [title]
+  (or title "Reveal"))
+
 (defn- confirm-exit-dialog [{:keys [title]}]
   {:fx/type :stage
    :showing true
@@ -340,7 +347,7 @@
                   :spacing style/default-padding
                   :padding style/default-padding
                   :children [{:fx/type :label
-                              :text (str "Are you sure you want to close \"" title "\"?")}
+                              :text (str "Are you sure you want to close \"" (short-title title) "\"?")}
                              {:fx/type :h-box
                               :spacing 5
                               :alignment :center-right
@@ -446,7 +453,7 @@
                            :on-mouse-dragged {::event/type ::drag-window}
                            :max-width ##Inf
                            :style-class "reveal-undecorated-title"
-                           :text title} ;; TODO shorter title!
+                           :text (short-title title)}
                           {:fx/type :region
                            :style-class "reveal-undecorated-resize"
                            :on-mouse-pressed {::event/type ::start-window-resize}
@@ -467,7 +474,7 @@
                    :desc {:fx/type :stage
                           :style (if decorations :decorated :undecorated)
                           :always-on-top always-on-top
-                          :title title
+                          :title (full-title title)
                           :on-close-request {::event/type ::confirm-exit
                                              :close-difficulty close-difficulty}
                           :showing showing
@@ -578,7 +585,7 @@
          *state (atom {:desc desc
                        :views {}
                        :result-trees []
-                       :title (cond-> "Reveal" title (str ": " title))
+                       :title title
                        :showing true
                        :close-difficulty close-difficulty
                        :always-on-top always-on-top
@@ -703,6 +710,6 @@
 ;;        - [x] movable
 ;;        - [x] resizable
 ;;        - [ ] non-movable/resizable when maximized
-;;        - [ ] shorter title
+;;        - [x] shorter title
 ;; 4. make persistent bounds
 ;; 5. make overlay that manages multiple popups
