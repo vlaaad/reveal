@@ -48,7 +48,20 @@
           inactive-scroll-bar-color @inactive-scroll-bar-color]
       (css/register ::main
         {".reveal"
-           {"-ui" {:-fx-background-color background-color}
+           {"-undecorated" {"-wrapper" {:-fx-background-color popup-color
+                                        :-fx-padding 1}
+                            "-resize" {:-fx-min-width 12
+                                       :-fx-min-height 12
+                                       :-fx-max-width 12
+                                       :-fx-max-height 12
+                                       :-fx-background-color util-color
+                                       :-fx-shape "\"M4 0 L5 0 L6 1 L6 2z M2 0 L3 0 L6 3 L6 4z M0 0 L1 0 L6 5 L6 6z\""
+                                       :-fx-cursor :ne-resize}
+                            "-title" {:-fx-font-family font-family
+                                      :-fx-text-fill symbol-color
+                                      :-fx-font-size smaller-font-size
+                                      :-fx-cursor :move}}
+            "-ui" {:-fx-background-color background-color}
             "-popup" {:-fx-background-color popup-color
                       "-scroll-pane" {:-fx-hbar-policy :never
                                       :-fx-min-height 0}

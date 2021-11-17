@@ -9,7 +9,7 @@
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle])
-  (:import [javafx.scene.input KeyEvent KeyCode]
+  (:import [javafx.scene.input KeyEvent KeyCode MouseEvent]
            [javafx.scene Node Parent]
            [javafx.beans.value ChangeListener]
            [javafx.event Event]
@@ -373,7 +373,6 @@
                                         :desc {:fx/type fx/ext-get-ref
                                                :ref focus}}})
           :desc {:fx/type :grid-pane
-                 :stylesheets [(:cljfx.css/url @style/style)]
                  :style-class "reveal-ui"
                  :column-constraints [{:fx/type :column-constraints
                                        :hgrow :always}]
@@ -407,19 +406,79 @@
                               fx.lifecycle/scalar
                               :default false)}))
 
-(defn- window [{:keys [title showing confirm-exit-showing close-difficulty always-on-top maximized]
+(defmethod event/handle ::start-window-drag [{:keys [^MouseEvent fx/event]}]
+  #(assoc % :window-drag-offset-x (- (:x %) (.getScreenX event))
+            :window-drag-offset-y (- (:y %) (.getScreenY event))))
+
+(defmethod event/handle ::drag-window [{:keys [^MouseEvent fx/event]}]
+  #(assoc % :x (+ (:window-drag-offset-x %) (.getScreenX event))
+            :y (+ (:window-drag-offset-y %) (.getScreenY event))))
+
+(defmethod event/handle ::start-window-resize [{:keys [^MouseEvent fx/event]}]
+  #(assoc % :window-resize-offset-x (-> (:x %)
+                                        (+ (:width %))
+                                        (- (.getScreenX event)))
+            :window-resize-offset-y (- (.getScreenY event) (:y %))))
+
+(defmethod event/handle ::resize-window [{:keys [^MouseEvent fx/event]}]
+  #(let [new-height (max 50 (-> (:y %)
+                                (+ (:height %))
+                                (- (.getScreenY event))
+                                (+ (:window-resize-offset-y %))))]
+     (assoc % :width (max 50 (-> (:window-resize-offset-x %)
+                                 (+ (.getScreenX event))
+                                 (- (:x %))))
+              :height new-height
+              :y (-> (:y %)
+                     (+ (:height %))
+                     (- new-height)))))
+
+(defn- undecorated-view-wrapper [{:keys [title] :as props}]
+  {:fx/type :v-box
+   :style-class "reveal-undecorated-wrapper"
+   :children [{:fx/type :h-box
+               :alignment :center
+               :padding {:left 2 :right 2}
+               :children [{:fx/type :label
+                           :h-box/hgrow :always
+                           ;; TODO not draggable/resizable when maximized!
+                           :on-mouse-pressed {::event/type ::start-window-drag}
+                           :on-mouse-dragged {::event/type ::drag-window}
+                           :max-width ##Inf
+                           :style-class "reveal-undecorated-title"
+                           :text title} ;; TODO shorter title!
+                          {:fx/type :region
+                           :style-class "reveal-undecorated-resize"
+                           :on-mouse-pressed {::event/type ::start-window-resize}
+                           :on-mouse-dragged {::event/type ::resize-window}}]}
+              (assoc props :fx/type view
+                           :v-box/vgrow :always)]})
+
+(defmethod event/handle ::set [{:keys [key fx/event]}]
+  #(assoc % key event))
+
+(defn- window [{:keys [title showing confirm-exit-showing
+                       close-difficulty always-on-top maximized decorations
+                       x y width height]
                 :as props}]
   {:fx/type fx/ext-let-refs
    :refs {::stage {:fx/type ext-with-notifying-maximize
                    :props {:maximized maximized}
                    :desc {:fx/type :stage
+                          :style (if decorations :decorated :undecorated)
                           :always-on-top always-on-top
                           :title title
                           :on-close-request {::event/type ::confirm-exit
                                              :close-difficulty close-difficulty}
                           :showing showing
-                          :width 400
-                          :height 500
+                          :x x
+                          :on-x-changed {::event/type ::set :key :x}
+                          :y y
+                          :on-y-changed {::event/type ::set :key :y}
+                          :width width
+                          :on-width-changed {::event/type ::set :key :width}
+                          :height height
+                          :on-height-changed {::event/type ::set :key :height}
                           :icons (if @christmas
                                    ["vlaaad/reveal/logo-xmas-16.png"
                                     "vlaaad/reveal/logo-xmas-32.png"
@@ -433,9 +492,11 @@
                                     "vlaaad/reveal/logo-512.png"])
                           :on-focused-changed {::event/type ::on-window-focused-changed}
                           :scene {:fx/type :scene
+                                  :stylesheets [(:cljfx.css/url @style/style)]
                                   :on-key-pressed {::event/type ::handle-scene-key-press
                                                    :close-difficulty close-difficulty}
-                                  :root (assoc props :fx/type view)}}}}
+                                  :root (assoc props :fx/type (if decorations view undecorated-view-wrapper))}}}}
+
    :desc {:fx/type fx/ext-let-refs
           :refs (cond-> {}
                   confirm-exit-showing
@@ -508,10 +569,11 @@
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
-  ([{:keys [title value dispose close-difficulty always-on-top]
+  ([{:keys [title value dispose close-difficulty always-on-top decorations]
      :or {dispose nop
-          close-difficulty :hard
-          always-on-top false}}]
+          close-difficulty :hard ;; :easy :normal
+          always-on-top false
+          decorations true}}]
    (let [desc (view/->desc value)
          *state (atom {:desc desc
                        :views {}
@@ -521,6 +583,12 @@
                        :close-difficulty close-difficulty
                        :always-on-top always-on-top
                        :maximized false
+                       :decorations decorations
+                       ;; TODO select better default bounds
+                       :x 100
+                       :y 100
+                       :width 400
+                       :height 500
                        :dispose (constantly nil)})
          event-handler (event/->MapEventHandler *state)
          renderer (fx/create-renderer
@@ -619,17 +687,22 @@
   ((:hide ui))
   ;; moves window to a different place...
   ((:show ui))
+  ((:dispose ui))
 
   (make
     :value 1
     :title "foo"
     :close-difficulty :easy
-    :always-on-top true))
+    :always-on-top true
+    :decorations false))
 
 ;; 3. allow different window options:
 ;;    - decorations:
-;;      - full (window title and default buttons)
-;;      - minimal (popup with small title, movable and resizable)
-;;      - none (only content, resizable? movable? needed? or minimal is enough?)
+;;      - minimal
+;;        - [x] small title
+;;        - [x] movable
+;;        - [x] resizable
+;;        - [ ] non-movable/resizable when maximized
+;;        - [ ] shorter title
 ;; 4. make persistent bounds
 ;; 5. make overlay that manages multiple popups
