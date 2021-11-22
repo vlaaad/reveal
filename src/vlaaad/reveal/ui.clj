@@ -8,7 +8,8 @@
             [vlaaad.reveal.view :as view]
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
-            [cljfx.lifecycle :as fx.lifecycle])
+            [cljfx.lifecycle :as fx.lifecycle]
+            [vlaaad.reveal.io :as rio])
   (:import [javafx.scene.input KeyEvent KeyCode MouseEvent]
            [javafx.scene Node Parent]
            [javafx.beans.value ChangeListener]
@@ -19,7 +20,7 @@
            [javafx.scene.control ScrollPane]
            [java.time LocalDate]
            [clojure.lang Namespace]
-           [javafx.stage Stage]))
+           [javafx.stage Stage Screen]))
 
 (defn- remove-index [xs i]
   (into (subvec xs 0 i) (subvec xs (inc i))))
@@ -404,6 +405,55 @@
                             :result-tree result-tree}))
                        result-trees)}}})
 
+(defonce bounds-state
+  (delay
+    (atom
+      {:state (rio/slurp-edn "bounds.edn")
+       :usage {}})))
+
+(defn- take-bounds [state scope key id]
+  (let [existing-bounds (get-in state [:state scope key])
+        used (get-in state [:usage scope key :id])
+        free-index (first (remove used (range (count existing-bounds))))
+        index (or free-index (count existing-bounds))]
+    (-> state
+        (cond-> (not free-index)
+          (update-in [:state scope key]
+                     (fnil assoc [])
+                     index
+                     (let [screen-bounds (.getVisualBounds (Screen/getPrimary))
+                           screen-width (.getWidth screen-bounds)
+                           screen-height (.getHeight screen-bounds)
+                           w (* 0.5 screen-width)
+                           h (* 0.5 screen-height)
+                           x (+ (.getMinX screen-bounds)
+                                (* 0.5 (- screen-width w)))
+                           y (+ (.getMinY screen-bounds)
+                                (* 1/3 (- screen-height h)))]
+                       {:x x :y y :width w :height h})))
+        (assoc-in [:usage scope key :id index] id)
+        (assoc-in [:usage scope key :index id] index))))
+
+(defn- set-bounds [state scope key id rect]
+  (let [index (get-in state [:usage scope key :index id])]
+    (assoc-in state [:state scope key index] rect)))
+
+(defn- free-bounds [state scope key id]
+  (let [index (get-in state [:usage scope key :index id])]
+    (-> state
+        (update-in [:usage scope key :id] dissoc index)
+        (update-in [:usage scope key :index] dissoc id))))
+
+(defn- take-bounds! [scope key id]
+  (let [new-state (swap! @bounds-state take-bounds scope key id)]
+    (get-in new-state [:state scope key (get-in new-state [:usage scope key :index id])])))
+
+(defn- set-bounds-from-ui-state [state]
+  (let [{:keys [x y width height bound]} state
+        {:keys [scope key id]} bound]
+    (swap! @bounds-state set-bounds scope key id {:x x :y y :width width :height height}))
+  state)
+
 (def ^:private ext-with-notifying-maximize
   (fx/make-ext-with-props
     {:maximized (fx.prop/make (fx.mutator/setter
@@ -418,8 +468,10 @@
             :window-drag-offset-y (- (:y %) (.getScreenY event))))
 
 (defmethod event/handle ::drag-window [{:keys [^MouseEvent fx/event]}]
-  #(assoc % :x (+ (:window-drag-offset-x %) (.getScreenX event))
-            :y (+ (:window-drag-offset-y %) (.getScreenY event))))
+  #(-> %
+       (assoc :x (+ (:window-drag-offset-x %) (.getScreenX event))
+              :y (+ (:window-drag-offset-y %) (.getScreenY event)))
+       set-bounds-from-ui-state))
 
 (defmethod event/handle ::start-window-resize [{:keys [^MouseEvent fx/event]}]
   #(assoc % :window-resize-offset-x (-> (:x %)
@@ -432,13 +484,15 @@
                                 (+ (:height %))
                                 (- (.getScreenY event))
                                 (+ (:window-resize-offset-y %))))]
-     (assoc % :width (max 50 (-> (:window-resize-offset-x %)
-                                 (+ (.getScreenX event))
-                                 (- (:x %))))
-              :height new-height
-              :y (-> (:y %)
-                     (+ (:height %))
-                     (- new-height)))))
+     (-> %
+         (assoc :width (max 50 (-> (:window-resize-offset-x %)
+                                   (+ (.getScreenX event))
+                                   (- (:x %))))
+                :height new-height
+                :y (-> (:y %)
+                       (+ (:height %))
+                       (- new-height)))
+         set-bounds-from-ui-state)))
 
 (defn- undecorated-view-wrapper [{:keys [title maximized] :as props}]
   {:fx/type :v-box
@@ -467,8 +521,10 @@
               (assoc props :fx/type view
                            :v-box/vgrow :always)]})
 
-(defmethod event/handle ::set [{:keys [key fx/event]}]
-  #(assoc % key event))
+(defmethod event/handle ::set-bound [{:keys [key fx/event]}]
+  #(-> %
+       (assoc key event)
+       (cond-> (not (:maximized %)) set-bounds-from-ui-state)))
 
 (defn- window [{:keys [title showing confirm-exit-showing
                        close-difficulty always-on-top maximized decorations
@@ -485,13 +541,13 @@
                                              :close-difficulty close-difficulty}
                           :showing showing
                           :x x
-                          :on-x-changed {::event/type ::set :key :x}
+                          :on-x-changed {::event/type ::set-bound :key :x}
                           :y y
-                          :on-y-changed {::event/type ::set :key :y}
+                          :on-y-changed {::event/type ::set-bound :key :y}
                           :width width
-                          :on-width-changed {::event/type ::set :key :width}
+                          :on-width-changed {::event/type ::set-bound :key :width}
                           :height height
-                          :on-height-changed {::event/type ::set :key :height}
+                          :on-height-changed {::event/type ::set-bound :key :height}
                           :icons (if @christmas
                                    ["vlaaad/reveal/logo-xmas-16.png"
                                     "vlaaad/reveal/logo-xmas-32.png"
@@ -582,27 +638,30 @@
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
-  ([{:keys [title value dispose close-difficulty always-on-top decorations]
+  ([{:keys [title value dispose close-difficulty always-on-top decorations bounds]
      :or {dispose nop
           close-difficulty :hard ;; :easy :normal
           always-on-top false
-          decorations true}}]
+          decorations true
+          bounds :default}}]
    (let [desc (view/->desc value)
-         *state (atom {:desc desc
-                       :views {}
-                       :result-trees []
-                       :title title
-                       :showing true
-                       :close-difficulty close-difficulty
-                       :always-on-top always-on-top
-                       :maximized false
-                       :decorations decorations
-                       ;; TODO select better default bounds
-                       :x 100
-                       :y 100
-                       :width 400
-                       :height 500
-                       :dispose (constantly nil)})
+         bound-id (gensym "bound")
+         bound-scope (System/getProperty "user.dir")
+         bound-rect (take-bounds! bound-scope bounds bound-id)
+         *state (atom (into {:desc desc
+                             :views {}
+                             :result-trees []
+                             :title title
+                             :showing true
+                             :close-difficulty close-difficulty
+                             :always-on-top always-on-top
+                             :maximized false
+                             :decorations decorations
+                             :dispose (constantly nil)
+                             :bound {:scope bound-scope
+                                     :key bounds
+                                     :id bound-id}}
+                            bound-rect))
          event-handler (event/->MapEventHandler *state)
          renderer (fx/create-renderer
                     :opts {:fx.opt/map-event-handler event-handler}
@@ -626,6 +685,7 @@
                                                ~form)))))))
                      nop-event))
          dispose-delay (delay
+                         (swap! @bounds-state free-bounds bound-scope bounds bound-id)
                          (fx/unmount-renderer *state renderer)
                          (dispose))
          dispose! #(do @dispose-delay nil)]
@@ -686,21 +746,14 @@
         (send-via event/daemon-executor *running when-running execute-or-submit execute x)
         x)))))
 
-;; TODO:
-;; 2. make window more interactive mutably:
-;;    - watch on-disposed
-;; options:
-;; - make popup a map and add API fns
-;; - make popup a map with a bunch of fns
-;; - commands - useful from remote reveal repls!
-
-
 (comment
   (def ui (make :value (range 100)))
   ((:hide ui))
   ;; moves window to a different place...
   ((:show ui))
   ((:dispose ui))
+
+  @bounds-state
 
   (make
     :value 1
@@ -710,4 +763,12 @@
     :decorations false))
 
 ;; 4. make persistent bounds
+;; - [x] load persisted bounds once per JVM
+;; - [ ] save bounds
+;; - [ ] debounce saving bounds by something like 1 second, so it's not constantly writing
+;;       to disk while we move the window
+;; - [x] pick better bounds by default if none exist
+;; - [x] load bounds
+
 ;; 5. make overlay that manages multiple popups
+;; 6. shift+enter to open action result in a new popup
