@@ -1,14 +1,19 @@
 (ns vlaaad.reveal.event
-  (:import [java.util.concurrent Executors ThreadFactory ExecutorService]
+  (:import [java.util.concurrent Executors ThreadFactory ExecutorService ScheduledExecutorService]
            [clojure.lang IFn]))
 
+(def ^:private ^ThreadFactory daemon-thread-factory
+  (let [*counter (atom 0)]
+    (reify ThreadFactory
+      (newThread [_ runnable]
+        (doto (Thread. runnable (str "reveal-agent-pool-" (swap! *counter inc)))
+          (.setDaemon true))))))
+
 (def ^ExecutorService daemon-executor
-  (let [*counter (atom 0)
-        factory (reify ThreadFactory
-                  (newThread [_ runnable]
-                    (doto (Thread. runnable (str "reveal-agent-pool-" (swap! *counter inc)))
-                      (.setDaemon true))))]
-    (Executors/newCachedThreadPool factory)))
+  (Executors/newCachedThreadPool daemon-thread-factory))
+
+(def ^ScheduledExecutorService daemon-scheduler
+  (Executors/newSingleThreadScheduledExecutor daemon-thread-factory))
 
 (defn daemon-future-call [f]
   (.submit daemon-executor ^Callable (bound-fn* f)))

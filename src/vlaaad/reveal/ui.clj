@@ -9,12 +9,13 @@
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle]
-            [vlaaad.reveal.io :as rio])
+            [vlaaad.reveal.io :as rio]
+            [clojure.spec.alpha :as s])
   (:import [javafx.scene.input KeyEvent KeyCode MouseEvent]
            [javafx.scene Node Parent]
            [javafx.beans.value ChangeListener]
            [javafx.event Event]
-           [java.util.concurrent ArrayBlockingQueue]
+           [java.util.concurrent ArrayBlockingQueue TimeUnit]
            [java.util UUID]
            [javafx.geometry Bounds]
            [javafx.scene.control ScrollPane]
@@ -405,15 +406,46 @@
                             :result-tree result-tree}))
                        result-trees)}}})
 
+(s/def ::x number?)
+(s/def ::y number?)
+(s/def ::width number?)
+(s/def ::height number?)
+(s/def ::bounds (s/coll-of (s/keys :req-un [::x ::y ::width ::height]) :kind vector?))
+(s/def ::bounds.edn (s/nilable (s/map-of any? (s/map-of any? ::bounds))))
+
 (defonce bounds-state
   (delay
-    (atom
-      {:state (rio/slurp-edn "bounds.edn")
-       :usage {}})))
+    (let [state (rio/slurp-edn "bounds.edn")
+          persister (agent nil
+                           :error-handler (fn [_ ^Throwable ex]
+                                            (.printStackTrace ex)))
+          persist (fn [task state]
+                    (rio/update-edn "bounds.edn" #(merge-with merge %1 %2) state)
+                    task)
+          schedule-persistence
+          (fn [task state]
+            (when task (future-cancel task))
+            (.schedule event/daemon-scheduler
+                       ^Runnable (fn []
+                                   (send-via event/daemon-executor persister persist state))
+                       1 TimeUnit/SECONDS))]
+      (add-watch
+        (atom
+          {:state (if (s/valid? ::bounds.edn state)
+                    state
+                    (do
+                      (println (str "Invalid " (rio/path "bounds.edn") ":"))
+                      (s/explain ::bounds.edn state)
+                      nil))
+           :usage {}})
+        ::persist
+        (fn [_ _ {old :state} {new :state}]
+          (when-not (= old new)
+            (send-via event/daemon-executor persister schedule-persistence new)))))))
 
 (defn- take-bounds [state scope key id]
   (let [existing-bounds (get-in state [:state scope key])
-        used (get-in state [:usage scope key :id])
+        used (get-in state [:usage scope key :id] {})
         free-index (first (remove used (range (count existing-bounds))))
         index (or free-index (count existing-bounds))]
     (-> state
@@ -761,14 +793,6 @@
     :close-difficulty :easy
     :always-on-top true
     :decorations false))
-
-;; 4. make persistent bounds
-;; - [x] load persisted bounds once per JVM
-;; - [ ] save bounds
-;; - [ ] debounce saving bounds by something like 1 second, so it's not constantly writing
-;;       to disk while we move the window
-;; - [x] pick better bounds by default if none exist
-;; - [x] load bounds
 
 ;; 5. make overlay that manages multiple popups
 ;; 6. shift+enter to open action result in a new popup

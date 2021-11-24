@@ -14,6 +14,9 @@
       :else (System/getProperty "user.home"))
     ".reveal"))
 
+(defn path [filename]
+  (str (io/file app-data-dir filename)))
+
 (defn- slurp-edn* [^File f]
   (when (.exists f)
     (try
