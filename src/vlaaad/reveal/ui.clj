@@ -747,13 +747,14 @@
         x)))))
 
 (defn inspect [x & {:as opts}]
-  (make (into {:value x
-               :title "inspect"
-               :close-difficulty :easy
-               :always-on-top true
-               :decorations false
-               :bounds :inspector}
-              opts))
+  (make (merge
+          {:title "inspect"
+           :close-difficulty :easy
+           :always-on-top true
+           :decorations false
+           :bounds `inspect}
+          opts
+          {:value x}))
   x)
 
 (defmethod event/handle ::view [{:keys [value
@@ -797,15 +798,16 @@
   #(remove-tap notify))
 
 (defn tap-log [& {:as opts}]
-  (make (into {:value {:fx/type view/ref-watch-all
-                       :result-factory (view/str-result-factory "tap>")
-                       :subscribe subscribe-tap}
-               :title "tap log"
-               :close-difficulty :easy
-               :always-on-top true
-               :decorations false
-               :bounds `tap-log}
-              opts))
+  (make (merge
+          {:title "tap log"
+           :close-difficulty :normal
+           :always-on-top true
+           :decorations false
+           :bounds `tap-log}
+          opts
+          {:value {:fx/type view/ref-watch-all
+                   :result-factory (view/str-result-factory "tap>")
+                   :subscribe subscribe-tap}}))
   nil)
 
 (comment
@@ -816,18 +818,9 @@
 
   (tap-log)
 
-  @bounds-state
-
-  (make
-    :value 1
-    :title "foo"
-    :close-difficulty :easy
-    :always-on-top true
-    :decorations false))
-
-(tap> {:a 1})
+  @bounds-state)
 
 ;; TODO
 ;; - pro: update graphviz open view code to support shift
 ;; - pro: update license checking
-;; - allow showing-hiding all popups at once
+;; - allow showing-hiding all popups at once (minimizing?)
