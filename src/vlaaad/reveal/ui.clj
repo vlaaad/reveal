@@ -612,38 +612,6 @@
    (let [rf (xf (completing #(f %2)))]
      (rf (rf nil x)))))
 
-(defmethod event/handle ::view [{:keys [value
-                                        form
-                                        new-result-panel
-
-                                        view-index
-                                        view-id]}]
-  (let [id (UUID/randomUUID)
-        desc (view/->desc value)
-        form (or form (stream/horizontal
-                        (stream/raw-string "(" {:fill :util})
-                        (stream/raw-string "view" {:fill :symbol})
-                        stream/separator
-                        (stream/stream value)
-                        (stream/raw-string ")" {:fill :util})))]
-    (fn [state]
-      (let [result-trees (:result-trees state)
-            index (if new-result-panel (count result-trees) (or view-index 0))]
-        (-> state
-            (assoc :result-trees (update result-trees index focus-tree/add view-id id))
-            (assoc-in [:views id] {:form form :desc desc}))))))
-
-(defmethod event/handle ::execute-action [{:keys [action] :as event}]
-  (if (::ignore-action-result (meta (:invoke action)))
-    (do
-      (event/daemon-future ((:invoke action)))
-      identity)
-    (event/handle
-      (assoc event
-        ::event/type ::view
-        :value {:fx/type view/derefable :derefable (event/daemon-future ((:invoke action)))}
-        :form (:form action)))))
-
 (def ^:dynamic *eval-env*)
 
 (defmethod event/handle ::nop [_] identity)
@@ -778,10 +746,55 @@
         (send-via event/daemon-executor *running when-running execute-or-submit execute x)
         x)))))
 
+(defn inspect [x & {:as opts}]
+  (make (into {:value x
+               :title "inspect"
+               :close-difficulty :easy
+               :always-on-top true
+               :decorations false
+               :bounds :inspector}
+              opts))
+  x)
+
+(defmethod event/handle ::view [{:keys [value
+                                        form
+                                        target
+
+                                        view-index
+                                        view-id]}]
+  (if (= :inspector target)
+    (do
+      (inspect value)
+      identity)
+    (let [id (UUID/randomUUID)
+          desc (view/->desc value)
+          form (or form (stream/horizontal
+                          (stream/raw-string "(" {:fill :util})
+                          (stream/raw-string "view" {:fill :symbol})
+                          stream/separator
+                          (stream/stream value)
+                          (stream/raw-string ")" {:fill :util})))]
+      (fn [state]
+        (let [result-trees (:result-trees state)
+              index (if (= :new-result-panel target) (count result-trees) (or view-index 0))]
+          (-> state
+              (assoc :result-trees (update result-trees index focus-tree/add view-id id))
+              (assoc-in [:views id] {:form form :desc desc})))))))
+
+(defmethod event/handle ::execute-action [{:keys [action] :as event}]
+  (if (::ignore-action-result (meta (:invoke action)))
+    (do
+      (event/daemon-future ((:invoke action)))
+      identity)
+    (event/handle
+      (assoc event
+        ::event/type ::view
+        :value {:fx/type view/derefable :derefable (event/daemon-future ((:invoke action)))}
+        :form (:form action)))))
+
 (comment
   (def ui (make :value (range 100)))
   ((:hide ui))
-  ;; moves window to a different place...
   ((:show ui))
   ((:dispose ui))
 
@@ -794,5 +807,8 @@
     :always-on-top true
     :decorations false))
 
-;; 5. make overlay that manages multiple popups
-;; 6. shift+enter to open action result in a new popup
+;; TODO
+;; - pro: update graphviz open view code to support shift
+;; - pro: update license checking
+;; - watch-all using :subscribe, popup that logs taps
+;; - allow showing-hiding all popups at once
