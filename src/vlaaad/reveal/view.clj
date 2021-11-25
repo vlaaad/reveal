@@ -132,13 +132,12 @@
   (when (instance? IRef v)
     (constantly {:fx/type ref-watch-latest :ref v})))
 
-(defn- log! [id *ref handler]
+(defn- log! [id {:keys [subscribe result-factory]} handler]
   (handler {::event/type ::create-view-state :id id :state (output-panel/make)})
   (let [*running (volatile! true)
         out-queue (ArrayBlockingQueue. 1024)
         submit! #(.put out-queue ({nil ::nil} % %))
-        watch-key (gensym "vlaaad.reveal.view/watcher")
-        *counter (volatile! -1)
+        next-result (result-factory)
         f (event/daemon-future
             (while @*running
               (let [x (.take out-queue)]
@@ -151,21 +150,42 @@
                              :fx/event %
                              :id id})
                   (stream/horizontal
-                    (stream/raw-string (format "%4d: " (vswap! *counter inc))
-                                       {:fill :util})
-                    (stream/stream ({::nil nil} x x)))))))]
-    (submit! @*ref)
-    (add-watch *ref watch-key #(submit! %4))
+                    (stream/raw-string (next-result) {:fill :util})
+                    stream/separator
+                    (stream/stream ({::nil nil} x x)))))))
+        unsubscribe (subscribe submit!)]
     #(do
-       (remove-watch *ref watch-key)
+       (when (fn? unsubscribe) (unsubscribe))
        (vreset! *running false)
        (future-cancel f)
        (handler {::event/type ::dispose-state :id id}))))
 
-(defn ref-watch-all [{:keys [ref]}]
+(defrecord RefSubscribe [ref]
+  IFn
+  (invoke [_ notify]
+    (notify @ref)
+    (let [watch-key (gensym "vlaaad.reveal.view/ref-subscribe")]
+      (add-watch ref watch-key #(notify %4))
+      #(remove-watch ref watch-key))))
+
+(defn counter-factory []
+  (let [counter (volatile! -1)]
+    #(format "%4d:" (vswap! counter inc))))
+
+(defrecord ConstResultFactory [str]
+  IFn
+  (invoke [_]
+    (constantly str)))
+
+(defn str-result-factory [str]
+  (->ConstResultFactory str))
+
+(defn ref-watch-all [{:keys [ref subscribe result-factory]
+                      :or {result-factory counter-factory}}]
   {:fx/type rfx/ext-with-process
    :start log!
-   :args ref
+   :args {:subscribe (if ref (->RefSubscribe ref) subscribe)
+          :result-factory result-factory}
    :desc {:fx/type output-panel/view}})
 
 (action/defaction ::action/watch:all [v]
@@ -651,14 +671,6 @@
 (defn- observable-view-impl [props]
   {:fx/type ext-try
    :desc (assoc props :fx/type observable-view-impl-try)})
-
-(defrecord RefSubscribe [ref]
-  IFn
-  (invoke [_ notify]
-    (notify @ref)
-    (let [watch-key (gensym "vlaaad.reveal.view/observable")]
-      (add-watch ref watch-key #(notify %4))
-      #(remove-watch ref watch-key))))
 
 (defn observable-view [{:keys [ref fn subscribe]}]
   {:fx/type rfx/ext-with-process

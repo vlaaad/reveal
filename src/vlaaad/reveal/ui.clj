@@ -792,11 +792,29 @@
         :value {:fx/type view/derefable :derefable (event/daemon-future ((:invoke action)))}
         :form (:form action)))))
 
+(defn- subscribe-tap [notify]
+  (add-tap notify)
+  #(remove-tap notify))
+
+(defn tap-log [& {:as opts}]
+  (make (into {:value {:fx/type view/ref-watch-all
+                       :result-factory (view/str-result-factory "tap>")
+                       :subscribe subscribe-tap}
+               :title "tap log"
+               :close-difficulty :easy
+               :always-on-top true
+               :decorations false
+               :bounds `tap-log}
+              opts))
+  nil)
+
 (comment
   (def ui (make :value (range 100)))
   ((:hide ui))
   ((:show ui))
   ((:dispose ui))
+
+  (tap-log)
 
   @bounds-state
 
@@ -807,8 +825,9 @@
     :always-on-top true
     :decorations false))
 
+(tap> {:a 1})
+
 ;; TODO
 ;; - pro: update graphviz open view code to support shift
 ;; - pro: update license checking
-;; - watch-all using :subscribe, popup that logs taps
 ;; - allow showing-hiding all popups at once
