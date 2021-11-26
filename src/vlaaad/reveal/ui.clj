@@ -558,7 +558,10 @@
        (assoc key event)
        (cond-> (not (:maximized %)) set-bounds-from-ui-state)))
 
-(defn- window [{:keys [title showing confirm-exit-showing
+(defmethod event/handle ::set-iconified [{:keys [fx/event]}]
+  #(assoc % :iconified event))
+
+(defn- window [{:keys [title showing confirm-exit-showing iconified
                        close-difficulty always-on-top maximized decorations
                        x y width height]
                 :as props}]
@@ -568,6 +571,8 @@
                    :desc {:fx/type :stage
                           :style (if decorations :decorated :undecorated)
                           :always-on-top always-on-top
+                          :iconified iconified
+                          :on-iconified-changed {::event/type ::set-iconified}
                           :title (full-title title)
                           :on-close-request {::event/type ::confirm-exit
                                              :close-difficulty close-difficulty}
@@ -635,6 +640,9 @@
 
 (defn- nop [])
 
+(defonce all-windows
+  (atom #{}))
+
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
@@ -645,6 +653,8 @@
           decorations true
           bounds :default}}]
    (let [desc (view/->desc value)
+         dispose-delay-ref (volatile! nil)
+         dispose-fn #(do @@dispose-delay-ref nil)
          bound-id (gensym "bound")
          bound-scope (System/getProperty "user.dir")
          bound-rect (take-bounds! bound-scope bounds bound-id)
@@ -656,8 +666,9 @@
                              :close-difficulty close-difficulty
                              :always-on-top always-on-top
                              :maximized false
+                             :iconified false
                              :decorations decorations
-                             :dispose (constantly nil)
+                             :dispose dispose-fn
                              :bound {:scope bound-scope
                                      :key bounds
                                      :id bound-id}}
@@ -684,17 +695,18 @@
                                                               [sym `(get *eval-env* '~sym)])))]
                                                ~form)))))))
                      nop-event))
-         dispose-delay (delay
-                         (swap! @bounds-state free-bounds bound-scope bounds bound-id)
-                         (fx/unmount-renderer *state renderer)
-                         (dispose))
-         dispose! #(do @dispose-delay nil)]
+         ret {:dispose dispose-fn
+              :iconified #(do (swap! *state assoc :iconified (boolean %)) nil)
+              :execute (comp event-handler process)}]
+     (swap! all-windows conj ret)
      (fx/mount-renderer *state renderer)
-     (swap! *state assoc :dispose dispose!)
-     {:dispose dispose!
-      :show #(do (swap! *state assoc :showing true) nil)
-      :hide #(do (swap! *state assoc :showing false) nil)
-      :execute (comp event-handler process)})))
+     (vreset! dispose-delay-ref
+              (delay
+                (swap! all-windows disj ret)
+                (swap! @bounds-state free-bounds bound-scope bounds bound-id)
+                (fx/unmount-renderer *state renderer)
+                (dispose)))
+     ret)))
 
 (defn- stop-queue [_ ^ArrayBlockingQueue queue]
   (.clear queue)
@@ -810,17 +822,31 @@
                    :subscribe subscribe-tap}}))
   nil)
 
+(defn minimize-all []
+  (doseq [{:keys [iconified]} @all-windows]
+    (iconified true)))
+
+(defn restore-all []
+  (doseq [{:keys [iconified]} @all-windows]
+    (iconified false)))
+
 (comment
   (def ui (make :value (range 100)))
-  ((:hide ui))
+  ((:iconified ui) true)
   ((:show ui))
   ((:dispose ui))
 
   (tap-log)
+  (minimize-all)
+  (restore-all)
+
+  @all-windows
 
   @bounds-state)
 
 ;; TODO
+;; - add commands:
+;;   - minimize-all
+;;   - restore-all
 ;; - pro: update graphviz open view code to support shift
 ;; - pro: update license checking
-;; - allow showing-hiding all popups at once (minimizing?)
