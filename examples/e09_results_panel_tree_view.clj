@@ -1,5 +1,5 @@
 (ns e09-results-panel-tree-view
-  (:require [vlaaad.reveal.ext :as rx]
+  (:require [vlaaad.reveal :as r]
             [cljfx.ext.tree-view :as fx.ext.tree-view]
             [cljfx.api :as fx])
   (:import [javafx.scene.input KeyEvent KeyCode]
@@ -31,7 +31,7 @@
 
 ;; Example action creating tree view:
 
-(rx/defaction ::example-tree-view [x]
+(r/defaction ::example-tree-view [x]
   (when (::example-tree-view x)
     (fn []
       {:fx/type fx/ext-on-instance-lifecycle

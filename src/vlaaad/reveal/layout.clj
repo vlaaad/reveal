@@ -666,7 +666,7 @@
 (defn move-cursor-vertically [layout with-anchor direction]
   (let [{:keys [cursor]} layout
         row (cursor/row cursor)]
-    (set-cursor layout (vertical-move-cursor layout row direction)
+    (set-cursor layout (when row (vertical-move-cursor layout row direction))
                 :anchor with-anchor
                 :align false)))
 

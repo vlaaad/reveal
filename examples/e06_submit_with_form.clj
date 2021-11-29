@@ -1,6 +1,5 @@
 (ns e06-submit-with-form
-  (:require [vlaaad.reveal :as r]
-            [vlaaad.reveal.ext :as rx]))
+  (:require [vlaaad.reveal :as r]))
 
 ;; This example shows how to create a custom Reveal UI that allows submitting
 ;; evaluation results with code forms that produced these results (similar to
@@ -9,13 +8,12 @@
 (def ui (r/ui))
 
 (defn submit-with-form [form value]
-  (ui (rx/vertical
-        (rx/as form
-          (rx/raw-string (pr-str form) {:fill :util}))
-        (rx/horizontal
-          (rx/raw-string "=>" {:fill :util})
-          rx/separator
-          (rx/stream value)))))
+  (ui (r/vertical
+        (r/as form (r/raw-string (pr-str form) {:fill :util}))
+        (r/horizontal
+          (r/raw-string "=>" {:fill :util})
+          r/separator
+          (r/stream value)))))
 
 (comment
   ;; example usage

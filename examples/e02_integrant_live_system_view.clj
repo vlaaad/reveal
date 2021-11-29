@@ -3,7 +3,7 @@
             [ring.adapter.jetty :as jetty]
             [ring.util.response :as response]
             [clojure.main :as m]
-            [vlaaad.reveal.ext :as rx])
+            [vlaaad.reveal :as r])
   (:import [org.eclipse.jetty.server Server]))
 
 ;; Integrant is a micro-framework for building applications with data-driven
@@ -59,11 +59,11 @@
 
 ;; Reveal monitor and controls: eval it and execute "view" action
 
-{:fx/type rx/observable-view
+{:fx/type r/observable-view
  :ref system
  :fn (fn [state]
        {:fx/type :v-box
-        :children [{:fx/type rx/value-view
+        :children [{:fx/type r/value-view
                     :v-box/vgrow :always
                     :value state}
                    {:fx/type :h-box

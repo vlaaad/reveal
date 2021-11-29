@@ -1,5 +1,5 @@
 (ns e03-chess-server-popups
-  (:require [vlaaad.reveal.ext :as rx]))
+  (:require [vlaaad.reveal :as r]))
 
 ;; We are developing a server for chess Battle Royale where each player plays its own
 ;; piece. During development we want to be able to see every game on the server as
@@ -54,10 +54,10 @@
                                :min-height 30})
    :children children})
 
-(rx/defaction ::boards [x]
+(r/defaction ::boards [x]
   (when (::server (meta x))
     (constantly
-      {:fx/type rx/observable-view
+      {:fx/type r/observable-view
        :ref x
        :fn (fn [state]
              {:fx/type :scroll-pane
@@ -70,7 +70,7 @@
                (for [[id board :as id+board] (sort-by key state)]
                  {:fx/type :v-box
                   :children
-                  [{:fx/type rx/popup-view
+                  [{:fx/type r/popup-view
                     :value id+board
                     :desc {:fx/type :label
                            :text (str "board #" id)}}
@@ -84,7 +84,7 @@
                           :grid-pane/row y
                           :style {:-fx-background-color (if (even? (+ x y)) "#888" "#999")}}))
                      (grid (for [[[x y] player :as coordinate+player] board]
-                             {:fx/type rx/popup-view
+                             {:fx/type r/popup-view
                               :grid-pane/column x
                               :grid-pane/row y
                               :value coordinate+player

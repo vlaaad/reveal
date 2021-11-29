@@ -72,11 +72,15 @@
   (apply require m/repl-requires))
 
 (defn repl [args]
-  (let [ui (ui/make-queue :title (:title args "repl"))
+  (let [ui (-> args
+               (select-keys [:title :close-difficulty :always-on-top :decorations :bounds])
+               (update :title #(or % "repl"))
+               (update :bounds #(or % 'vlaaad.reveal.ui/repl))
+               ui/make-queue)
         tap (make-tap ui)
         version (str "Clojure " (clojure-version))
         repl-args (-> args
-                      (dissoc :title)
+                      (select-keys [:init :need-prompt :prompt :flush :read :eval :print :caught])
                       (update :init #(or % init))
                       (update :read #(wrap-read ui (or % m/repl-read)))
                       (update :eval #(wrap-eval ui (or % eval)))

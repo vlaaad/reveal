@@ -49,19 +49,26 @@
 (defn remote-prepl
   ([] (remote-prepl {}))
   ([k v & kvs] (remote-prepl (apply hash-map k v kvs)))
-  ([{:keys [host port in-reader out-fn title]
+  ([{:keys [host port in-reader out-fn]
      :or {in-reader *in*
           out-fn prn}
-     :as prepl-args}]
+     :as opts}]
    {:pre [(some? port)]}
-   (let [ui (ui/make-queue :title (or title (str "remote-prepl on " (when host (str host ":")) port)))
-         prepl-args (update prepl-args :valf (fn [valf]
-                                               (or valf
-                                                   #(binding [*default-data-reader-fn* tagged-literal]
-                                                      (read-string %)))))]
+
+   (let [ui (-> opts
+                (select-keys [:title :close-difficulty :always-on-top :decorations :bounds])
+                (update :title #(or % (str "remote-prepl on " (when host (str host ":")) port)))
+                (update :bounds #(or % 'vlaaad.reveal.ui/repl))
+                ui/make-queue)
+         prepl-args (-> opts
+                        (select-keys [:host :port :in-reader :out-fn :valf :readf])
+                        (update :valf (fn [valf]
+                                        (or valf
+                                            #(binding [*default-data-reader-fn* tagged-literal]
+                                               (read-string %))))))]
      (try
        (apply server/remote-prepl host port in-reader (wrap-out-fn ui (bound-fn* out-fn))
-              (mapcat identity (dissoc prepl-args :host :port :in-reader :out-fn :title)))
+              (mapcat identity (dissoc prepl-args :host :port :in-reader :out-fn)))
        (finally (ui))))))
 
 (defn io-prepl
@@ -69,8 +76,13 @@
   ([k v & kvs] (io-prepl (apply hash-map k v kvs)))
   ([{:keys [valf title]
      :or {valf pr-str
-          title "io-prepl"}}]
-   (let [ui (ui/make-queue :title title)
+          title "io-prepl"}
+     :as args}]
+   (let [ui (-> args
+                (dissoc :valf)
+                (update :title #(or % "io-prepl"))
+                (update :bounds #(or % 'vlaaad.reveal.ui/repl))
+                ui/make-queue)
          out *out*
          lock (Object.)]
      (try

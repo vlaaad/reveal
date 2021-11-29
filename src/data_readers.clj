@@ -1,0 +1,1 @@
+{reveal/inspect vlaaad.reveal.ui/read-inspect-tag}

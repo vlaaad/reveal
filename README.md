@@ -51,6 +51,6 @@ Reveal uses `1.MAJOR.REVISION` versioning where:
   improvements to Reveal;
 - `REVISION` is a commit number from the beginning of a history.
 
-Reveal's compatibility promise applies to its public API: `vlaaad.reveal` and 
-`vlaaad.reveal.ext` namespaces, everything else is implementation detail that 
-is subject to change. Reveal's UI and controls might change in the future.
+Reveal's compatibility promise applies to its public API: `vlaaad.reveal` ns, 
+everything else is implementation detail that is subject to change. Reveal's UI 
+and controls might change in the future.

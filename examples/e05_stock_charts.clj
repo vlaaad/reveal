@@ -1,6 +1,6 @@
 (ns e05-stock-charts
   (:require [clj-http.client :as http]
-            [vlaaad.reveal.ext :as rx])
+            [vlaaad.reveal :as r])
   (:import [java.util Date]
            [java.time ZoneId LocalDate]))
 
@@ -65,26 +65,26 @@
                         (assoc-in [:yields ticker] yields))))
                 {:divs {} :prices {} :yields {}}
                 tickers)]
-    (rx/as
+    (r/as
       {:fx/type :h-box
        :children [{:fx/type :v-box
                    :children [{:fx/type :label
                                :text "Prices:"}
-                              {:fx/type rx/scatter-chart-view
+                              {:fx/type r/scatter-chart-view
                                :data prices}]}
                   {:fx/type :v-box
                    :children [{:fx/type :label
                                :text "Dividends:"}
-                              {:fx/type rx/scatter-chart-view
+                              {:fx/type r/scatter-chart-view
                                :data divs}]}
                   {:fx/type :v-box
                    :children [{:fx/type :label
                                :text "Yields:"}
-                              {:fx/type rx/scatter-chart-view
+                              {:fx/type r/scatter-chart-view
                                :data yields}]}]}
-      (rx/horizontal
-        (rx/raw-string "#charts" {:fill :object})
-        (rx/stream tickers)))))
+      (r/horizontal
+        (r/raw-string "#charts" {:fill :object})
+        (r/stream tickers)))))
 
 ;; try it out:
 (comment

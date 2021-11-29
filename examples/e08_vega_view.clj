@@ -1,7 +1,7 @@
 (ns e08-vega-view
   (:require [cljfx.ext.web-view :as fx.ext.web-view]
             [clojure.data.json :as json]
-            [vlaaad.reveal.ext :as rx]))
+            [vlaaad.reveal :as r]))
 
 ;; Define vega view
 
@@ -20,9 +20,9 @@
 
 ;; Use at the REPL with Reveal commands to view vega charts without leaving the editor
 
-(rx/all
-  (rx/close-all-views)
-  (rx/open-view
+(r/doall-command
+  (r/close-all-views-command)
+  (r/open-view-command
     {:fx/type vega-view
      :spec {:data {:url "https://vega.github.io/vega-lite/data/seattle-weather.csv"}
             :mark :bar

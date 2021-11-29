@@ -643,16 +643,29 @@
 (defonce all-windows
   (atom #{}))
 
+(defmethod event/handle ::minimize [_]
+  #(assoc % :iconified true))
+
+(defmethod event/handle ::restore [_]
+  #(assoc % :iconified false))
+
+(defmethod event/handle ::toggle-minimized [_]
+  #(update % :iconified not))
+
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
-  ([{:keys [title value dispose close-difficulty always-on-top decorations bounds]
+  ([{:keys [title value dispose close-difficulty always-on-top bounds] ;; + :decorations
      :or {dispose nop
           close-difficulty :hard ;; :easy :normal
           always-on-top false
-          decorations true
-          bounds :default}}]
-   (let [desc (view/->desc value)
+          bounds :default}
+     :as opts}]
+   (let [decorations (:decorations opts (not always-on-top))
+         queryable-opts (-> opts
+                            (select-keys [:title :close-difficulty :always-on-top :bounds])
+                            (assoc :decorations decorations))
+         desc (view/->desc value)
          dispose-delay-ref (volatile! nil)
          dispose-fn #(do @@dispose-delay-ref nil)
          bound-id (gensym "bound")
@@ -683,7 +696,7 @@
                        (if (= :vlaaad.reveal.command/event form)
                          x
                          (let [{:keys [ns env]
-                                :or {ns 'vlaaad.reveal.ext}} x]
+                                :or {ns 'vlaaad.reveal}} x]
                            (binding [*ns* (or (when (instance? Namespace ns) ns)
                                               (find-ns ns)
                                               (do (require ns) (find-ns ns)))
@@ -696,8 +709,8 @@
                                                ~form)))))))
                      nop-event))
          ret {:dispose dispose-fn
-              :iconified #(do (swap! *state assoc :iconified (boolean %)) nil)
-              :execute (comp event-handler process)}]
+              :execute (comp event-handler process)
+              :opts queryable-opts}]
      (swap! all-windows conj ret)
      (fx/mount-renderer *state renderer)
      (vreset! dispose-delay-ref
@@ -758,16 +771,20 @@
         (send-via event/daemon-executor *running when-running execute-or-submit execute x)
         x)))))
 
-(defn inspect [x & {:as opts}]
-  (make (merge
-          {:title "inspect"
-           :close-difficulty :easy
-           :always-on-top true
-           :decorations false
-           :bounds `inspect}
-          opts
-          {:value x}))
-  x)
+(defn inspect
+  ([x]
+   (inspect x {}))
+  ([x k v & kvs]
+   (inspect x (apply hash-map k v kvs)))
+  ([x {:as opts}]
+   (make (merge
+           {:title "inspect"
+            :close-difficulty :easy
+            :always-on-top true
+            :bounds `inspect}
+           opts
+           {:value x}))
+   x))
 
 (defmethod event/handle ::view [{:keys [value
                                         form
@@ -777,7 +794,7 @@
                                         view-id]}]
   (if (= :inspector target)
     (do
-      (inspect value)
+      (inspect value {})
       identity)
     (let [id (UUID/randomUUID)
           desc (view/->desc value)
@@ -809,44 +826,23 @@
   (add-tap notify)
   #(remove-tap notify))
 
-(defn tap-log [& {:as opts}]
+(defn tap-log [{:as opts}]
   (make (merge
           {:title "tap log"
            :close-difficulty :normal
            :always-on-top true
-           :decorations false
            :bounds `tap-log}
           opts
           {:value {:fx/type view/ref-watch-all
                    :result-factory (view/str-result-factory "tap>")
-                   :subscribe subscribe-tap}}))
+                   :subscribe subscribe-tap
+                   :id :output}}))
   nil)
 
-(defn minimize-all []
-  (doseq [{:keys [iconified]} @all-windows]
-    (iconified true)))
+(defn submit! [pred command]
+   (doseq [{:keys [execute opts]} @all-windows
+           :when (pred opts)]
+     (execute command)))
 
-(defn restore-all []
-  (doseq [{:keys [iconified]} @all-windows]
-    (iconified false)))
-
-(comment
-  (def ui (make :value (range 100)))
-  ((:iconified ui) true)
-  ((:show ui))
-  ((:dispose ui))
-
-  (tap-log)
-  (minimize-all)
-  (restore-all)
-
-  @all-windows
-
-  @bounds-state)
-
-;; TODO
-;; - add commands:
-;;   - minimize-all
-;;   - restore-all
-;; - pro: update graphviz open view code to support shift
-;; - pro: update license checking
+(defn- read-inspect-tag [form]
+  `(inspect ~form :title (pr-str '~form)))

@@ -180,10 +180,12 @@
 (defn str-result-factory [str]
   (->ConstResultFactory str))
 
-(defn ref-watch-all [{:keys [ref subscribe result-factory]
-                      :or {result-factory counter-factory}}]
+(defn ref-watch-all [{:keys [ref subscribe result-factory id]
+                      :or {result-factory counter-factory
+                           id ::rfx/undefined}}]
   {:fx/type rfx/ext-with-process
    :start log!
+   :id id
    :args {:subscribe (if ref (->RefSubscribe ref) subscribe)
           :result-factory result-factory}
    :desc {:fx/type output-panel/view}})
