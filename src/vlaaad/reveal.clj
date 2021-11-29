@@ -6,7 +6,8 @@
             [vlaaad.reveal.action-popup :as action-popup]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.view :as view]
-            [vlaaad.reveal.ui :as ui]))
+            [vlaaad.reveal.ui :as ui])
+  (:import [javafx.application Platform]))
 
 ;; region repl
 
@@ -738,11 +739,12 @@
                             (sort-by #(-> % val meta :line)))
               pad (apply max (map #(-> % key name count) sym+vars))]
           (doseq [[sym var] sym+vars]
-            (println (format (str "  %-" pad "s  %s") sym (first (str/split-lines (:cli (meta var))))))))
+            (println (format (str "  %-" pad "s  %s") sym (first (str/split-lines (:doc (meta var))))))))
         (println "\nUse 'clj ... -M -m vlaaad.reveal help <command>' to see full description of that command"))
     (apply (or (let [var ((ns-interns 'vlaaad.reveal) (symbol command))]
                  (and (:cli (meta var)) var))
                (throw (Exception. (str "Unknown command: " command))))
-           (map edn/read-string args))))
+           (map edn/read-string args)))
+  (Platform/exit))
 
 ;; endregion
