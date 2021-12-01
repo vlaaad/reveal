@@ -318,7 +318,9 @@
     (do (.consume event)
         (event/handle {::event/type ::quit}))
 
-    (= KeyCode/F11 (.getCode event))
+    (or (= KeyCode/F11 (.getCode event))
+        (and (= KeyCode/M (.getCode event))
+             (.isShortcutDown event)))
     #(update % :maximized not)
 
     :else
@@ -486,15 +488,6 @@
     (swap! @bounds-state set-bounds scope key id {:x x :y y :width width :height height}))
   state)
 
-(def ^:private ext-with-notifying-maximize
-  (fx/make-ext-with-props
-    {:maximized (fx.prop/make (fx.mutator/setter
-                                (fn [^Stage stage maximized]
-                                  (binding [fx.lifecycle/*in-progress?* false]
-                                    (.setMaximized stage maximized))))
-                              fx.lifecycle/scalar
-                              :default false)}))
-
 (defmethod event/handle ::start-window-drag [{:keys [^MouseEvent fx/event]}]
   #(assoc % :window-drag-offset-x (- (:x %) (.getScreenX event))
             :window-drag-offset-y (- (:y %) (.getScreenY event))))
@@ -554,9 +547,7 @@
                            :v-box/vgrow :always)]})
 
 (defmethod event/handle ::set-bound [{:keys [key fx/event]}]
-  #(-> %
-       (assoc key event)
-       (cond-> (not (:maximized %)) set-bounds-from-ui-state)))
+  #(cond-> % (not (:maximized %)) (-> (assoc key event) set-bounds-from-ui-state)))
 
 (defmethod event/handle ::set-iconified [{:keys [fx/event]}]
   #(assoc % :iconified event))
@@ -565,50 +556,47 @@
                        close-difficulty always-on-top maximized decorations
                        x y width height]
                 :as props}]
-  {:fx/type fx/ext-let-refs
-   :refs {::stage {:fx/type ext-with-notifying-maximize
-                   :props {:maximized maximized}
-                   :desc {:fx/type :stage
-                          :style (if decorations :decorated :undecorated)
-                          :always-on-top always-on-top
-                          :iconified iconified
-                          :on-iconified-changed {::event/type ::set-iconified}
-                          :title (full-title title)
-                          :on-close-request {::event/type ::confirm-exit
-                                             :close-difficulty close-difficulty}
-                          :showing showing
-                          :x x
-                          :on-x-changed {::event/type ::set-bound :key :x}
-                          :y y
-                          :on-y-changed {::event/type ::set-bound :key :y}
-                          :width width
-                          :on-width-changed {::event/type ::set-bound :key :width}
-                          :height height
-                          :on-height-changed {::event/type ::set-bound :key :height}
-                          :icons (if @christmas
-                                   ["vlaaad/reveal/logo-xmas-16.png"
-                                    "vlaaad/reveal/logo-xmas-32.png"
-                                    "vlaaad/reveal/logo-xmas-64.png"
-                                    "vlaaad/reveal/logo-xmas-256.png"
-                                    "vlaaad/reveal/logo-xmas-512.png"]
-                                   ["vlaaad/reveal/logo-16.png"
-                                    "vlaaad/reveal/logo-32.png"
-                                    "vlaaad/reveal/logo-64.png"
-                                    "vlaaad/reveal/logo-256.png"
-                                    "vlaaad/reveal/logo-512.png"])
-                          :on-focused-changed {::event/type ::on-window-focused-changed}
-                          :scene {:fx/type :scene
-                                  :stylesheets [(:cljfx.css/url @style/style)]
-                                  :on-key-pressed {::event/type ::handle-scene-key-press
-                                                   :close-difficulty close-difficulty}
-                                  :root (assoc props :fx/type (if decorations view undecorated-view-wrapper))}}}}
-
-   :desc {:fx/type fx/ext-let-refs
-          :refs (cond-> {}
-                  confirm-exit-showing
-                  (assoc ::confirm-exit {:fx/type confirm-exit-dialog
-                                         :title title}))
-          :desc {:fx/type fx/ext-get-ref :ref ::stage}}})
+  (let [bounds (if maximized
+                 (let [b (.getVisualBounds (Screen/getPrimary))]
+                   {:x (.getMinX b) :y (.getMinY b) :width (.getWidth b) :height (.getHeight b)})
+                 {:x x :y y :width width :height height})
+        stage {:fx/type :stage
+               :style (if decorations :decorated :undecorated)
+               :always-on-top always-on-top
+               :iconified iconified
+               :on-iconified-changed {::event/type ::set-iconified}
+               :title (full-title title)
+               :on-close-request {::event/type ::confirm-exit
+                                  :close-difficulty close-difficulty}
+               :showing showing
+               :on-x-changed {::event/type ::set-bound :key :x}
+               :on-y-changed {::event/type ::set-bound :key :y}
+               :on-width-changed {::event/type ::set-bound :key :width}
+               :on-height-changed {::event/type ::set-bound :key :height}
+               :icons (if @christmas
+                        ["vlaaad/reveal/logo-xmas-16.png"
+                         "vlaaad/reveal/logo-xmas-32.png"
+                         "vlaaad/reveal/logo-xmas-64.png"
+                         "vlaaad/reveal/logo-xmas-512.png"]
+                        ["vlaaad/reveal/logo-16.png"
+                         "vlaaad/reveal/logo-32.png"
+                         "vlaaad/reveal/logo-64.png"
+                         "vlaaad/reveal/logo-256.png"
+                         "vlaaad/reveal/logo-512.png"])
+               :on-focused-changed {::event/type ::on-window-focused-changed}
+               :scene {:fx/type :scene
+                       :stylesheets [(:cljfx.css/url @style/style)]
+                       :on-key-pressed {::event/type ::handle-scene-key-press
+                                        :close-difficulty close-difficulty}
+                       :root (assoc props :fx/type (if decorations view undecorated-view-wrapper))}}]
+    {:fx/type fx/ext-let-refs
+     :refs {::stage (into stage bounds)}
+     :desc {:fx/type fx/ext-let-refs
+            :refs (cond-> {}
+                          confirm-exit-showing
+                          (assoc ::confirm-exit {:fx/type confirm-exit-dialog
+                                                 :title title}))
+            :desc {:fx/type fx/ext-get-ref :ref ::stage}}}))
 
 (defn oneduce
   ([xf x]
