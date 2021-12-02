@@ -238,6 +238,34 @@
   [x & {:as opts}]
   (ui/inspect x opts))
 
+(defn sticker
+  "Open a new sticker window that shows x
+
+  Returns nil
+
+  Available opts (all optional):
+
+    :title              window title, defaults to \"inspect\"
+    :close-difficulty   how easy it is to close the window; either:
+                        * :easy - close on Escape
+                        * :normal (default) - close on OS close window shortcut
+                        * :hard - close on shortcut + confirmation
+    :always-on-top      whether the window is always on top of other windows,
+                        defaults to true
+    :decorations        whether to show OS window decorations, defaults to
+                        inverse of :always-on-top
+    :bounds             any value indicating window bounds group, defaults to
+                        :title value if provided. Every group remembers window
+                        bounds - location and size - and reuses them between
+                        shown windows"
+  [x & {:as opts}]
+  (ui/make (merge {:close-difficulty :normal
+                   :always-on-top true
+                   :bounds (:title opts :default)}
+                  opts
+                  {:value x}))
+  nil)
+
 ;; endregion
 
 ;; region streaming

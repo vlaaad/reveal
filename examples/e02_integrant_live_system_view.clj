@@ -53,25 +53,30 @@
 ;; REPL controls
 
 (comment
+
+  ;; REPL controls
+
   (start!)
   (slurp "http://localhost:8080")
-  (stop!))
+  (stop!)
 
-;; Reveal monitor and controls: eval it and execute "view" action
+  ;; Reveal sticker monitor and controls
 
-{:fx/type r/observable-view
- :ref system
- :fn (fn [state]
-       {:fx/type :v-box
-        :children [{:fx/type r/value-view
-                    :v-box/vgrow :always
-                    :value state}
-                   {:fx/type :h-box
-                    :children [{:fx/type :button
-                                :disable (not state)
-                                :text "Stop"
-                                :on-action (fn [_] (stop!))}
-                               {:fx/type :button
-                                :disable (some? state)
-                                :text "Start"
-                                :on-action (fn [_] (start!))}]}]})}
+  (require '[vlaaad.reveal :as r])
+  (r/sticker
+    {:fx/type r/observable-view
+     :ref system
+     :fn (fn [state]
+           {:fx/type :h-box
+            :children [{:fx/type r/value-view
+                        :h-box/hgrow :always
+                        :value (if state
+                                 (keys state)
+                                 (r/raw-string "stopped" {:fill :util}))}
+                       {:fx/type :button
+                        :pseudo-classes #{:small}
+                        :text (if state "stop" "start")
+                        :on-action (fn [_] ((if state stop! start!)))}]})}
+    :title "system")
+
+  ,)

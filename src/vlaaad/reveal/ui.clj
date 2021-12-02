@@ -318,10 +318,18 @@
     (do (.consume event)
         (event/handle {::event/type ::quit}))
 
-    (or (= KeyCode/F11 (.getCode event))
+    (or (and (= KeyCode/F11 (.getCode event))
+             (not (.isAltDown event)))
         (and (= KeyCode/M (.getCode event))
+             (.isShiftDown event)
              (.isShortcutDown event)))
     #(update % :maximized not)
+
+    (or (and (= KeyCode/F11 (.getCode event))
+             (.isAltDown event))
+        (and (= KeyCode/M (.getCode event))
+             (.isShortcutDown event)))
+    #(update % :iconified not)
 
     :else
     identity))
@@ -780,24 +788,24 @@
 
                                         view-index
                                         view-id]}]
-  (if (= :inspector target)
-    (do
-      (inspect value {})
-      identity)
-    (let [id (UUID/randomUUID)
-          desc (view/->desc value)
-          form (or form (stream/horizontal
-                          (stream/raw-string "(" {:fill :util})
-                          (stream/raw-string "view" {:fill :symbol})
-                          stream/separator
-                          (stream/stream value)
-                          (stream/raw-string ")" {:fill :util})))]
-      (fn [state]
-        (let [result-trees (:result-trees state)
-              index (if (= :new-result-panel target) (count result-trees) (or view-index 0))]
-          (-> state
-              (assoc :result-trees (update result-trees index focus-tree/add view-id id))
-              (assoc-in [:views id] {:form form :desc desc})))))))
+  (let [form (or form (stream/horizontal
+                        (stream/raw-string "(" {:fill :util})
+                        (stream/raw-string "view" {:fill :symbol})
+                        stream/separator
+                        (stream/stream value)
+                        (stream/raw-string ")" {:fill :util})))]
+    (if (= :inspector target)
+      (do
+        (inspect value {:title (stream/str-summary form)})
+        identity)
+      (let [id (UUID/randomUUID)
+            desc (view/->desc value)]
+        (fn [state]
+          (let [result-trees (:result-trees state)
+                index (if (= :new-result-panel target) (count result-trees) (or view-index 0))]
+            (-> state
+                (assoc :result-trees (update result-trees index focus-tree/add view-id id))
+                (assoc-in [:views id] {:form form :desc desc}))))))))
 
 (defmethod event/handle ::execute-action [{:keys [action] :as event}]
   (if (::ignore-action-result (meta (:invoke action)))
