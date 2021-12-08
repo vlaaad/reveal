@@ -1,6 +1,7 @@
 (ns vlaaad.reveal.stream
   (:refer-clojure :exclude [newline])
   (:require [vlaaad.reveal.style :as style]
+            [vlaaad.reveal.ns :as ns]
             [clojure.main :as m])
   (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn
                          ISeq MultiFn IRef Var Volatile Namespace IRecord Delay
@@ -864,15 +865,8 @@
 (when-class "java.sql.Timestamp"
   (load "stream/sql_timestamp"))
 
-(defmacro ^:private when-ns [ns-sym & body]
-  `(try
-     (binding [*warn-on-reflection* false] ;; not our problem
-       (require '~ns-sym))
-     ~@body
-     (catch FileNotFoundException _#)))
-
-(when-ns lambdaisland.deep-diff.diff
+(ns/when-exists lambdaisland.deep-diff.diff
   (load "stream/deep_diff"))
 
-(when-ns lambdaisland.deep-diff2.diff-impl
+(ns/when-exists lambdaisland.deep-diff2.diff-impl
   (load "stream/deep_diff2"))
