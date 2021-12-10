@@ -14,7 +14,7 @@
    {:println {:enabled? false}
     :reveal {:enabled? true
              :fn (fn [data]
-                   (tap> (r/submit-command
+                   (tap> (r/submit
                            (r/as data
                                  (r/raw-string
                                    (format "[%1$tH:%1$tM:%1$tS.%1$tL %2$s:%3$s]: %4$s"

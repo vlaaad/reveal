@@ -20,9 +20,9 @@
 
 ;; Use at the REPL with Reveal commands to view vega charts without leaving the editor
 
-(r/doall-command
-  (r/close-all-views-command)
-  (r/open-view-command
+(r/all
+  (r/close-all-views)
+  (r/open-view
     {:fx/type vega-view
      :spec {:data {:url "https://vega.github.io/vega-lite/data/seattle-weather.csv"}
             :mark :bar
