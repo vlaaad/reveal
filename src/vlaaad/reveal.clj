@@ -259,12 +259,7 @@
                         bounds - location and size - and reuses them between
                         shown windows"
   [x & {:as opts}]
-  (ui/make (merge {:close-difficulty :normal
-                   :always-on-top true
-                   :bounds (:title opts :default)}
-                  opts
-                  {:value x}))
-  nil)
+  (ui/sticker x opts))
 
 ;; endregion
 

@@ -782,6 +782,14 @@
            {:value x}))
    x))
 
+(defn sticker [x opts]
+  (make (merge {:close-difficulty :normal
+                :always-on-top true
+                :bounds (:title opts :default)}
+               opts
+               {:value x}))
+  nil)
+
 (defmethod event/handle ::view [{:keys [value
                                         form
                                         target
