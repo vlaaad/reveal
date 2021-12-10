@@ -453,7 +453,7 @@
           (when-not (= old new)
             (send-via event/daemon-executor persister schedule-persistence new)))))))
 
-(defn- take-bounds [state scope key id]
+(defn- take-bounds [state scope key id default-size]
   (let [existing-bounds (get-in state [:state scope key])
         used (get-in state [:usage scope key :id] {})
         free-index (first (remove used (range (count existing-bounds))))
@@ -466,8 +466,8 @@
                      (let [screen-bounds (.getVisualBounds (Screen/getPrimary))
                            screen-width (.getWidth screen-bounds)
                            screen-height (.getHeight screen-bounds)
-                           w (* 0.5 screen-width)
-                           h (* 0.5 screen-height)
+                           w (or (:width default-size) (* 0.5 screen-width))
+                           h (or (:height default-size) (* 0.5 screen-height))
                            x (+ (.getMinX screen-bounds)
                                 (* 0.5 (- screen-width w)))
                            y (+ (.getMinY screen-bounds)
@@ -486,8 +486,8 @@
         (update-in [:usage scope key :id] dissoc index)
         (update-in [:usage scope key :index] dissoc id))))
 
-(defn- take-bounds! [scope key id]
-  (let [new-state (swap! @bounds-state take-bounds scope key id)]
+(defn- take-bounds! [scope key id default-size]
+  (let [new-state (swap! @bounds-state take-bounds scope key id default-size)]
     (get-in new-state [:state scope key (get-in new-state [:usage scope key :index id])])))
 
 (defn- set-bounds-from-ui-state [state]
@@ -513,12 +513,12 @@
             :window-resize-offset-y (- (.getScreenY event) (:y %))))
 
 (defmethod event/handle ::resize-window [{:keys [^MouseEvent fx/event]}]
-  #(let [new-height (max 50 (-> (:y %)
+  #(let [new-height (max 46 (-> (:y %)
                                 (+ (:height %))
                                 (- (.getScreenY event))
                                 (+ (:window-resize-offset-y %))))]
      (-> %
-         (assoc :width (max 50 (-> (:window-resize-offset-x %)
+         (assoc :width (max 46 (-> (:window-resize-offset-x %)
                                    (+ (.getScreenX event))
                                    (- (:x %))))
                 :height new-height
@@ -651,7 +651,8 @@
 (defn make
   ([] (make {}))
   ([k v & kvs] (make (apply hash-map k v kvs)))
-  ([{:keys [title value dispose close-difficulty always-on-top bounds] ;; + :decorations
+  ([{:keys [title value close-difficulty always-on-top bounds ;; and :decorations
+            default-size dispose]
      :or {dispose nop
           close-difficulty :hard ;; :easy :normal
           always-on-top false
@@ -666,7 +667,7 @@
          dispose-fn #(do @@dispose-delay-ref nil)
          bound-id (gensym "bound")
          bound-scope (System/getProperty "user.dir")
-         bound-rect (take-bounds! bound-scope bounds bound-id)
+         bound-rect (take-bounds! bound-scope bounds bound-id default-size)
          *state (atom (into {:desc desc
                              :views {}
                              :result-trees []
@@ -801,15 +802,20 @@
                         (stream/raw-string "view" {:fill :symbol})
                         stream/separator
                         (stream/stream value)
-                        (stream/raw-string ")" {:fill :util})))]
-    (if (= :inspector target)
-      (do
-        (inspect value {:title (stream/str-summary form)})
-        identity)
-      (let [id (UUID/randomUUID)
-            desc (view/->desc value)]
-        (fn [state]
-          (let [result-trees (:result-trees state)
+                        (stream/raw-string ")" {:fill :util})))
+        done (atom false)]
+    (fn [state]
+      (let [target (or target
+                       (when (and (:always-on-top state) (not (:maximized state)))
+                         :inspector))]
+        (if (= :inspector target)
+          (do
+            (when (compare-and-set! done false true)
+              (inspect value {:title (stream/str-summary form)}))
+            state)
+          (let [id (UUID/randomUUID)
+                desc (view/->desc value)
+                result-trees (:result-trees state)
                 index (if (= :new-result-panel target) (count result-trees) (or view-index 0))]
             (-> state
                 (assoc :result-trees (update result-trees index focus-tree/add view-id id))
