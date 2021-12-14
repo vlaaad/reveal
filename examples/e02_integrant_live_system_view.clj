@@ -61,6 +61,8 @@
   ;; Reveal sticker monitor and controls
 
   (require '[vlaaad.reveal :as r])
+
+  ;; free version: implement custom sticker
   (r/sticker
     {:fx/type r/observable-view
      :ref system
@@ -76,5 +78,9 @@
                         :text (if state "stop" "start")
                         :on-action (fn [_] ((if state stop! start!)))}]})}
     :title "system")
+
+
+  ;; pro version: use built-in sticker
+  (r/integrant-sticker :ref system :config config)
 
   ,)
