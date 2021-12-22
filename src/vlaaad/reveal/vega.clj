@@ -147,32 +147,3 @@
             :props {:content (html spec opt)
                     :on-create-popup create-popup}
             :desc {:fx/type :web-view}}}))
-
-(def signals
-  {"CylYr_Cylinders" 6
-   "CylYr_Year" 1978})
-{:fx/type vlaaad.reveal/observable-view
- :ref #'signals
- :fn (fn [signals]
-       {:fx/type view
-        :signals signals
-        :spec {:data {:url "https://vega.github.io/vega-lite/data/cars.json"}
-               :transform [{:calculate "year(datum.Year)" :as "Year"}]
-               :layer [{:params [{:name "CylYr"
-                                  :value [{:Cylinders 4 :Year 1977}]
-                                  :select {:type "point" :fields ["Cylinders" "Year"]}
-                                  :bind {:Cylinders {:input "range" :min 3 :max 8 :step 1}
-                                         :Year {:input "range" :min 1969 :max 1981 :step 1}}}]
-                        :mark :circle
-                        :encoding {:x {:field "Horsepower" :type :quantitative}
-                                   :y {:field "Miles_per_Gallon" :type :quantitative}
-                                   :color {:condition {:param "CylYr"
-                                                       :field "Origin"
-                                                       :type :nominal}
-                                           :value :grey}}}
-                       {:transform [{:filter {:param "CylYr"}}]
-                        :mark :circle
-                        :encoding {:x {:field "Horsepower" :type :quantitative}
-                                   :y {:field "Miles_per_Gallon" :type :quantitative}
-                                   :color {:field "Origin" :type :nominal}
-                                   :size {:value 100}}}]}})}
