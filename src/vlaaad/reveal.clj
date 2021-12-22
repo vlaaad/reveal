@@ -6,6 +6,7 @@
             [vlaaad.reveal.action-popup :as action-popup]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.view :as view]
+            [vlaaad.reveal.vega :as vega]
             [vlaaad.reveal.ui :as ui])
   (:import [javafx.application Platform]))
 
@@ -635,6 +636,85 @@
   [{:keys [action value annotation]}]
   {:fx/type derefable-view
    :derefable (execute-action action value annotation)})
+
+(defn ^{:arglists '([{:keys [spec opt data signals]}])} vega-view
+  "Cljfx component fn that shows a vega(-lite) visualization
+
+  Required keys:
+
+    :spec      vega(-lite) spec, either URL string that points to vega(-lite)
+               spec, or map that can be serialized to vega(-lite) json spec
+
+  Optional keys:
+
+    :opt       map that can be serialized to json vega-embed opt:
+               https://github.com/vega/vega-embed#options
+    :data      either:
+               * vega dataset - a coll of map datums that will be assigned to
+                 \"source\" dataset (which is a default name if vega spec does
+                 not specify a named dataset)
+               * a map from dataset names to datasets
+               using :data instead of inlining dataset inside a spec has much
+               better performance in data streaming uses
+    :signals   map from signal name to signal value
+
+  Examples:
+
+    ;; simple barchart
+
+    {:fx/type vega-view
+     :spec {:mark :bar
+            :encoding {:x {:field :a
+                           :type :nominal
+                           :axis {:labelAngle 0}}
+                       :y {:field :b
+                           :type :quantitative}}}
+     :data [{:a \"A\" :b 28}
+            {:a \"B\" :b 55}
+            {:a \"C\" :b 43}
+            {:a \"D\" :b 91}
+            {:a \"E\" :b 81}
+            {:a \"F\" :b 53}
+            {:a \"G\" :b 19}
+            {:a \"H\" :b 87}
+            {:a \"I\" :b 52}]}
+
+    ;; REPL-driven signals - redefine signals var to control UI inputs
+
+    (def signals
+      {\"CylYr_Cylinders\" 6
+       \"CylYr_Year\" 1978})
+
+    {:fx/type observable-view
+     :ref #'signals
+     :fn (fn [signals]
+           {:fx/type view
+            :signals signals
+            :spec
+            {:data {:url \"https://vega.github.io/vega-lite/data/cars.json\"}
+             :transform [{:calculate \"year(datum.Year)\" :as \"Year\"}]
+             :layer
+             [{:params
+               [{:name \"CylYr\"
+                 :value [{:Cylinders 4 :Year 1977}]
+                 :select {:type \"point\" :fields [\"Cylinders\" \"Year\"]}
+                 :bind {:Cylinders {:input \"range\" :min 3 :max 8 :step 1}
+                        :Year {:input \"range\" :min 1969 :max 1981 :step 1}}}]
+               :mark :circle
+               :encoding {:x {:field \"Horsepower\" :type :quantitative}
+                          :y {:field \"Miles_per_Gallon\" :type :quantitative}
+                          :color {:condition {:param \"CylYr\"
+                                              :field \"Origin\"
+                                              :type :nominal}
+                                  :value :grey}}}
+              {:transform [{:filter {:param \"CylYr\"}}]
+               :mark :circle
+               :encoding {:x {:field \"Horsepower\" :type :quantitative}
+                          :y {:field \"Miles_per_Gallon\" :type :quantitative}
+                          :color {:field \"Origin\" :type :nominal}
+                          :size {:value 100}}}]}})}"
+  [props]
+  (assoc props :fx/type vega/view))
 
 ;; endregion
 
