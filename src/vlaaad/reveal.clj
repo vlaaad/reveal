@@ -688,7 +688,7 @@
     {:fx/type observable-view
      :ref #'signals
      :fn (fn [signals]
-           {:fx/type view
+           {:fx/type vega-view
             :signals signals
             :spec
             {:data {:url \"https://vega.github.io/vega-lite/data/cars.json\"}
