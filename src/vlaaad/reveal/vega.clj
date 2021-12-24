@@ -158,7 +158,9 @@
              :heatmap {:scheme (case @style/theme :dark "darkmulti" :light "lightmulti")}}}))
 
 (defn- deep-merge [& maps]
-  (apply merge-with deep-merge maps))
+  (if (every? (some-fn nil? map?) maps)
+    (apply merge-with deep-merge maps)
+    (last maps)))
 
 (defn view [{:keys [spec opt data signals]}]
   (let [spec (if (and (map? spec)
