@@ -7,7 +7,9 @@
             [clojure.string :as str]
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
-            [cljfx.lifecycle :as fx.lifecycle])
+            [cljfx.lifecycle :as fx.lifecycle]
+            [vlaaad.reveal.style :as style]
+            [vlaaad.reveal.font :as font])
   (:import [javafx.scene.web WebView]
            [javafx.concurrent Worker$State Worker]
            [javafx.beans.value ChangeListener]))
@@ -20,7 +22,7 @@
      <script src=\"%s\"></script>
      <script src=\"%s\"></script>
      <style>
-       html, body {height:100%%;margin:0;}
+       html, body {height:100%%;margin:0;background-color:%s;}
        #wrap {height:100vh;width:100%%;display:flex;flex-direction:column;}
        #view {flex:1;overflow:auto;}
      </style>
@@ -38,6 +40,7 @@
     (.toExternalForm (io/resource "vlaaad/reveal/vega/vega@5.21.0.min.js"))
     (.toExternalForm (io/resource "vlaaad/reveal/vega/vega-lite@5.2.0.min.js"))
     (.toExternalForm (io/resource "vlaaad/reveal/vega/vega-embed@6.20.5.min.js"))
+    @style/background-color
     (json/write-str spec)
     (json/write-str opt)))
 
@@ -127,6 +130,36 @@
                               nil)
                             fx.lifecycle/scalar)}))
 
+(def ^:private default-config
+  (delay
+    {:background @style/background-color
+     :font (str (.getFamily (font/font)) ", monospace")
+     :title {:color @style/unfocused-selection-color
+             :subtitleColor @style/unfocused-selection-color}
+     :style {:guide-label {:fill (style/color :symbol)}
+             :guide-title {:fill (style/color :symbol)}
+             :group-title {:fill (style/color :symbol)}
+             :cell {:stroke @style/unfocused-selection-color}}
+     :axis {:domainColor (style/color :util)
+            :gridColor @style/unfocused-selection-color
+            :tickColor (style/color :util)}
+     :range {:category ["#4285F4"
+                        "#DB4437"
+                        "#F4B400"
+                        "#0F9D58"
+                        "#AB47BC"
+                        "#00ACC1"
+                        "#FF7043"
+                        "#9E9D24"
+                        "#5C6BC0"
+                        "#F06292"
+                        "#00796B"
+                        "#C2185B"]
+             :heatmap {:scheme (case @style/theme :dark "darkmulti" :light "lightmulti")}}}))
+
+(defn- deep-merge [& maps]
+  (apply merge-with deep-merge maps))
+
 (defn view [{:keys [spec opt data signals]}]
   (let [spec (if (and (map? spec)
                       (str/includes? (:$schema spec "https://vega.github.io/schema/vega-lite/v5.json")
@@ -137,7 +170,8 @@
                spec)
         opt (-> opt
                 (assoc :bind "#bind")
-                (update :actions #(if (some? %) % false)))]
+                (update :actions #(if (some? %) % false))
+                (update :config #(deep-merge @default-config %)))]
     {:fx/type ext-with-data-props
      :props {:data (cond
                      (map? data) data

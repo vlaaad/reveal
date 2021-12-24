@@ -3,7 +3,7 @@
             [vlaaad.reveal.font :as font]
             [vlaaad.reveal.prefs :as prefs]))
 
-(def ^:private theme (delay (:theme @prefs/prefs :dark)))
+(def theme (delay (:theme @prefs/prefs :dark)))
 
 (def scroll-bar-color (delay (case @theme :dark "#fff6" :light "#0006")))
 (def inactive-scroll-bar-color (delay (case @theme :dark "#eee3" :light "#3333")))
