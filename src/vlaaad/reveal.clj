@@ -637,26 +637,30 @@
   {:fx/type derefable-view
    :derefable (execute-action action value annotation)})
 
-(defn ^{:arglists '([{:keys [spec opt data signals]}])} vega-view
+(defn ^{:arglists '([{:keys [spec opt data signals on-signals]}])} vega-view
   "Cljfx component fn that shows a vega(-lite) visualization
 
   Required keys:
 
-    :spec      vega(-lite) spec, either URL string that points to vega(-lite)
-               spec, or map that can be serialized to vega(-lite) json spec
+    :spec          vega(-lite) spec, either URL string that points to spec, or
+                   map that can be serialized to vega(-lite) json spec
 
   Optional keys:
 
-    :opt       map that can be serialized to json vega-embed opt:
-               https://github.com/vega/vega-embed#options
-    :data      either:
-               * vega dataset - a coll of map datums that will be assigned to
-                 \"source\" dataset (which is a default name if vega spec does
-                 not specify a named dataset)
-               * a map from dataset names to datasets
-               using :data instead of inlining dataset inside a spec has much
-               better performance in data streaming uses
-    :signals   map from signal name to signal value
+    :opt           map that can be serialized to json vega-embed opt:
+                   https://github.com/vega/vega-embed#options
+    :data          either:
+                   * vega dataset - a coll of map datums that will be assigned
+                     to \"source\" dataset (which is a default name if vega spec
+                     does not specify a named dataset)
+                   * a map from dataset names to dataset colls
+                   using :data instead of inlining dataset coll inside a spec
+                   has much better update performance in data streaming use case
+    :signals       map from signal name to signal value (will be serialized
+                   to json)
+    :on-signals    map from signal name to 1-arg fn that will be called with new
+                   signal values (will be deserialized from json with
+                   keyword keys)
 
   Examples:
 

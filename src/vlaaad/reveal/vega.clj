@@ -10,9 +10,10 @@
             [cljfx.lifecycle :as fx.lifecycle]
             [vlaaad.reveal.style :as style]
             [vlaaad.reveal.font :as font])
-  (:import [javafx.scene.web WebView]
+  (:import [javafx.scene.web WebView WebEngine]
            [javafx.concurrent Worker$State Worker]
-           [javafx.beans.value ChangeListener]))
+           [javafx.beans.value ChangeListener]
+           [netscape.javascript JSObject]))
 
 (defn- html [spec opt]
   (format
@@ -22,7 +23,7 @@
      <script src=\"%s\"></script>
      <script src=\"%s\"></script>
      <style>
-       html, body {height:100%%;margin:0;background-color:%s;}
+       html, body {height:100%%;margin:0;background-color:%s;color:%s;}
        #wrap {height:100vh;width:100%%;display:flex;flex-direction:column;}
        #view {flex:1;overflow:auto;}
      </style>
@@ -41,6 +42,7 @@
     (.toExternalForm (io/resource "vlaaad/reveal/vega/vega-lite@5.2.0.min.js"))
     (.toExternalForm (io/resource "vlaaad/reveal/vega/vega-embed@6.20.5.min.js"))
     @style/background-color
+    (style/color :symbol)
     (json/write-str spec)
     (json/write-str opt)))
 
@@ -64,7 +66,7 @@
                (.removeListener prop# this#)
                ~@body)))))))
 
-(defn- set-data-html [m]
+(defn- set-data-js [m]
   (format
     "viewPromise = viewPromise.then(function(view) {
       return view
@@ -82,7 +84,7 @@
                      "))")))
          (str/join "\n        "))))
 
-(defn- set-signal-html [m]
+(defn- set-signal-js [m]
   (format
     "viewPromise = viewPromise.then(function(view) {
       return view
@@ -98,6 +100,60 @@
                      (json/write-str v)
                      ")")))
          (str/join "\n        "))))
+
+(defn- add-signal-listeners! [^WebEngine e m]
+  (let [^JSObject w (.executeScript e "window")]
+    (doseq [[k f] m]
+      (.setMember w (str "vega_signal_handler_" (name k)) f)))
+  (.executeScript
+    e
+    (format
+      "%s
+       viewPromise = viewPromise.then(function(view) {
+         %s
+         return view;
+       })"
+      (->> m
+           keys
+           (map #(str "window["
+                      (json/write-str (str "vega_signal_handler_fn_" (name %)))
+                      "] = function(name, value) { window["
+                      (json/write-str (str "vega_signal_handler_" (name %)))
+                      "].invoke(/*name, */JSON.stringify(value)); };"))
+           (str/join "\n"))
+      (->> m
+           keys
+           (map #(str "view.addSignalListener("
+                      (json/write-str %) ", "
+                      "window[" (json/write-str (str "vega_signal_handler_fn_" (name %))) "]"
+                      ");"))
+           (str/join "\n      ")))))
+
+(defn- remove-signal-listeners! [^WebEngine e m]
+  (.executeScript
+    e
+    (format
+      "viewPromise = viewPromise.then(function(view) {
+         %s
+         return view;
+       })"
+      (->> m
+           keys
+           (map #(str "view.removeSignalListener(" (json/write-str %) ", window[" (json/write-str (str "vega_signal_handler_fn_" (name %)) "]);")))
+           (str/join "\n      "))))
+  (let [^JSObject w (.executeScript e "window")]
+    (doseq [k (keys m)]
+      (.removeMember w (str "vega_signal_handler_" (name k)))
+      (.removeMember w (str "vega_signal_handler_fn_" (name k))))))
+
+(def ref-lifecycle
+  (reify fx.lifecycle/Lifecycle
+    (create [_ desc _]
+      (atom desc))
+    (advance [_ component desc _]
+      (reset! component desc)
+      component)
+    (delete [_ _ _])))
 
 (defn- replace-from-map-mutator [f default]
   (reify fx.mutator/Mutator
@@ -117,7 +173,7 @@
                                (let [e (.getEngine view)]
                                  (on-loaded
                                    (.getLoadWorker e)
-                                   (.executeScript (.getEngine view) (set-data-html m))))))
+                                   (.executeScript e (set-data-js m))))))
                            [])
                          fx.lifecycle/scalar)
      :signals (fx.prop/make (replace-from-map-mutator
@@ -126,9 +182,20 @@
                                   (let [e (.getEngine view)]
                                     (on-loaded
                                       (.getLoadWorker e)
-                                      (.executeScript (.getEngine view) (set-signal-html m))))))
+                                      (.executeScript e (set-signal-js m))))))
                               nil)
-                            fx.lifecycle/scalar)}))
+                            fx.lifecycle/scalar)
+     :on-signals (fx.prop/make (fx.mutator/adder-remover
+                                 (fn [^WebView view m]
+                                   (let [e (.getEngine view)]
+                                     (on-loaded (.getLoadWorker e) (add-signal-listeners! e m))))
+                                 (fn [^WebView view m]
+                                   (let [e (.getEngine view)]
+                                     (on-loaded (.getLoadWorker e) (remove-signal-listeners! e m)))))
+                               (fx.lifecycle/map-of
+                                 (fx.lifecycle/wrap-coerce ref-lifecycle
+                                                           (fn [f]
+                                                             #(@f (json/read-str % :key-fn keyword))))))}))
 
 (def ^:private default-config
   (delay
@@ -162,7 +229,7 @@
     (apply merge-with deep-merge maps)
     (last maps)))
 
-(defn view [{:keys [spec opt data signals]}]
+(defn view [{:keys [spec opt data signals on-signals]}]
   (let [spec (if (and (map? spec)
                       (str/includes? (:$schema spec "https://vega.github.io/schema/vega-lite/v5.json")
                                      "vega-lite"))
@@ -175,11 +242,15 @@
                 (update :actions #(if (some? %) % false))
                 (update :config #(deep-merge @default-config %)))]
     {:fx/type ext-with-data-props
-     :props {:data (cond
-                     (map? data) data
-                     (coll? data) {"source" data})
-             :signals signals}
+     :props (cond-> {:data (cond
+                             (map? data) data
+                             (coll? data) {"source" data})}
+              signals
+              (assoc :signals signals)
+              on-signals
+              (assoc :on-signals on-signals))
      :desc {:fx/type fx.ext.web-view/with-engine-props
             :props {:content (html spec opt)
                     :on-create-popup create-popup}
-            :desc {:fx/type :web-view}}}))
+            :desc {:fx/type :web-view
+                   :context-menu-enabled false}}}))
