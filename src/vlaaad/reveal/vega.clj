@@ -9,7 +9,8 @@
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle]
             [vlaaad.reveal.style :as style]
-            [vlaaad.reveal.font :as font])
+            [vlaaad.reveal.font :as font]
+            [vlaaad.reveal.view :as view])
   (:import [javafx.scene.web WebView WebEngine]
            [javafx.concurrent Worker$State Worker]
            [javafx.beans.value ChangeListener]
@@ -73,7 +74,8 @@
         %s
         .resize()
         .runAsync()
-        .then(function() { return view; });
+        .then(function() { return view; })
+        .catch(function(e) { console.error(e); return view;});
      })"
     (->> m
          (map (fn [[k v]]
@@ -90,7 +92,8 @@
       return view
         %s
         .runAsync()
-        .then(function() { return view; });
+        .then(function() { return view; })
+        .catch(function(e) { console.error(e); return view;});
      })"
     (->> m
          (map (fn [[k v]]
@@ -110,7 +113,11 @@
     (format
       "%s
        viewPromise = viewPromise.then(function(view) {
+         try {
          %s
+         } catch (e) {
+           console.error(e);
+         }
          return view;
        })"
       (->> m
@@ -134,7 +141,11 @@
     e
     (format
       "viewPromise = viewPromise.then(function(view) {
+         try {
          %s
+         } catch (e) {
+           console.error(e);
+         }
          return view;
        })"
       (->> m
@@ -201,8 +212,8 @@
   (delay
     {:background @style/background-color
      :font (str (.getFamily (font/font)) ", monospace")
-     :title {:color @style/unfocused-selection-color
-             :subtitleColor @style/unfocused-selection-color}
+     :title {:color (style/color :symbol)
+             :subtitleColor (style/color :symbol)}
      :style {:guide-label {:fill (style/color :symbol)}
              :guide-title {:fill (style/color :symbol)}
              :group-title {:fill (style/color :symbol)}
@@ -241,16 +252,18 @@
                 (assoc :bind "#bind")
                 (update :actions #(if (some? %) % false))
                 (update :config #(deep-merge @default-config %)))]
-    {:fx/type ext-with-data-props
-     :props (cond-> {:data (cond
-                             (map? data) data
-                             (coll? data) {"source" data})}
-              signals
-              (assoc :signals signals)
-              on-signals
-              (assoc :on-signals on-signals))
-     :desc {:fx/type fx.ext.web-view/with-engine-props
-            :props {:content (html spec opt)
-                    :on-create-popup create-popup}
-            :desc {:fx/type :web-view
-                   :context-menu-enabled false}}}))
+    {:fx/type view/ext-recreate-on-key-changed
+     :key [spec opt]
+     :desc {:fx/type ext-with-data-props
+            :props (cond-> {:data (cond
+                                    (map? data) data
+                                    (coll? data) {"source" data})}
+                     signals
+                     (assoc :signals signals)
+                     on-signals
+                     (assoc :on-signals on-signals))
+            :desc {:fx/type fx.ext.web-view/with-engine-props
+                   :props {:content (html spec opt)
+                           :on-create-popup create-popup}
+                   :desc {:fx/type :web-view
+                          :context-menu-enabled false}}}}))
