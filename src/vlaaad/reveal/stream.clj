@@ -2,13 +2,15 @@
   (:refer-clojure :exclude [newline])
   (:require [vlaaad.reveal.style :as style]
             [vlaaad.reveal.ns :as ns]
-            [clojure.main :as m])
+            [clojure.main :as m]
+            lambdaisland.deep-diff2.diff-impl)
   (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn
                          ISeq MultiFn IRef Var Volatile Namespace IRecord Delay
                          IBlockingDeref TaggedLiteral Reduced ReaderConditional
                          IPersistentCollection BigInt PersistentQueue]
            [java.util.regex Pattern]
-           [java.io File FileNotFoundException]
+           [java.io File]
+           [lambdaisland.deep_diff2.diff_impl Insertion Deletion Mismatch]
            [java.net URL URI]
            [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar]
            [clojure.core Eduction]
@@ -868,5 +870,30 @@
 (ns/when-exists lambdaisland.deep-diff.diff
   (load "stream/deep_diff"))
 
-(ns/when-exists lambdaisland.deep-diff2.diff-impl
-  (load "stream/deep_diff2"))
+(defstream Mismatch [{:keys [- +]}]
+  (horizontal
+    (override-style
+      (horizontal
+        (raw-string "-")
+        (stream -))
+      assoc :fill :error)
+    separator
+    (override-style
+      (horizontal
+        (raw-string "+")
+        (stream +))
+      assoc :fill :success)))
+
+(defstream Insertion [{:keys [+]}]
+  (override-style
+    (horizontal
+      (raw-string "+")
+      (stream +))
+    assoc :fill :success))
+
+(defstream Deletion [{:keys [-]}]
+  (override-style
+    (horizontal
+      (raw-string "-")
+      (stream -))
+    assoc :fill :error))

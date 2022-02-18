@@ -4,6 +4,7 @@
             [clojure.spec.alpha :as s]
             [clojure.core.specs.alpha :as specs]
             [vlaaad.reveal.event :as event]
+            [lambdaisland.deep-diff2 :as diff]
             [clojure.main :as m])
   (:import [clojure.lang IDeref]
            [java.awt Desktop]
@@ -163,6 +164,23 @@
 (defaction ::vec [v]
   (when (and v (.isArray (class v)))
     #(vec v)))
+
+(defaction ::diff [x]
+  (cond
+    (and (vector? x) (= 2 (count x)))
+    #(apply diff/diff x)
+
+    (and (map? x) (contains? x :expected) (contains? x :actual))
+    #(let [{:keys [expected actual]} x]
+       (if (and (sequential? expected)
+                (= '= (first expected))
+                (sequential? actual)
+                (= 'not (first actual))
+                (sequential? (second actual))
+                (= '= (first (second actual)))
+                (= 3 (bounded-count 4 (second actual))))
+         (apply diff/diff (drop 1 (second actual)))
+         (diff/diff expected actual)))))
 
 (defn execute [id x ann]
   (event/daemon-future
