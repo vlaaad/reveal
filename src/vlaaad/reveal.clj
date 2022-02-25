@@ -197,7 +197,7 @@
    (ui/make-queue (update args :default #(or % :normal)))))
 
 (defn tap-log
-  "Open new window that logs all tapped values
+  "Open a new sticker window that logs all tapped values
 
   Available opts (all optional):
 
@@ -425,19 +425,59 @@
 
 ;; region test
 
-(defn test-runner [test]
-  (test/runner test))
+(defn test-runner
+  "Create reveal test runner object
 
-(defn run-tests! [runner]
+  A test can be either:
+  * Namespace instance or simple symbol that points to namespace
+  * Var instance or qualified symbol that points to Var
+  * :everything to test all Vars in directories on the classpath
+  * a map with optional :include and :exclude keys whose vals are collections of
+    idents that define what tests from directories on the classpath to include
+    or exclude, where:
+    - a simple symbol describes Namespace to include/exclude
+    - a qualified symbol describes Var to include/exclude
+    - a keyword describes Var or Namespace metadata key to include/exclude
+  * a collection of tests"
+  ([]
+   (test-runner :everything))
+  ([test]
+   (test/runner test)))
+
+(defn run-tests!
+  "Run the tests defined by test runner if they are not already running"
+  [runner]
   (test/test! runner))
 
-;; simple, controls+output
-(defn test-runner-view [{:keys [runner]}]
+(defn test-runner-view
+  "Cljfx component that shows test runner controls, summary and output
+
+  Optional keys:
+
+    :runner    test runner created with [[test-runner]]
+
+  Example:
+
+    {:fx/type test-runner-view
+     :runner (test-runner)}"
+  [{:keys [runner]}]
   {:fx/type test/runner-view
    :runner runner})
 
-;; simple, control+button to open output
-(defn test-runner-controls-view [{:keys [runner]}]
+(defn test-runner-controls-view
+  "Cljfx component that shows only test runner controls and summary
+
+  Clicking on a summary will open the test output
+
+  Optional keys:
+
+    :runner    test runner created with [[test-runner]]
+
+  Example:
+
+    {:fx/type test-runner-controls-view
+     :runner (test-runner)}"
+  [{:keys [runner]}]
   {:fx/type test/controls-view
    :runner runner
    :open-view-button true})
@@ -447,6 +487,32 @@
                      :or {test :everything
                           auto-run false}}])}
   test-view
+  "Cljfx component that shows test UI with controls, summary and output
+
+  This is a convenience component that automatically creates an instance of
+  test runner and optionally starts it
+
+  Optional keys:
+
+    :test        the test to run, defaults to :everything. Valid values are:
+                 * Namespace instance or simple symbol that points to namespace
+                 * Var instance or qualified symbol that points to Var
+                 * :everything to test all Vars in directories on the classpath
+                 * a map with optional :include and :exclude keys whose vals are
+                   collections of idents that define what tests from directories
+                   on the classpath to include or exclude, where:
+                   - a simple symbol describes Namespace to include/exclude
+                   - a qualified symbol describes Var to include/exclude
+                   - a keyword describes Var or Namespace metadata key
+                     to include/exclude
+                 * a collection of tests
+    :auto-run    a flag indicating whether to start the test run when the view
+                 is shown or not, defaults to false
+
+  Example:
+
+    {:fx/type test-view
+     :test '{:exclude [:generative my.ns.with.long.tests]}}"
   (fn [props]
     (assoc props :fx/type test/test-view)))
 
@@ -456,6 +522,41 @@
                     :or {test :everything
                          auto-run false}}])}
   test-sticker
+  "Opens a new sticker window with test runner controls and summary
+
+  Test output can be opened by clicking on a summary.
+
+  Optional kv-args:
+
+    ;; test opts
+    :test        the test to run, defaults to :everything. Valid values are:
+                 * Namespace instance or simple symbol that points to namespace
+                 * Var instance or qualified symbol that points to Var
+                 * :everything to test all Vars in directories on the classpath
+                 * a map with optional :include and :exclude keys whose vals are
+                   collections of idents that define what tests from directories
+                   on the classpath to include or exclude, where:
+                   - a simple symbol describes Namespace to include/exclude
+                   - a qualified symbol describes Var to include/exclude
+                   - a keyword describes Var or Namespace metadata key
+                     to include/exclude
+                 * a collection of tests
+    :auto-run    a flag indicating whether to start the test run when the view
+                 is shown or not, defaults to false
+    ;; window opts
+    :title              window title, defaults to \"test the-test\"
+    :close-difficulty   how easy it is to close the window; either:
+                        * :easy - close on Escape
+                        * :normal (default) - close on OS close window shortcut
+                        * :hard - close on shortcut + confirmation
+    :always-on-top      whether the window is always on top of other windows,
+                        defaults to true
+    :decorations        whether to show OS window decorations, defaults to
+                        inverse of :always-on-top
+    :bounds             any value indicating window bounds group, defaults to
+                        :title value if provided. Every group remembers window
+                        bounds - location and size - and reuses them between
+                        shown windows"
   (fn [& {:as opts}]
     (test/sticker opts)))
 
