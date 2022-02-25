@@ -300,9 +300,12 @@
   (swap! (:state runner) update :output update-in-path path assoc :expanded event)
   identity)
 
+(defn- expanded? [node]
+  (:expanded node (or (:fail node) (not (:end node)))))
+
 (defn- node->tree-item [runner node]
   (if (:name node)
-    (let [expanded (:expanded node (or (:fail node) (not (:end node))))]
+    (let [expanded (expanded? node)]
       {:fx/type tree-item
        :expanded expanded
        :on-expanded-changed {::event/type ::change-expanded
@@ -313,7 +316,7 @@
                   (dissoc :children))
        :children (if expanded
                    (mapv #(node->tree-item runner %) (:children node))
-                   [{:fx/type tree-item}])})
+                   [{:fx/type tree-item :value {:type :out :message "YOU SHOULD NOT SEE IT"}}])})
     {:fx/type tree-item
      :value (assoc (:value node) :path (:path node))}))
 
@@ -356,12 +359,12 @@
                                                            (-> acc .getChildren (.get i)))
                                                          (.getRoot view)
                                                          path)]
+                              (.select (.getSelectionModel view) item)
                               (when (or (= mode :auto) scroll)
                                 (when-let [f (.lookup view ".virtual-flow")]
                                   ;; using reflection on purpose to support javafx 8 and 9
                                   ;; where VirtualFlow class is in different packages
-                                  (.scrollTo f (.getRow view item))))
-                              (.select (.getSelectionModel view) item)))))
+                                  (.scrollTo f (.getRow view item))))))))
                       fx.lifecycle/scalar)}))
 
 (defmethod event/handle ::select [{:keys [runner ^TreeItem fx/event]}]
@@ -393,6 +396,20 @@
       nil))
   identity)
 
+(defn- limit-path [path nodes pred]
+  (loop [acc []
+         nodes nodes
+         path (seq path)]
+    (if path
+      (let [i (first path)
+            node (nodes i)]
+        (if (pred node)
+          (recur (conj acc i)
+                 (:children node)
+                 (next path))
+          (conj acc i)))
+      acc)))
+
 (defn- result-tree-view [{:keys [runner]}]
   (let [{:keys [state]} runner]
     {:fx/type view/observable-view
@@ -403,13 +420,16 @@
             :desc {:fx/type fx/ext-on-instance-lifecycle
                    :on-created init-tree-view!
                    :desc {:fx/type ext-with-selected-path
-                          :props {:selected-path (let [[mode path] selection]
+                          :props {:selected-path (let [[mode path scroll] selection]
                                                    (case mode
-                                                     :manual selection
-                                                     :auto [mode (-> failure-paths
-                                                                     (subseq > path)
-                                                                     first
-                                                                     (or (last-path output)))]))}
+                                                     :manual [mode (limit-path path output expanded?) scroll]
+                                                     :auto [mode
+                                                            (-> failure-paths
+                                                                (subseq > path)
+                                                                first
+                                                                (or (last-path output))
+                                                                (limit-path output expanded?))
+                                                            true]))}
                           :desc {:fx/type fx.ext.tree-view/with-selection-props
                                  :props {:on-selected-item-changed {::event/type ::select
                                                                     :runner runner}}
