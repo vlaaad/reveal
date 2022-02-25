@@ -25,52 +25,6 @@
            [javafx.css PseudoClass]
            [java.util Collection]))
 
-(t/deftest addition
-  (Thread/sleep 100)
-  (println "testing addition...")
-  (Thread/sleep 100)
-  (t/testing "small plus"
-    (Thread/sleep 100)
-    (t/is (= 5 (+ 2 3)) "better be right!")
-    (Thread/sleep 100)
-    (t/is (= 6 (+ 3 3))))
-  (Thread/sleep 100)
-  (t/testing "big plus"
-    (Thread/sleep 100)
-    (dotimes [i 10000]
-      (t/is (= (* 1000 i) (+ (* i 200) (* 800 i)))))
-    (t/testing "biggest!"
-      (Thread/sleep 100)
-      (println "and now for the fun part")
-      (t/is (= 10000000000 (+ 10000000000 0))))))
-
-(t/deftest subtraction
-  (Thread/sleep 100)
-  (dotimes [i 20000]
-    (t/is (= 0 (- i i))))
-  (Thread/sleep 100)
-  (t/is (= 3 (- 6 3))))
-
-(t/deftest arithmetic
-  (Thread/sleep 100)
-  (addition)
-  (Thread/sleep 100)
-  (println "doing some more...")
-  (Thread/sleep 100)
-  (subtraction)
-  (Thread/sleep 100)
-  (t/is (= 0 (/ 1 0)) "Uhmmm..."))
-
-(t/deftest ^:guh broken
-  (Thread/sleep 100)
-  (/ 1 0))
-
-(t/deftest should-diff
-  (t/is (thrown? Exception (/ 1 0)))
-  (t/is (= {:a 1
-            :b {:c 5}}
-           (assoc-in {:a 1} [:b :c] 5))))
-
 (defn- scan-classpath [{:keys [include exclude]}]
   (let [ns-filter (every-pred
                     (if include
@@ -258,36 +212,41 @@
               mark-failure-path)
     :out (update state :output add-value (into (:ctx e) (:ctx state)) e)))
 
-(defn- test! [{:keys [state test]}]
+(defn test! [{:keys [state test]}]
   (event/daemon-future
     (let [old @state]
       (when (and (not (:running old))
                  (compare-and-set! state old (assoc fresh-state :running true)))
-        (try
-          (let [{:keys [ns var]} (test->ns+var* test)
-                process #(swap! state process-state %)]
-            (binding [*out* (PrintWriter-on #(process {:type :out
-                                                       :message (str/trim-newline %)
-                                                       :ctx (vec t/*testing-contexts*)})
-                                            nil)
-                      t/*test-out* (PrintWriter-on #(process {:type :out
-                                                              :message (str/trim-newline %)
-                                                              :ctx (vec t/*testing-contexts*)})
-                                                   nil)
-                      t/report (fn [x]
-                                 (when-let [e (case (:type x)
-                                                :begin-test-ns {:type :start :name (str (.getName ^Namespace (:ns x)))}
-                                                :begin-test-var {:type :start :name (str (symbol (:var x))) :test true}
-                                                :end-test-ns {:type :stop}
-                                                :end-test-var {:type :stop}
-                                                :pass (assoc x :type :pass :ctx (vec t/*testing-contexts*))
-                                                :fail (assoc x :type :fail :ctx (vec t/*testing-contexts*))
-                                                :error (assoc x :type :fail :ctx (vec t/*testing-contexts*))
-                                                nil)]
-                                   (process e)))]
-              (run! t/test-ns ns)
-              (t/test-vars var)))
-          (finally (swap! state assoc :running false))))))
+        (let [process #(swap! state process-state %)]
+          (try
+            (let [{:keys [ns var]} (test->ns+var* test)]
+              (binding [*out* (PrintWriter-on #(process {:type :out
+                                                         :message (str/trim-newline %)
+                                                         :ctx (vec t/*testing-contexts*)})
+                                              nil)
+                        t/*test-out* (PrintWriter-on #(process {:type :out
+                                                                :message (str/trim-newline %)
+                                                                :ctx (vec t/*testing-contexts*)})
+                                                     nil)
+                        t/report (fn [x]
+                                   (when-let [e (case (:type x)
+                                                  :begin-test-ns {:type :start :name (str (.getName ^Namespace (:ns x)))}
+                                                  :begin-test-var {:type :start :name (str (symbol (:var x))) :test true}
+                                                  :end-test-ns {:type :stop}
+                                                  :end-test-var {:type :stop}
+                                                  :pass (assoc x :type :pass :ctx (vec t/*testing-contexts*))
+                                                  :fail (assoc x :type :fail :ctx (vec t/*testing-contexts*))
+                                                  :error (assoc x :type :fail :ctx (vec t/*testing-contexts*))
+                                                  nil)]
+                                     (process e)))]
+                (run! t/test-ns ns)
+                (t/test-vars var)))
+            (catch Exception e
+              (process {:type :fail
+                        :ctx (vec t/*testing-contexts*)
+                        :message "Uncaught exception, not in assertion."
+                        :actual e}))
+            (finally (swap! state assoc :running false)))))))
   nil)
 
 (defn- describe-cell [e]
@@ -317,7 +276,6 @@
           :pseudo-classes #{:out}
           :text (:message e)}
     {}))
-
 
 (def ext-with-appended-children
   (fx/make-ext-with-props
@@ -362,13 +320,6 @@
 (defmethod event/handle ::run [{:keys [runner]}]
   (test! runner)
   identity)
-
-;; TODO
-;; * output tree view:
-;;   - behavior:
-;;     - shortcuts:
-;;       - Alt+Up/Down to jump between errors
-;;     - stretch goal: open in text editor/ide
 
 (defn- init-tree-view! [^TreeView tree-view]
   (let [dispatcher (.getEventDispatcher tree-view)]
@@ -506,7 +457,7 @@
                :value {:fx/type result-tree-view
                        :runner runner}}})
 
-(defn- controls-view [{:keys [runner open-view-button]}]
+(defn controls-view [{:keys [runner open-view-button]}]
   (let [{:keys [state]} runner]
     {:fx/type view/observable-view
      :ref state
@@ -578,22 +529,27 @@
 
 ;;easy
 (defn test-view [{:keys [test auto-run]
-                  :or {auto-run false}}]
+                  :or {test :everything
+                       auto-run false}}]
   (let [r (runner test)]
     (when auto-run (test! r))
     {:fx/type runner-view
      :runner r}))
 
 (defn sticker [{:keys [test auto-run]
-                :or {auto-run false}}]
+                :or {test :everything
+                     auto-run false}
+                :as opts}]
   (let [r (runner test)]
     (when auto-run (test! r))
     (ui/sticker {:fx/type controls-view
                  :open-view-button true
                  :runner r}
-                {:title (str "test " test)
-                 :default-size {:width 234
-                                :height 46}})))
+                (merge
+                  {:title (str "test " test)
+                   :default-size {:width 234
+                                  :height 46}}
+                  (dissoc opts :test :auto-run)))))
 
 (comment
   (sticker {:test '{:exclude [vlaaad.reveal.nrepl]}}))
@@ -617,19 +573,3 @@
          (let [var (resolve x)]
            (and var (testable-var? var))))
     #(-> {:fx/type test-view :test x :auto-run true})))
-
-'vlaaad.reveal.test
-
-;; TODO
-;; order:
-;; - API - views, stickers, runner
-;; * test runner:
-;;   - can stop while running -- later?
-
-
-;; nodes: a vector of node (branch|leaf)
-;; branch:
-;; - :name
-;; - :children
-;; leaf:
-;; - :value

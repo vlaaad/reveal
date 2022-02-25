@@ -5,6 +5,7 @@
             [vlaaad.reveal.action :as action]
             [vlaaad.reveal.action-popup :as action-popup]
             [vlaaad.reveal.stream :as stream]
+            [vlaaad.reveal.test :as test]
             [vlaaad.reveal.view :as view]
             [vlaaad.reveal.vega :as vega]
             [vlaaad.reveal.ui :as ui])
@@ -419,6 +420,44 @@
    (execute-action action value nil))
   ([action value annotation]
    (action/execute action value annotation)))
+
+;; endregion
+
+;; region test
+
+(defn test-runner [test]
+  (test/runner test))
+
+(defn run-tests! [runner]
+  (test/test! runner))
+
+;; simple, controls+output
+(defn test-runner-view [{:keys [runner]}]
+  {:fx/type test/runner-view
+   :runner runner})
+
+;; simple, control+button to open output
+(defn test-runner-controls-view [{:keys [runner]}]
+  {:fx/type test/controls-view
+   :runner runner
+   :open-view-button true})
+
+;; easy, controls+output
+(def ^{:arglists '([{:keys [test auto-run]
+                     :or {test :everything
+                          auto-run false}}])}
+  test-view
+  (fn [props]
+    (assoc props :fx/type test/test-view)))
+
+;; easy, controls+button to open output
+(def
+  ^{:arglists '([& {:keys [test auto-run]
+                    :or {test :everything
+                         auto-run false}}])}
+  test-sticker
+  (fn [& {:as opts}]
+    (test/sticker opts)))
 
 ;; endregion
 
