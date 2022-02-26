@@ -633,6 +633,39 @@
      :items [[:a 1] {:a 1} \"a=1\"]}"
   view/table)
 
+(def ^{:arglists '([{:keys [branch? root children render annotate valuate]
+                     :or {render identity
+                          valuate identity
+                          annotate (constantly nil)}}])}
+  tree-view
+  "Cljfx component fn that shows a tree view
+
+  Required keys:
+
+    :root        a root node of the tree
+    :branch?     predicate that tests if a node is a branch
+    :children    1-arg fn that converts tree node that is known to be a branch
+                 to a coll of children nodes.
+
+  Optional keys:
+
+    :render      1-arg fn that converts the node to value that will be displayed
+                 in a tree cell (e.g. to a cljfx description or an object to
+                 display using the streaming printing system)
+    :valuate     1-arg fn that converts node to value that can be further
+                 explored with action/popup system
+    :annotate    1-arg fn that converts node to optional annotation map that can
+                 be used by actions
+
+  Example:
+
+    {:fx/type tree-view
+     :root [0 [1 [2] [[3]]] [4 [5 [[6 7 8]]]]]
+     :branch? seqable?
+     :children seq}"
+  (fn [props]
+    (assoc props :fx/type view/tree-view)))
+
 (defn observable
   "Returns an instance of IRef that wraps another ref with fn transform
 

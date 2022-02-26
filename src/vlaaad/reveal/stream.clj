@@ -16,7 +16,8 @@
            [clojure.core Eduction]
            [java.text SimpleDateFormat DateFormat]
            [java.time Instant]
-           [java.util.concurrent Future]))
+           [java.util.concurrent Future]
+           [java.lang.reflect Method Constructor Field Proxy]))
 
 (set! *warn-on-reflection* true)
 
@@ -709,6 +710,18 @@
 
 (defstream Class [^Class class]
   (raw-string (.getName class) {:fill :object}))
+
+(defstream Method [^Method meth]
+  (raw-string (str meth) {:fill :object}))
+
+(defstream Constructor [^Constructor c]
+  (raw-string (str c) {:fill :object}))
+
+(defstream Field [f]
+  (raw-string (str f) {:fill :object}))
+
+(defstream Proxy [p]
+  (raw-string (str p) {:fill :object}))
 
 (defstream Enum [^Enum enum]
   (raw-string

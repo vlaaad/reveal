@@ -11,16 +11,20 @@
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.component :as fx.component]
-            [clojure.main :as m])
+            [clojure.main :as m]
+            [cljfx.ext.tree-view :as fx.ext.tree-view])
   (:import [clojure.lang IRef IFn]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
-           [javafx.scene.control TableView TablePosition TableColumn$SortType]
+           [javafx.scene.control TableView TablePosition TableColumn$SortType TreeView TreeCell TreeItem]
            [javafx.scene Node]
            [javafx.css PseudoClass]
            [java.net URL URI]
            [javafx.event Event EventDispatcher]
            [javafx.scene.paint Color]
-           [javafx.scene.input KeyEvent KeyCode Clipboard ClipboardContent]))
+           [javafx.scene.input KeyEvent KeyCode Clipboard ClipboardContent]
+           [java.beans Introspector PropertyDescriptor]
+           [java.lang.reflect Modifier Field]
+           [java.util UUID]))
 
 (defn- runduce!
   ([xf x]
@@ -616,6 +620,298 @@
 (action/defaction ::action/view:value [x ann]
   (when (::stream/hidden ann)
     (constantly {:fx/type value :value x})))
+
+(defn- default-tree-item-render [x]
+  (if (view? x)
+    x
+    {:fx/type summary
+     :value x
+     :max-length 256}))
+
+(defn- as-util-string [x]
+  (stream/raw-string x {:fill :util}))
+
+(defn- as-error-string [e]
+  (let [{:clojure.error/keys [cause class]} (-> e Throwable->map m/ex-triage)]
+    (stream/raw-string (or cause class) {:fill :error})))
+
+(defn- get-in-tree-state [state path]
+  (get-in state (concat (interleave (repeat :children) path) [:state])))
+
+(defn- tree-item-view [{:keys [state
+                               on-expanded-changed
+                               branch?
+                               root
+                               path
+                               render
+                               valuate
+                               annotate]
+                        :or {render identity
+                             valuate identity
+                             annotate {}}
+                        :as props}]
+  (if (branch? root)
+    (let [expanded-state (get-in-tree-state state path)]
+      {:fx/type :tree-item
+       :value {:value root
+               :render render
+               :valuate valuate
+               :annotate annotate}
+       :expanded (some? expanded-state)
+       :on-expanded-changed (assoc on-expanded-changed :path path :root root)
+       :children (case (:state expanded-state)
+                   :loading [{:fx/type :tree-item
+                              :value {:value "Loading..."
+                                      :render as-util-string
+                                      :disable-popup true}}]
+                   :done (map-indexed
+                           (fn [i child]
+                             (assoc props :fx/type tree-item-view :root child :path (conj path i)))
+                           (:children expanded-state))
+                   :failed [{:fx/type :tree-item
+                             :value {:value (:error expanded-state)
+                                     :render as-error-string
+                                     :valuate identity
+                                     :annotate {}}}]
+                   [{:fx/type :tree-item
+                     :value {:value ::hidden
+                             :render render
+                             :valuate valuate
+                             :annotate annotate}}])})
+    {:fx/type :tree-item
+     :value {:value root
+             :render render
+             :valuate valuate
+             :annotate annotate}}))
+
+(defn- select-tree-bounds-and-value! [^Event e]
+  (let [^TreeView view (.getSource e)]
+    (when-let [^TreeCell cell (->> (.lookupAll view ".tree-cell:selected")
+                                   (some #(when (contains? (.getPseudoClassStates ^Node %)
+                                                           (PseudoClass/getPseudoClass "selected"))
+                                            %)))]
+      (when-let [^Node node (.lookup cell ".tree-cell > .reveal-tree-cell-content")]
+        (let [item (.getItem cell)]
+          (if (:disable-popup item)
+            (.consume e)
+            (let [{:keys [value valuate annotate]} item]
+              {:bounds (.localToScreen node (.getBoundsInLocal node))
+               :value (valuate value)
+               :annotation (annotate value)})))))))
+
+(defn- init-tree-view! [^TreeView tree-view]
+  (let [dispatcher (.getEventDispatcher tree-view)]
+    (-> tree-view
+        (.setEventDispatcher
+          (reify EventDispatcher
+            (dispatchEvent [_ e next]
+              (if (and (instance? KeyEvent e)
+                       (= KeyEvent/KEY_PRESSED (.getEventType e)))
+                (let [^KeyEvent e e]
+                  (cond
+                    (.isShortcutDown e)
+                    (condp = (.getCode e)
+                      KeyCode/C
+                      (do (fx/on-fx-thread
+                            (let [{:keys [value valuate]} (-> tree-view
+                                                              .getSelectionModel
+                                                              ^TreeItem .getSelectedItem
+                                                              .getValue)]
+                              (.setContent
+                                (Clipboard/getSystemClipboard)
+                                (doto (ClipboardContent.)
+                                  (.putString (stream/->str (valuate value)))))))
+                          e)
+                      e)
+
+                    (#{KeyCode/ESCAPE} (.getCode e))
+                    e
+
+                    :else
+                    (.dispatchEvent dispatcher e next)))
+
+                (.dispatchEvent dispatcher e next))))))))
+
+(defn- describe-tree-cell [{:keys [value render]}]
+  (let [v (try (render value) (catch Exception e e))]
+    {:graphic {:fx/type :anchor-pane
+               :max-width :use-pref-size
+               :style-class "reveal-tree-cell-content"
+               :children [(if (view? v) v {:fx/type summary :value v :max-length 256})]}}))
+
+(defn- tree-view-impl [props]
+  {:fx/type action-popup/ext
+   :select select-tree-bounds-and-value!
+   :desc {:fx/type fx/ext-on-instance-lifecycle
+          :on-created init-tree-view!
+          :desc {:fx/type fx.ext.tree-view/with-selection-props
+                 :props {:selected-index 0}
+                 :desc {:fx/type :tree-view
+                        :cell-factory {:fx/cell-type :tree-cell
+                                       :describe describe-tree-cell}
+                        :root (assoc props
+                                :fx/type tree-item-view
+                                :path [])}}}})
+
+
+(defmethod event/handle ::update-state [{:keys [id fn]}]
+  #(cond-> % (contains? % id) (update id fn)))
+
+(defmethod event/handle ::change-expanded [{:keys [load-fn] :as e}]
+  (load-fn e)
+  identity)
+
+(defn- set-in-tree-state [state path v]
+  (assoc-in state (concat (interleave (repeat :children) path) [:state]) v))
+
+(defn- update-in-tree-state-if-exists [state path f & args]
+  (let [full-path (concat (interleave (repeat :children) path) [:state])
+        up (fn up [m ks f args]
+             (let [[k & ks] ks]
+               (if ks
+                 (assoc m k (up (get m k) ks f args))
+                 (if (contains? m k)
+                   (assoc m k (apply f (get m k) args))
+                   m))))]
+    (up state full-path f args)))
+
+(defn- get-in-tree-state [state path]
+  (get-in state (concat (interleave (repeat :children) path) [:state])))
+
+(defn- remove-from-tree-state [state path]
+  (let [full-path (interleave (repeat :children) path)]
+    (if (seq full-path)
+      (update-in state full-path dissoc :state :children)
+      (dissoc state :state :children))))
+
+(defn- init-tree-view-state! [id {:keys [branch? children root]} handler]
+  (let [load-fn (fn [{:keys [path root fx/event]}]
+                  (if event
+                    (let [request (UUID/randomUUID)
+                          loading-state {:state :loading :request request}]
+                      (handler {::event/type ::update-state
+                                :id id :fn #(update % :state set-in-tree-state path loading-state)})
+                      (event/daemon-future
+                        (try
+                          (let [children (children root)]
+                            (if (seqable? children)
+                              (doall children)
+                              (throw (ex-info "Children are not seqable" {:root root
+                                                                          :children children})))
+                            (handler {::event/type ::update-state
+                                      :id id
+                                      :fn #(update % :state update-in-tree-state-if-exists path (fn [m]
+                                                                                                  (if (= loading-state m)
+                                                                                                    {:state :done :children children}
+                                                                                                    m)))}))
+                          (catch Exception e
+                            (handler {::event/type ::update-state
+                                      :id id
+                                      :fn #(update % :state update-in-tree-state-if-exists path (fn [m]
+                                                                                                  (if (= loading-state m)
+                                                                                                    {:state :failed :error e}
+                                                                                                    m)))})))))
+                    (handler {::event/type ::update-state
+                              :id id :fn #(update % :state remove-from-tree-state path)})))]
+    (handler {::event/type ::create-view-state
+              :id id
+              :state {:state {}
+                      :on-expanded-changed {::event/type ::change-expanded
+                                            :load-fn load-fn}}})
+    (when (branch? root)
+      (load-fn {:path [] :root root :fx/event true}))
+    #(handler {::event/type ::dispose-state :id id})))
+
+(defn tree-view [props]
+  {:fx/type rfx/ext-with-process
+   :start init-tree-view-state!
+   :args props
+   :desc (assoc props :fx/type tree-view-impl)})
+
+(action/defaction ::action/java-bean [x]
+  (when (some? x)
+    (fn []
+      (let [reflect (fn [value]
+                      (let [props (->> value
+                                       class
+                                       (Introspector/getBeanInfo)
+                                       (.getPropertyDescriptors)
+                                       (keep
+                                         (fn [^PropertyDescriptor descriptor]
+                                           (when-let [read-meth (.getReadMethod descriptor)]
+                                             (try
+                                               (.setAccessible read-meth true)
+                                               (merge
+                                                 {:name (.getName descriptor)
+                                                  :sort 1
+                                                  :key descriptor}
+                                                 (try
+                                                   {:value (.invoke read-meth value (object-array 0))}
+                                                   (catch Exception e {:error e})))
+                                               (catch Throwable _ nil))))))
+                            fields (->> value
+                                        class
+                                        (iterate #(.getSuperclass ^Class %))
+                                        (take-while some?)
+                                        (mapcat #(.getDeclaredFields ^Class %))
+                                        (remove #(Modifier/isStatic (.getModifiers ^Field %)))
+                                        (keep
+                                          (fn [^Field field]
+                                            (try
+                                              (.setAccessible field true)
+                                              (merge
+                                                {:name (.getName field)
+                                                 :sort -1
+                                                 :key field}
+                                                (try
+                                                  {:value (.get field value)}
+                                                  (catch Exception e {:error e})))
+                                              (catch Throwable _ nil)))))
+                            items (when (.isArray (class value))
+                                    (cons
+                                      {:name "length"
+                                       :sort 2
+                                       :value (count value)}
+                                      (->> value
+                                           (take 1000)
+                                           (map-indexed (fn [i v]
+                                                          {:name i
+                                                           :key i
+                                                           :sort -3
+                                                           :value v})))))
+                            all (concat fields props items)
+                            pad (->> all
+                                     (map #(-> % :name str count))
+                                     (reduce max 0))]
+                        (->> all
+                             (map #(assoc % :pad pad))
+                             (into (sorted-set-by
+                                     (fn [a b]
+                                       (let [v (juxt :sort :name)]
+                                         (compare (v a) (v b)))))))))]
+        {:fx/type tree-view
+         :valuate (some-fn :error :value)
+         :annotate #(when-let [k (:key %)]
+                      {::action/java-bean:key k})
+         :branch? #(-> % :value some?)
+         :children #(-> % :value reflect)
+         :root {:value x}
+         :render (fn [{:keys [value error name sort pad]}]
+                   (apply stream/horizontal
+                          (concat
+                            (when name
+                              [(stream/raw-string (format (str "%-" pad "s") name) {:fill (if (neg? sort) :symbol :util)})
+                               stream/separator])
+                            [(if error
+                               (let [{:clojure.error/keys [cause class]} (-> error
+                                                                             Throwable->map
+                                                                             m/ex-triage)]
+                                 (stream/raw-string (or cause class) {:fill :error}))
+                               (stream/stream value))])))}))))
+
+(action/defaction ::action/java-bean:key [x ann]
+  (when-let [k (::action/java-bean:key ann)]
+    (constantly k)))
 
 (deftype Observable [*ref f]
   IRef

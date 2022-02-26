@@ -4,14 +4,11 @@
             [clojure.spec.alpha :as s]
             [clojure.core.specs.alpha :as specs]
             [vlaaad.reveal.event :as event]
-            [lambdaisland.deep-diff2 :as diff]
-            [clojure.main :as m])
+            [lambdaisland.deep-diff2 :as diff])
   (:import [clojure.lang IDeref]
            [java.awt Desktop]
            [java.net URI URL]
            [java.io File]
-           [java.lang.reflect Field Modifier]
-           [java.beans Introspector PropertyDescriptor]
            [java.util.concurrent Future]))
 
 (defonce ^:private *registry
@@ -73,69 +70,6 @@
       (cond
         (not= key ::not-found) #(d/nav datafied-coll key x)
         (not= val ::not-found) #(d/nav datafied-coll x val)))))
-
-(defaction ::java-bean [x]
-  (when (some? x)
-    (fn []
-      (let [props (->> x
-                       class
-                       (Introspector/getBeanInfo)
-                       (.getPropertyDescriptors)
-                       (keep
-                         (fn [^PropertyDescriptor descriptor]
-                           (when-let [read-meth (.getReadMethod descriptor)]
-                             (try
-                               (.setAccessible read-meth true)
-                               [(.getName descriptor)
-                                (try
-                                  [(.invoke read-meth x (object-array 0)) nil]
-                                  (catch Exception e [nil e]))
-                                descriptor]
-                               (catch Throwable _ nil))))))
-            fields (->> x
-                        (class)
-                        (iterate #(.getSuperclass ^Class %))
-                        (take-while some?)
-                        (mapcat #(.getDeclaredFields ^Class %))
-                        (remove #(Modifier/isStatic (.getModifiers ^Field %)))
-                        (keep
-                          (fn [^Field field]
-                            (try
-                              (.setAccessible field true)
-                              [(.getName field)
-                               (try
-                                 [(.get field x) nil]
-                                 (catch Exception e [nil e]))
-                               field]
-                              (catch Throwable _ nil)))))
-            sorted (->> (concat fields props)
-                        (group-by (juxt first second))
-                        (sort-by ffirst)
-                        (map (fn [[[name [value error]] xs]]
-                               (let [kinds (mapv last xs)]
-                                 (stream/vertical
-                                   (apply
-                                     stream/horizontal
-                                     (stream/as name
-                                       (stream/raw-string name {:fill :symbol}))
-                                     stream/separator
-                                     (->> kinds
-                                          (map (fn [kind]
-                                                 (stream/as kind
-                                                   (stream/raw-string (.getSimpleName (class kind))
-                                                                      {:fill :util}))))
-                                          (interpose stream/separator)))
-                                   (stream/horizontal
-                                     (stream/raw-string "  " {:selectable false})
-                                     (if error
-                                       (stream/as
-                                         error
-                                         (let [{:clojure.error/keys [cause class]} (-> error
-                                                                                       Throwable->map
-                                                                                       m/ex-triage)]
-                                           (stream/raw-string (or cause class) {:fill :error})))
-                                       (stream/stream value))))))))]
-        (stream/vertically sorted)))))
 
 (defaction ::deref [v]
   (when (or (instance? IDeref v)
