@@ -205,9 +205,22 @@
             (f @ret))
           (f ret)))))
 
+(defn- preserving-reduced [rf]
+  #(let [ret (rf %1 %2)]
+     (if (reduced? ret)
+       (reduced ret)
+       ret)))
+
 (defn- streamduce [xf coll]
   (fn [rf acc]
-    (transduce xf (fn ([acc] acc) ([acc sf] (sf rf acc))) acc coll)))
+    (let [rrf (preserving-reduced rf)]
+      (transduce
+        xf
+        (fn
+          ([acc] acc)
+          ([acc sf] (sf rrf acc)))
+        acc
+        coll))))
 
 (defn entries
   ([m]
