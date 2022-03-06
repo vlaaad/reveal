@@ -356,7 +356,7 @@
                column-count (count columns)
                cells (* (count sample) column-count)]
            (when (and (<= (/ cells 2) (count all-keys))
-                      (<= 1 column-count 16))
+                      (<= 1 column-count 32))
              (for [k columns]
                {:header k :fn #(get % k no-val)})))
 
@@ -368,7 +368,7 @@
                column-count (apply max counts)
                cell-count (* (count sample) column-count)]
            (when (and (<= (/ cell-count 2) (reduce + counts))
-                      (<= 1 column-count 16))
+                      (<= 1 column-count 32))
              (for [i (range column-count)]
                {:header i :fn #(nth % i no-val)})))
 
