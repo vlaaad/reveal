@@ -2,7 +2,8 @@
   (:require [clojure.main :as m]
             [vlaaad.reveal.ui :as ui]
             [vlaaad.reveal.stream :as stream]
-            [clojure.string :as str]))
+            [clojure.string :as str])
+  (:import [java.io PrintWriter Writer BufferedWriter]))
 
 (defn- stream-read [form ui]
   (ui (stream/as form
@@ -48,8 +49,30 @@
           stream/separator
           (stream/stream x))))))
 
+(defn ^PrintWriter auto-flushing-PrintWriter-on
+  "Like PrintWriter-on, but flushes more aggressively"
+  {:added "1.10"}
+  [flush-fn close-fn]
+  (let [sb (StringBuilder.)]
+    (-> (proxy [Writer] []
+          (flush []
+            (when (pos? (.length sb))
+              (flush-fn (.toString sb)))
+            (.setLength sb 0))
+          (close []
+            (.flush ^Writer this)
+            (when close-fn (close-fn))
+            nil)
+          (write [str-cbuf off len]
+            (when (pos? len)
+              (if (instance? String str-cbuf)
+                (.append sb ^String str-cbuf ^int off ^int len)
+                (.append sb ^chars str-cbuf ^int off ^int len)))))
+        BufferedWriter.
+        (PrintWriter. true))))
+
 (defn- make-print [ui out fill]
-  (PrintWriter-on
+  (auto-flushing-PrintWriter-on
     #(do
        (ui (stream/as %
              (stream/raw-string (str/replace % #"\r?\n$" "") {:fill fill})))
