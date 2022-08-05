@@ -1,5 +1,6 @@
 (ns vlaaad.reveal.fx
   (:require [cljfx.lifecycle :as fx.lifecycle]
+            [cljfx.fx.text-formatter :as fx.text-formatter]
             [cljfx.component :as fx.component]
             [vlaaad.reveal.event :as event]
             [cljfx.mutator :as fx.mutator]
@@ -158,7 +159,7 @@
       (doto v format!))))
 
 (def code-text-formatter
-  {:fx/type :text-formatter
+  {:fx/type fx.text-formatter/lifecycle
    :filter code-text-formatter-filter})
 
 (defn property-prop [key]

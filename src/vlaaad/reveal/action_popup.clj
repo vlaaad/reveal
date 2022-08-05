@@ -10,6 +10,10 @@
             [clojure.string :as str]
             [cljfx.prop :as fx.prop]
             [clojure.walk :as walk]
+            [cljfx.fx.scroll-pane :as fx.scroll-pane]
+            [cljfx.fx.v-box :as fx.v-box]
+            [cljfx.fx.text-field :as fx.text-field]
+            [cljfx.fx.label :as fx.label]
             [vlaaad.reveal.action :as action]
             [cljfx.fx.node :as fx.node]
             [vlaaad.reveal.stream :as stream])
@@ -166,10 +170,10 @@
                    :as this}]
   (let [actions (displayed-actions this)
         bottom (popup/more-screen-space-below? bounds)
-        action-view {:fx/type :scroll-pane
+        action-view {:fx/type fx.scroll-pane/lifecycle
                      :style-class "reveal-popup-scroll-pane"
                      :fit-to-width true
-                     :content {:fx/type :v-box
+                     :content {:fx/type fx.v-box/lifecycle
                                :fill-width true
                                :children (map
                                            (fn [action]
@@ -183,7 +187,7 @@
      :position (if bottom :bottom :top)
      :on-cancel on-cancel
      :desc {:fx/type fx/ext-let-refs
-            :refs (into {::text-field {:fx/type :text-field
+            :refs (into {::text-field {:fx/type fx.text-field/lifecycle
                                        :text-formatter rfx/code-text-formatter
                                        :text text
                                        :on-focused-changed {::event/type ::on-text-focused
@@ -201,7 +205,7 @@
                         (map-indexed
                           (fn [i action]
                             [[::action (:id action)]
-                             {:fx/type :label
+                             {:fx/type fx.label/lifecycle
                               :style-class (cond-> ["reveal-popup-item"]
                                              (= i selected-index)
                                              (conj "reveal-popup-item-selected"))
@@ -228,7 +232,7 @@
                    :props {:focused-ref (if selected-index
                                           [::action (:id (actions selected-index))]
                                           ::text-field)}
-                   :desc {:fx/type :v-box
+                   :desc {:fx/type fx.v-box/lifecycle
                           :spacing style/default-padding
                           :padding style/default-padding
                           :children (-> []

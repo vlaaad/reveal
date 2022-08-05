@@ -3,7 +3,11 @@
             [cljfx.composite :as fx.composite]
             [cljfx.fx.popup :as fx.popup]
             [cljfx.mutator :as fx.mutator]
-            [vlaaad.reveal.style :as style])
+            [vlaaad.reveal.style :as style]
+            [cljfx.fx.drop-shadow :as fx.drop-shadow]
+            [cljfx.fx.polygon :as fx.polygon]
+            [cljfx.fx.v-box :as fx.v-box]
+            [cljfx.fx.stack-pane :as fx.stack-pane])
   (:import [javafx.stage Popup Window Screen]
            [java.util Collection]
            [javafx.geometry Bounds Rectangle2D]
@@ -129,28 +133,28 @@
        :auto-hide true
        :on-auto-hide on-cancel
        :event-handler event-handler
-       :content [{:fx/type :v-box
+       :content [{:fx/type fx.v-box/lifecycle
                   :pref-width width
                   :max-width width
-                  :effect {:fx/type :drop-shadow
+                  :effect {:fx/type fx.drop-shadow/lifecycle
                            :radius shadow-radius
                            :offset-y shadow-offset-y
                            :color "#0006"}
                   :children (-> []
                                 (cond-> popup-at-the-bottom
-                                  (conj {:fx/type :polygon
+                                  (conj {:fx/type fx.polygon/lifecycle
                                          :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
                                          :fill @style/popup-color
                                          :points [0 arrow-height
                                                   arrow-width arrow-height
                                                   (* arrow-width 0.5) 0]}))
                                 (conj
-                                  {:fx/type :stack-pane
+                                  {:fx/type fx.stack-pane/lifecycle
                                    :style-class "reveal-popup"
                                    :max-height max-content-height
                                    :children [desc]})
                                 (cond-> (not popup-at-the-bottom)
-                                  (conj {:fx/type :polygon
+                                  (conj {:fx/type fx.polygon/lifecycle
                                          :v-box/margin {:left (- arrow-x (* arrow-width 0.5))}
                                          :fill @style/popup-color
                                          :points [0 0

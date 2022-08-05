@@ -10,6 +10,7 @@
             [cljfx.lifecycle :as fx.lifecycle]
             [vlaaad.reveal.style :as style]
             [vlaaad.reveal.font :as font]
+            [cljfx.fx.web-view :as fx.web-view]
             [vlaaad.reveal.view :as view])
   (:import [javafx.scene.web WebView WebEngine]
            [javafx.concurrent Worker$State Worker]
@@ -265,5 +266,5 @@
             :desc {:fx/type fx.ext.web-view/with-engine-props
                    :props {:content (html spec opt)
                            :on-create-popup create-popup}
-                   :desc {:fx/type :web-view
+                   :desc {:fx/type fx.web-view/lifecycle
                           :context-menu-enabled false}}}}))

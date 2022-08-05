@@ -1,5 +1,6 @@
 (ns vlaaad.reveal.output-panel
   (:require [vlaaad.reveal.event :as event]
+            [cljfx.fx.stack-pane :as fx.stack-pane]
             [vlaaad.reveal.layout :as layout]
             [vlaaad.reveal.action-popup :as action-popup]
             [cljfx.api :as fx]
@@ -9,7 +10,8 @@
             [vlaaad.reveal.cursor :as cursor]
             [vlaaad.reveal.font :as font]
             [cljfx.coerce :as fx.coerce]
-            [vlaaad.reveal.style :as style])
+            [vlaaad.reveal.style :as style]
+            [cljfx.fx.text-field :as fx.text-field])
   (:import [javafx.scene.input ScrollEvent KeyEvent MouseEvent MouseButton KeyCode Clipboard ClipboardContent]
            [javafx.scene.canvas Canvas GraphicsContext]
            [javafx.event Event]
@@ -295,13 +297,13 @@
   #(assoc-in % [id :search :term] event))
 
 (defn- search-view-impl [{:keys [term id]}]
-  {:fx/type :stack-pane
+  {:fx/type fx.stack-pane/lifecycle
    :style-class "reveal-search"
    :max-width :use-pref-size
    :max-height :use-pref-size
    :children [{:fx/type fx/ext-on-instance-lifecycle
                :on-created init-text-field-created!
-               :desc {:fx/type :text-field
+               :desc {:fx/type fx.text-field/lifecycle
                       :prompt-text "Find..."
                       :event-filter {::event/type ::on-search-event-filter :id id}
                       :on-focused-changed {::event/type ::on-search-focus-changed :id id}
@@ -454,7 +456,7 @@
      :refs (when popup
              {::popup (assoc popup :fx/type action-popup/view
                                    :on-cancel {::event/type ::hide-popup :id id})})
-     :desc {:fx/type :stack-pane
+     :desc {:fx/type fx.stack-pane/lifecycle
             :children (cond->
                         [{:fx/type canvas/view
                           :draw [draw layout search]

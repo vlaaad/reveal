@@ -10,7 +10,19 @@
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle]
             [vlaaad.reveal.io :as rio]
-            [clojure.spec.alpha :as s])
+            [clojure.spec.alpha :as s]
+            [cljfx.fx.h-box :as fx.h-box]
+            [cljfx.fx.row-constraints :as fx.row-constraints]
+            [cljfx.fx.scene :as fx.scene]
+            [cljfx.fx.column-constraints :as fx.column-constraints]
+            [cljfx.fx.stage :as fx.stage]
+            [cljfx.fx.grid-pane :as fx.grid-pane]
+            [cljfx.fx.scroll-pane :as fx.scroll-pane]
+            [cljfx.fx.v-box :as fx.v-box]
+            [cljfx.fx.region :as fx.region]
+            [cljfx.fx.button :as fx.button]
+            [cljfx.fx.tooltip :as fx.tooltip]
+            [cljfx.fx.label :as fx.label])
   (:import [javafx.scene.input KeyEvent KeyCode MouseEvent]
            [javafx.scene Node Parent]
            [javafx.beans.value ChangeListener]
@@ -194,7 +206,7 @@
             :refs (into {}
                         (for [[view-index view-id] (map-indexed vector order)
                               :let [form (get-in views [view-id :form])]]
-                          [view-id {:fx/type :h-box
+                          [view-id {:fx/type fx.h-box/lifecycle
                                     :style-class "reveal-view-result-tree-item"
                                     :pseudo-classes (if (= view-id id) #{:selected} #{})
                                     :on-mouse-entered {::event/type ::focus-tab :index index :view-index view-index}
@@ -208,7 +220,7 @@
                                                          (stream/stream form))}]}]))
             :desc {:fx/type ext-with-scroll-to
                    :props {:scroll-to {:fx/type fx/ext-get-ref :ref id}}
-                   :desc {:fx/type :scroll-pane
+                   :desc {:fx/type fx.scroll-pane/lifecycle
                           :event-handler {::event/type ::on-popup-event :index index}
                           :padding style/default-padding
                           :focus-traversable true
@@ -216,7 +228,7 @@
                           :fit-to-width true
                           :hbar-policy :never
                           :min-height 0
-                          :content {:fx/type :v-box
+                          :content {:fx/type fx.v-box/lifecycle
                                     :min-height :use-pref-size
                                     :children (for [view-id order]
                                                 {:fx/type fx/ext-get-ref
@@ -239,42 +251,42 @@
                        ::index index}})
      :desc {:fx/type fx/ext-on-instance-lifecycle
             :on-created mark-as-tree-root!
-            :desc {:fx/type :v-box
+            :desc {:fx/type fx.v-box/lifecycle
                    :event-handler {::event/type ::on-view-event :index index}
-                   :children [{:fx/type :h-box
+                   :children [{:fx/type fx.h-box/lifecycle
                                :style-class "reveal-view-header"
                                :alignment :center
                                :children (interpose
-                                           {:fx/type :region
+                                           {:fx/type fx.region/lifecycle
                                             :style-class "reveal-view-header-separator"}
-                                           [{:fx/type :button
+                                           [{:fx/type fx.button/lifecycle
                                              :style-class "reveal-view-header-button"
                                              :disable (not (focus-tree/has-prev? result-tree))
                                              :text "<"
-                                             :tooltip {:fx/type :tooltip
+                                             :tooltip {:fx/type fx.tooltip/lifecycle
                                                        :text (str @shortcut-text " ←")}
                                              :on-action {::event/type ::change-result-focus
                                                          :index index
                                                          :fn focus-tree/focus-prev}}
-                                            {:fx/type :button
+                                            {:fx/type fx.button/lifecycle
                                              :style-class "reveal-view-header-button"
                                              :disable (not (focus-tree/has-next? result-tree))
                                              :text ">"
-                                             :tooltip {:fx/type :tooltip
+                                             :tooltip {:fx/type fx.tooltip/lifecycle
                                                        :text (str @shortcut-text " →")}
                                              :on-action {::event/type ::change-result-focus
                                                          :index index
                                                          :fn focus-tree/focus-next}}
-                                            {:fx/type :scroll-pane
+                                            {:fx/type fx.scroll-pane/lifecycle
                                              :h-box/hgrow :always
                                              :min-height :use-pref-size
                                              :fit-to-width true
                                              :hbar-policy :never
                                              :vbar-policy :never
-                                             :tooltip {:fx/type :tooltip
+                                             :tooltip {:fx/type fx.tooltip/lifecycle
                                                        :text (str @shortcut-text " ↑")}
                                              :content
-                                             {:fx/type :button
+                                             {:fx/type fx.button/lifecycle
                                               :style-class "reveal-view-header-button"
                                               :alignment :baseline-left
                                               :min-width 0
@@ -345,29 +357,29 @@
   (or title "Reveal"))
 
 (defn- confirm-exit-dialog [{:keys [title]}]
-  {:fx/type :stage
+  {:fx/type fx.stage/lifecycle
    :showing true
    :owner {:fx/type fx/ext-get-ref :ref ::stage}
    :on-close-request {::event/type ::cancel-quit}
    :modality :window-modal
    :title "Close window?"
-   :scene {:fx/type :scene
+   :scene {:fx/type fx.scene/lifecycle
            :stylesheets [(:cljfx.css/url @style/style)]
            :accelerators {[:escape] {::event/type ::cancel-quit}}
-           :root {:fx/type :v-box
+           :root {:fx/type fx.v-box/lifecycle
                   :style-class "reveal-ui"
                   :spacing style/default-padding
                   :padding style/default-padding
-                  :children [{:fx/type :label
+                  :children [{:fx/type fx.label/lifecycle
                               :text (str "Are you sure you want to close \"" (short-title title) "\"?")}
-                             {:fx/type :h-box
+                             {:fx/type fx.h-box/lifecycle
                               :spacing 5
                               :alignment :center-right
-                              :children [{:fx/type :button
+                              :children [{:fx/type fx.button/lifecycle
                                           :on-action {::event/type ::cancel-quit}
                                           :text "Cancel"}
                                          {:fx/type ext-focused-by-default
-                                          :desc {:fx/type :button
+                                          :desc {:fx/type fx.button/lifecycle
                                                  :on-action {::event/type ::quit}
                                                  :text "Close"}}]}]}}})
 
@@ -391,16 +403,16 @@
                   {[::focus focus-key] {:fx/type ext-focused-by-default
                                         :desc {:fx/type fx/ext-get-ref
                                                :ref focus}}})
-          :desc {:fx/type :grid-pane
+          :desc {:fx/type fx.grid-pane/lifecycle
                  :style-class "reveal-ui"
-                 :column-constraints [{:fx/type :column-constraints
+                 :column-constraints [{:fx/type fx.column-constraints/lifecycle
                                        :hgrow :always}]
                  :row-constraints (let [n (inc (count result-trees))
                                         priority 2.25
                                         total (inc (* priority (dec n)))]
                                     (->> (repeat (dec n) (* priority (/ 100 total)))
                                          (cons (/ 100 total))
-                                         (map #(hash-map :fx/type :row-constraints
+                                         (map #(hash-map :fx/type fx.row-constraints/lifecycle
                                                          :percent-height %))))
                  :children
                  (into [(assoc desc
@@ -528,18 +540,18 @@
          set-bounds-from-ui-state)))
 
 (defn- undecorated-view-wrapper [{:keys [title maximized] :as props}]
-  {:fx/type :v-box
+  {:fx/type fx.v-box/lifecycle
    :style-class "reveal-undecorated-wrapper"
-   :children [{:fx/type :h-box
+   :children [{:fx/type fx.h-box/lifecycle
                :alignment :center
                :padding {:left 2 :right 2}
                :children (if maximized
-                           [{:fx/type :label
+                           [{:fx/type fx.label/lifecycle
                              :h-box/hgrow :always
                              :max-width ##Inf
                              :style-class "reveal-undecorated-title"
                              :text (short-title title)}]
-                           [{:fx/type :label
+                           [{:fx/type fx.label/lifecycle
                              :h-box/hgrow :always
                              :on-mouse-pressed {::event/type ::start-window-drag}
                              :on-mouse-dragged {::event/type ::drag-window}
@@ -547,7 +559,7 @@
                              :style-class "reveal-undecorated-title"
                              :pseudo-classes #{:draggable}
                              :text (short-title title)}
-                            {:fx/type :region
+                            {:fx/type fx.region/lifecycle
                              :style-class "reveal-undecorated-resize"
                              :on-mouse-pressed {::event/type ::start-window-resize}
                              :on-mouse-dragged {::event/type ::resize-window}}])}
@@ -568,7 +580,7 @@
                  (let [b (.getVisualBounds (Screen/getPrimary))]
                    {:x (.getMinX b) :y (.getMinY b) :width (.getWidth b) :height (.getHeight b)})
                  {:x x :y y :width width :height height})
-        stage {:fx/type :stage
+        stage {:fx/type fx.stage/lifecycle
                :style (if decorations :decorated :undecorated)
                :always-on-top always-on-top
                :iconified iconified
@@ -592,7 +604,7 @@
                          "vlaaad/reveal/logo-256.png"
                          "vlaaad/reveal/logo-512.png"])
                :on-focused-changed {::event/type ::on-window-focused-changed}
-               :scene {:fx/type :scene
+               :scene {:fx/type fx.scene/lifecycle
                        :stylesheets [(:cljfx.css/url @style/style)]
                        :on-key-pressed {::event/type ::handle-scene-key-press
                                         :close-difficulty close-difficulty}

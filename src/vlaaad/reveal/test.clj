@@ -16,7 +16,17 @@
             [vlaaad.reveal.ui :as ui]
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
-            [cljfx.lifecycle :as fx.lifecycle])
+            [cljfx.fx.tree-cell :as fx.tree-cell]
+            [cljfx.lifecycle :as fx.lifecycle]
+            [cljfx.fx.button :as fx.button]
+            [cljfx.fx.rotate-transition :as fx.rotate-transition]
+            [cljfx.fx.h-box :as fx.h-box]
+            [cljfx.fx.region :as fx.region]
+            [cljfx.fx.tooltip :as fx.tooltip]
+            [cljfx.fx.tree-item :as fx.tree-item]
+            [cljfx.fx.tree-view :as fx.tree-view]
+            [cljfx.fx.label :as fx.label]
+            [cljfx.fx.v-box :as fx.v-box])
   (:import [clojure.lang Var Namespace]
            [javafx.scene.input KeyEvent KeyCode]
            [javafx.event Event EventDispatcher]
@@ -256,7 +266,7 @@
                   :content-display :right
                   :text (:name e)}
            (and (:start e) (:end e))
-           (assoc :graphic {:fx/type :label
+           (assoc :graphic {:fx/type fx.label/lifecycle
                             :style-class "reveal-test-time-label"
                             :text (str (- (:end e) (:start e)) "ms")}))
 
@@ -293,7 +303,7 @@
   {:fx/type ext-with-appended-children
    :props {:children (:children props [])}
    :desc (-> props
-             (assoc :fx/type :tree-item)
+             (assoc :fx/type fx.tree-item/lifecycle)
              (dissoc :children))})
 
 (defmethod event/handle ::change-expanded [{:keys [path runner fx/event]}]
@@ -433,8 +443,8 @@
                           :desc {:fx/type fx.ext.tree-view/with-selection-props
                                  :props {:on-selected-item-changed {::event/type ::select
                                                                     :runner runner}}
-                                 :desc {:fx/type :tree-view
-                                        :cell-factory {:fx/cell-type :tree-cell
+                                 :desc {:fx/type fx.tree-view/lifecycle
+                                        :cell-factory {:fx/cell-type fx.tree-cell/lifecycle
                                                        :describe describe-cell}
                                         :on-key-pressed {::event/type ::handle-key-press
                                                          :runner runner}
@@ -447,7 +457,7 @@
 ;; region controls
 
 (defn- icon-view [{:keys [icon]}]
-  {:fx/type :region
+  {:fx/type fx.region/lifecycle
    :style-class "reveal-test-icon"
    :min-width :use-pref-size
    :max-width :use-pref-size
@@ -456,18 +466,18 @@
    :pseudo-classes #{icon}})
 
 (defn- counter-view [{:keys [count icon color text]}]
-  {:fx/type :label
+  {:fx/type fx.label/lifecycle
    :style-class "reveal-test-label"
    :pseudo-classes #{color}
    :text (str count)
-   :tooltip {:fx/type :tooltip
+   :tooltip {:fx/type fx.tooltip/lifecycle
              :text (str count " " text)}
    :content-display :left
    :graphic {:fx/type icon-view
              :icon icon}})
 
 (defn- open-view-button-view [{:keys [view-id view-index graphic runner]}]
-  {:fx/type :button
+  {:fx/type fx.button/lifecycle
    :style-class ["button" "reveal-test-open-view-button"]
    :graphic graphic
    :on-action {::event/type :vlaaad.reveal.ui/view
@@ -486,7 +496,7 @@
                          (pos? fail) :error
                          (and (not running) (pos? pass)) :success
                          :else :default)
-                 buttons {:fx/type :h-box
+                 buttons {:fx/type fx.h-box/lifecycle
                           :alignment :center-left
                           :spacing style/default-padding
                           :children [{:fx/type counter-view
@@ -504,14 +514,14 @@
                                       :icon :test
                                       :text "tests"
                                       :color color}]}]
-             {:fx/type :h-box
+             {:fx/type fx.h-box/lifecycle
               :alignment :center-left
-              :children [{:fx/type :button
+              :children [{:fx/type fx.button/lifecycle
                           :graphic {:fx/type fx/ext-let-refs
                                     :refs {::icon {:fx/type icon-view
                                                    :icon (if running :running :start)}}
                                     :desc {:fx/type fx/ext-let-refs
-                                           :refs {::transition {:fx/type :rotate-transition
+                                           :refs {::transition {:fx/type fx.rotate-transition/lifecycle
                                                                 :status (if running :running :stopped)
                                                                 :from-angle 0
                                                                 :to-angle -360
@@ -539,7 +549,7 @@
 ;; simple
 
 (defn runner-view [{:keys [runner]}]
-  {:fx/type :v-box
+  {:fx/type fx.v-box/lifecycle
    :children [{:fx/type controls-view
                :open-view-button false
                :runner runner}

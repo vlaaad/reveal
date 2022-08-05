@@ -12,7 +12,27 @@
             [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.component :as fx.component]
             [clojure.main :as m]
-            [cljfx.ext.tree-view :as fx.ext.tree-view])
+            [cljfx.ext.tree-view :as fx.ext.tree-view]
+            [cljfx.fx.anchor-pane :as fx.anchor-pane]
+            [cljfx.fx.table-cell :as fx.table-cell]
+            [cljfx.fx.group :as fx.group]
+            [cljfx.fx.number-axis :as fx.number-axis]
+            [cljfx.fx.line-chart :as fx.line-chart]
+            [cljfx.fx.category-axis :as fx.category-axis]
+            [cljfx.fx.xy-chart-data :as fx.xy-chart-data]
+            [cljfx.fx.bar-chart :as fx.bar-chart]
+            [cljfx.fx.pie-chart :as fx.pie-chart]
+            [cljfx.fx.xy-chart-series :as fx.xy-chart-series]
+            [cljfx.fx.scatter-chart :as fx.scatter-chart]
+            [cljfx.fx.table-view :as fx.table-view]
+            [cljfx.fx.table-column :as fx.table-column]
+            [cljfx.fx.pie-chart-data :as fx.pie-chart-data]
+            [cljfx.fx.label :as fx.label]
+            [cljfx.fx.web-view :as fx.web-view]
+            [cljfx.fx.region :as fx.region]
+            [cljfx.fx.tree-item :as fx.tree-item]
+            [cljfx.fx.tree-view :as fx.tree-view]
+            [cljfx.fx.tree-cell :as fx.tree-cell])
   (:import [clojure.lang IRef IFn]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
            [javafx.scene.control TableView TablePosition TableColumn$SortType TreeView TreeCell TreeItem]
@@ -215,7 +235,7 @@
 
 (defn- blocking-deref-view [{:keys [state] :as props}]
   (case state
-    ::waiting {:fx/type :label
+    ::waiting {:fx/type fx.label/lifecycle
                :focus-traversable true
                :text "Loading..."}
     ::value (->desc (:value props))
@@ -231,7 +251,7 @@
 
 (defn summary [{:keys [value max-length]
                 :or {max-length 48}}]
-  {:fx/type :group
+  {:fx/type fx.group/lifecycle
    :children [(stream/fx-summary max-length value)]})
 
 (defn- describe-cell [x]
@@ -302,13 +322,13 @@
 (defn- make-column [{:keys [header fn columns]
                      :or {header ::not-found}
                      :as props}]
-  (into {:fx/type :table-column
+  (into {:fx/type fx.table-column/lifecycle
          :style-class "reveal-table-column"
          :min-width 40
          :graphic {:fx/type summary
                    :max-length 64
                    :value (if (= header ::not-found) fn header)}
-         :cell-factory {:fx/cell-type :table-cell
+         :cell-factory {:fx/cell-type fx.table-cell/lifecycle
                         :describe describe-cell}
          :cell-value-factory #(try
                                 (fn (peek %))
@@ -337,7 +357,7 @@
           :desc {:fx/type ext-with-items-prop
                  :props {::items items}
                  :desc (into
-                         {:fx/type :table-view
+                         {:fx/type fx.table-view/lifecycle
                           :on-key-pressed {::event/type ::on-table-key-pressed}
                           :style-class "reveal-table"
                           :columns (mapv make-column columns)
@@ -396,7 +416,7 @@
                           (.endsWith (.getPath ^URI v) ".html"))))
             (instance? URL v)
             (and (string? v) (re-matches #"^https?://.+" v)))
-    (constantly {:fx/type :web-view
+    (constantly {:fx/type fx.web-view/lifecycle
                  :url (str v)})))
 
 (defn- request-source-focus! [^Event e]
@@ -422,12 +442,12 @@
        (every? pred (labeled->values x))))
 
 (defn pie-chart [{:keys [data]}]
-  {:fx/type :pie-chart
+  {:fx/type fx.pie-chart/lifecycle
    :style-class "reveal-chart"
    :on-mouse-pressed request-source-focus!
    :animated false
    :data (for [[k v] (labeled->label+values data)]
-           {:fx/type :pie-chart-data
+           {:fx/type fx.pie-chart-data/lifecycle
             :name (stream/str-summary k)
             :pie-value v})})
 
@@ -462,24 +482,24 @@
 (defn bar-chart [{:keys [data]}]
   {:fx/type action-popup/ext
    :select select-chart-node!
-   :desc {:fx/type :bar-chart
+   :desc {:fx/type fx.bar-chart/lifecycle
           :style-class "reveal-chart"
           :on-mouse-pressed request-source-focus!
           :animated false
-          :x-axis {:fx/type :category-axis :label "key"}
-          :y-axis {:fx/type :number-axis :label "value"}
+          :x-axis {:fx/type fx.category-axis/lifecycle :label "key"}
+          :y-axis {:fx/type fx.number-axis/lifecycle :label "value"}
           :data (for [[series v] (labeled->label+values data)]
-                  {:fx/type :xy-chart-series
+                  {:fx/type fx.xy-chart-series/lifecycle
                    :name (stream/str-summary series)
                    :data (for [[key value] (labeled->label+values v)]
-                           {:fx/type :xy-chart-data
+                           {:fx/type fx.xy-chart-data/lifecycle
                             :x-value (stream/->str key)
                             :y-value (numbered->number value)
                             :node {:fx/type ext-with-value-on-node
                                    :props {::value {:value value
                                                     :key key
                                                     :series series}}
-                                   :desc {:fx/type :region}}})})}})
+                                   :desc {:fx/type fx.region/lifecycle}}})})}})
 
 (action/defaction ::action/view:bar-chart [x]
   (when-let [data (cond
@@ -512,11 +532,11 @@
 (defn line-chart [{:keys [data]}]
   {:fx/type action-popup/ext
    :select select-chart-node!
-   :desc {:fx/type :line-chart
+   :desc {:fx/type fx.line-chart/lifecycle
           :style-class "reveal-chart"
           :on-mouse-pressed request-source-focus!
           :animated false
-          :x-axis {:fx/type :number-axis
+          :x-axis {:fx/type fx.number-axis/lifecycle
                    :label "index"
                    :auto-ranging false
                    :lower-bound 0
@@ -527,25 +547,25 @@
                                        (labeled->label+values data)))
                    :tick-unit 10
                    :minor-tick-count 10}
-          :y-axis {:fx/type :number-axis
+          :y-axis {:fx/type fx.number-axis/lifecycle
                    :label "value"
                    :force-zero-in-range false}
           :data (for [[series numbers] (labeled->label+values data)]
                   {:fx/type ext-recreate-on-key-changed
                    :key (count numbers)
-                   :desc {:fx/type :xy-chart-series
+                   :desc {:fx/type fx.xy-chart-series/lifecycle
                           :name (stream/str-summary series)
                           :data (->> numbers
                                      (map-indexed
                                        (fn [index value]
-                                         {:fx/type :xy-chart-data
+                                         {:fx/type fx.xy-chart-data/lifecycle
                                           :x-value index
                                           :y-value (numbered->number value)
                                           :node {:fx/type ext-with-value-on-node
                                                  :props {::value {:value value
                                                                   :index index
                                                                   :series series}}
-                                                 :desc {:fx/type :region}}})))}})}})
+                                                 :desc {:fx/type fx.region/lifecycle}}})))}})}})
 
 (action/defaction ::action/view:line-chart [x]
   (when-let [data (cond
@@ -580,25 +600,25 @@
 (defn scatter-chart [{:keys [data]}]
   {:fx/type action-popup/ext
    :select select-chart-node!
-   :desc {:fx/type :scatter-chart
+   :desc {:fx/type fx.scatter-chart/lifecycle
           :style-class "reveal-chart"
           :on-mouse-pressed request-source-focus!
           :animated false
-          :x-axis {:fx/type :number-axis :label "x" :force-zero-in-range false}
-          :y-axis {:fx/type :number-axis :label "y" :force-zero-in-range false}
+          :x-axis {:fx/type fx.number-axis/lifecycle :label "x" :force-zero-in-range false}
+          :y-axis {:fx/type fx.number-axis/lifecycle :label "y" :force-zero-in-range false}
           :data (for [[series places] (labeled->label+values data)]
-                  {:fx/type :xy-chart-series
+                  {:fx/type fx.xy-chart-series/lifecycle
                    :name (stream/str-summary series)
                    :data (for [value places
                                :let [[x y :as с] (scattered->coordinate value)]]
-                           {:fx/type :xy-chart-data
+                           {:fx/type fx.xy-chart-data/lifecycle
                             :x-value x
                             :y-value y
                             :node {:fx/type ext-with-value-on-node
                                    :props {::value {:value value
                                                     :coordinate с
                                                     :series series}}
-                                   :desc {:fx/type :region}}})})}})
+                                   :desc {:fx/type fx.region/lifecycle}}})})}})
 
 (action/defaction ::action/view:scatter-chart [x]
   (when-let [data (cond
@@ -614,7 +634,7 @@
                      (instance? Color v) v
                      (string? v) (Color/valueOf v)
                      (keyword? v) (Color/valueOf (name v)))]
-    (constantly {:fx/type :region
+    (constantly {:fx/type fx.region/lifecycle
                  :background {:fills [{:fill color}]}})))
 
 (action/defaction ::action/view:value [x ann]
@@ -652,7 +672,7 @@
                         :as props}]
   (if (branch? root)
     (let [expanded-state (get-in-tree-state state path)]
-      {:fx/type :tree-item
+      {:fx/type fx.tree-item/lifecycle
        :value {:value root
                :render render
                :valuate valuate
@@ -660,7 +680,7 @@
        :expanded (some? expanded-state)
        :on-expanded-changed (assoc on-expanded-changed :path path :root root)
        :children (case (:state expanded-state)
-                   :loading [{:fx/type :tree-item
+                   :loading [{:fx/type fx.tree-item/lifecycle
                               :value {:value "Loading..."
                                       :render as-util-string
                                       :disable-popup true}}]
@@ -668,17 +688,17 @@
                            (fn [i child]
                              (assoc props :fx/type tree-item-view :root child :path (conj path i)))
                            (:children expanded-state))
-                   :failed [{:fx/type :tree-item
+                   :failed [{:fx/type fx.tree-item/lifecycle
                              :value {:value (:error expanded-state)
                                      :render as-error-string
                                      :valuate identity
                                      :annotate {}}}]
-                   [{:fx/type :tree-item
+                   [{:fx/type fx.tree-item/lifecycle
                      :value {:value ::hidden
                              :render render
                              :valuate valuate
                              :annotate annotate}}])})
-    {:fx/type :tree-item
+    {:fx/type fx.tree-item/lifecycle
      :value {:value root
              :render render
              :valuate valuate
@@ -734,7 +754,7 @@
 
 (defn- describe-tree-cell [{:keys [value render]}]
   (let [v (try (render value) (catch Exception e e))]
-    {:graphic {:fx/type :anchor-pane
+    {:graphic {:fx/type fx.anchor-pane/lifecycle
                :max-width :use-pref-size
                :style-class "reveal-tree-cell-content"
                :children [(if (view? v) v {:fx/type summary :value v :max-length 256})]}}))
@@ -746,8 +766,8 @@
           :on-created init-tree-view!
           :desc {:fx/type fx.ext.tree-view/with-selection-props
                  :props {:selected-index 0}
-                 :desc {:fx/type :tree-view
-                        :cell-factory {:fx/cell-type :tree-cell
+                 :desc {:fx/type fx.tree-view/lifecycle
+                        :cell-factory {:fx/cell-type fx.tree-cell/lifecycle
                                        :describe describe-tree-cell}
                         :root (assoc props
                                 :fx/type tree-item-view
@@ -963,7 +983,7 @@
 
 (defn- observable-view-impl-try [{:keys [fn val]}]
   (if (= val ::not-found)
-    {:fx/type :label :focus-traversable true :text "Waiting..."}
+    {:fx/type fx.label/lifecycle :focus-traversable true :text "Waiting..."}
     (fn val)))
 
 (defn- observable-view-impl [props]

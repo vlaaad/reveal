@@ -3,6 +3,8 @@
   (:require [vlaaad.reveal.style :as style]
             [vlaaad.reveal.ns :as ns]
             [clojure.main :as m]
+            [cljfx.fx.text-flow :as fx.text-flow]
+            [cljfx.fx.text :as fx.text]
             lambdaisland.deep-diff2.diff-impl)
   (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn
                          ISeq MultiFn IRef Var Volatile Namespace IRecord Delay
@@ -304,15 +306,15 @@
     (comp
       emit-xf
       (keep #(case (:op %)
-               ::string {:fx/type :text
+               ::string {:fx/type fx.text/lifecycle
                          :text (:text %)
                          :fill (style/color (:fill (:style %) :black))}
-               (::separator ::newline) {:fx/type :text
+               (::separator ::newline) {:fx/type fx.text/lifecycle
                                         :text " "
                                         :fill (style/color :util)}
                nil)))
     (fn
-      ([acc] {:fx/type :text-flow
+      ([acc] {:fx/type fx.text-flow/lifecycle
               :style-class "reveal-summary"
               :children (:children acc)})
       ([{:keys [length children] :as acc} desc]
@@ -332,7 +334,7 @@
                                     (assoc desc :text (subs text 0 (dec length))))
                               (update-in children [(dec (count children)) :text]
                                          #(subs % 0 (dec (count %)))))
-                            (conj {:fx/type :text
+                            (conj {:fx/type fx.text/lifecycle
                                    :text "…"
                                    :fill (style/color :util)}))
               :length new-length})
