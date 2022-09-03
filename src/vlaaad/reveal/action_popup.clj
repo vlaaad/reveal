@@ -16,7 +16,9 @@
             [cljfx.fx.label :as fx.label]
             [vlaaad.reveal.action :as action]
             [cljfx.fx.node :as fx.node]
-            [vlaaad.reveal.stream :as stream])
+            [vlaaad.reveal.stream :as stream]
+            [vlaaad.reveal.io :as rio]
+            [clojure.spec.alpha :as s])
   (:import [javafx.geometry Bounds]
            [javafx.stage Popup]
            [javafx.event Event]
@@ -24,6 +26,48 @@
            [java.util List]
            [javafx.beans.value ChangeListener]
            [javafx.scene Node]))
+
+(s/def ::dir string?)
+(s/def ::history (s/nilable (s/map-of ::dir (s/coll-of string? :kind vector? :distinct true))))
+
+(def ^:private eval-history
+  (delay
+    (let [scope (System/getProperty "user.dir")
+          initial-state (rio/slurp-edn "eval-history.edn")
+          initial-state (if (s/valid? ::history initial-state)
+                          initial-state
+                          (do (println "Invalid " (rio/path "eval-history.edn") ":")
+                              (s/explain ::history initial-state)
+                              nil))
+          persister (agent nil :error-handler (fn [_ ^Throwable ex]
+                                                (.printStackTrace ex)))
+          persist (fn [_ new-state]
+                    (rio/update-edn "eval-history.edn" assoc scope new-state)
+                    nil)]
+      (add-watch
+        (atom (get initial-state scope []))
+        ::persist
+        (fn [_ _ old new]
+          (when-not (= old new)
+            (send-via event/daemon-executor persister persist new)))))))
+
+(defn- get-history-item! [offset]
+  {:pre [(not (neg? offset))]}
+  (let [history @@eval-history
+        i (- (dec (count history)) offset)]
+    (when-not (neg? i)
+      (history i))))
+
+(def ^:private history-size 256)
+
+(defn- push-history-item! [item]
+  (swap! @eval-history (fn [items]
+                         (let [new-items (into [] (remove #(= item %)) items)
+                               drop-count (- (count new-items)
+                                             (dec history-size))]
+                           (-> new-items
+                               (cond->> (pos? drop-count) (into [] (drop drop-count)))
+                               (conj item))))))
 
 (set! *warn-on-reflection* true)
 
@@ -53,7 +97,7 @@
              :selected-actions (cond-> actions
                                        (not= "" text)
                                        (search/select text :label)))
-      (dissoc :selected-index)))
+      (dissoc :selected-index :history-index)))
 
 (defmethod event/handle ::on-action-key-pressed
   [{:keys [id ^KeyEvent fx/event action on-cancel view-id view-index]}]
@@ -87,8 +131,12 @@
                    :action action})
     (event/handle on-cancel)))
 
+(defn- apply-history-item [this index text]
+  {:pre [(some? index) (some? text)]}
+  (assoc (set-text this text) :history-index index))
+
 (defmethod event/handle ::on-text-key-pressed
-  [{:keys [text id ^KeyEvent fx/event on-cancel annotated-value view-id view-index]}]
+  [{:keys [text id ^KeyEvent fx/event on-cancel annotated-value view-id view-index history-index]}]
   (let [value (:value annotated-value)]
     (condp = (.getCode event)
       KeyCode/ESCAPE
@@ -105,6 +153,7 @@
                               (= '*v form) form
                               (ident? form) (list form '*v)
                               :else form))]
+            (push-history-item! text)
             (comp
               (event/handle {::event/type :vlaaad.reveal.ui/execute-action
                              :view-id view-id
@@ -125,10 +174,23 @@
         identity)
 
       KeyCode/UP
-      #(update % id move-selected-index dec)
+      (if (.isAltDown event)
+        (let [index (inc (or history-index -1))
+              item (get-history-item! index)]
+          (if item
+            #(update % id apply-history-item index item)
+            identity))
+        #(update % id move-selected-index dec))
 
       KeyCode/DOWN
-      #(update % id move-selected-index inc)
+      (if (.isAltDown event)
+        (if history-index
+          (let [index (dec history-index)]
+            (if (neg? index)
+              #(update % id set-text "")
+              #(update % id apply-history-item index (get-history-item! index))))
+          identity)
+        #(update % id move-selected-index inc))
 
       identity)))
 
@@ -165,7 +227,8 @@
                           view-id
                           view-index
                           text
-                          selected-index]
+                          selected-index
+                          history-index]
                    :or {text ""}
                    :as this}]
   (let [actions (displayed-actions this)
@@ -197,6 +260,7 @@
                                                         :view-index view-index
                                                         :text text
                                                         :id id
+                                                        :history-index history-index
                                                         :annotated-value annotated-value
                                                         :on-cancel on-cancel}
                                        :on-text-changed {::event/type ::on-text-changed
