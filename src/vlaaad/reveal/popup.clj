@@ -36,18 +36,19 @@
     #(.hide ^Popup %)))
 
 (defn more-screen-space-below? [bounds]
-  (let [^Screen screen (first (Screen/getScreensForRectangle (.getMinX bounds)
-                                                             (.getMinY bounds)
-                                                             (.getWidth bounds)
-                                                             (.getHeight bounds)))
+  (let [^Screen screen (or (first (Screen/getScreensForRectangle (.getMinX bounds)
+                                                                 (.getMinY bounds)
+                                                                 (.getWidth bounds)
+                                                                 (.getHeight bounds)))
+                           (Screen/getPrimary))
         screen-bounds (.getVisualBounds screen)
         bounds-min-x (max (.getMinX screen-bounds) (.getMinX bounds))
         bounds-min-y (max (.getMinY screen-bounds) (.getMinY bounds))
         bounds (Rectangle2D.
                  bounds-min-x
                  bounds-min-y
-                 (- (min (.getMaxX screen-bounds) (.getMaxX bounds)) bounds-min-x)
-                 (- (min (.getMaxY screen-bounds) (.getMaxY bounds)) bounds-min-y))
+                 (max 1 (- (min (.getMaxX screen-bounds) (.getMaxX bounds)) bounds-min-x))
+                 (max 1 (- (min (.getMaxY screen-bounds) (.getMaxY bounds)) bounds-min-y)))
         space-below (- (.getMaxY screen-bounds) (.getMaxY bounds))
         space-above (- (.getMinY bounds) (.getMinY screen-bounds))]
     (< space-above space-below)))
@@ -79,18 +80,19 @@
          alignment :center
          event-handler consume-popup-event}
     :as props}]
-  (let [^Screen screen (first (Screen/getScreensForRectangle (.getMinX bounds)
-                                                             (.getMinY bounds)
-                                                             (.getWidth bounds)
-                                                             (.getHeight bounds)))
+  (let [^Screen screen (or (first (Screen/getScreensForRectangle (.getMinX bounds)
+                                                                 (.getMinY bounds)
+                                                                 (.getWidth bounds)
+                                                                 (.getHeight bounds)))
+                           (Screen/getPrimary))
         screen-bounds (.getVisualBounds screen)
         bounds-min-x (max (.getMinX screen-bounds) (.getMinX bounds))
         bounds-min-y (max (.getMinY screen-bounds) (.getMinY bounds))
         bounds (Rectangle2D.
                  bounds-min-x
                  bounds-min-y
-                 (- (min (.getMaxX screen-bounds) (.getMaxX bounds)) bounds-min-x)
-                 (- (min (.getMaxY screen-bounds) (.getMaxY bounds)) bounds-min-y))
+                 (max 1 (- (min (.getMaxX screen-bounds) (.getMaxX bounds)) bounds-min-x))
+                 (max 1 (- (min (.getMaxY screen-bounds) (.getMaxY bounds)) bounds-min-y)))
         shadow-radius 10
         shadow-offset-y 5
         popup-width (+ width shadow-radius shadow-radius)
