@@ -64,7 +64,8 @@
                         (select-keys [:host :port :in-reader :out-fn :valf :readf])
                         (update :valf (fn [valf]
                                         (or valf
-                                            #(binding [*default-data-reader-fn* tagged-literal]
+                                            #(binding [*suppress-read* true
+                                                       *default-data-reader-fn* tagged-literal]
                                                (read-string %))))))]
      (try
        (apply server/remote-prepl host port in-reader (wrap-out-fn ui (bound-fn* out-fn))
