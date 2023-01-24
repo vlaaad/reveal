@@ -4,7 +4,7 @@
             [clojure.spec.alpha :as s]
             [clojure.core.specs.alpha :as specs]
             [vlaaad.reveal.event :as event]
-            [lambdaisland.deep-diff2 :as diff])
+            [lambdaisland.deep-diff2.diff-impl :as diff])
   (:import [clojure.lang IDeref]
            [java.awt Desktop]
            [java.net URI URL]
