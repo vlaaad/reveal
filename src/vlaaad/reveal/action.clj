@@ -80,11 +80,14 @@
   (when-let [m (meta v)]
     (constantly m)))
 
+(defn- open-uri-result [^URI uri]
+  (with-meta #(deref (future (.browse (Desktop/getDesktop) uri)))
+             {:vlaaad.reveal.ui/ignore-action-result true}))
+
 (defaction ::browse:external [v]
   (cond
     (instance? URI v)
-    (with-meta #(deref (future (.browse (Desktop/getDesktop) v)))
-               {:vlaaad.reveal.ui/ignore-action-result true})
+    (open-uri-result v)
 
     (instance? URL v)
     (recur (.toURI ^URL v))
@@ -115,6 +118,12 @@
                 (= 3 (bounded-count 4 (second actual))))
          (apply diff/diff (drop 1 (second actual)))
          (diff/diff expected actual)))))
+
+(defaction ::why-is-this-boolean-red? [x]
+  (when (and (boolean? x)
+             (not (or (identical? Boolean/TRUE x)
+                      (identical? Boolean/FALSE x))))
+    (open-uri-result (URI. "https://vlaaad.github.io/illegal-booleans"))))
 
 (defn execute [id x ann]
   (event/daemon-future
