@@ -550,7 +550,7 @@
   (raw-string (pr-str x) {:fill :scalar}))
 
 (defstream Boolean [x]
-  (raw-string (pr-str x) {:fill :scalar}))
+  (raw-string (pr-str x) {:fill (if (or (identical? Boolean/TRUE x) (identical? Boolean/FALSE x)) :scalar :error)}))
 
 (defstream String [s]
   (raw-string (pr-str s) {:fill :string}))
