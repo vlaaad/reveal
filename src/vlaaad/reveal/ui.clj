@@ -644,7 +644,9 @@
   (try
     (not= (:vlaaad.reveal/command x ::not-found) ::not-found)
     ;; sorted maps with non-keyword keys throw class cast exceptions
-    (catch Exception _ false)))
+    ;; also, custom types might only implement (valAt [this k]) and not (valAt [this k not-found]),
+    ;; in that case it'll throw an Error instead of an Exception.
+    (catch Throwable _ false)))
 
 (defn- nop [])
 
