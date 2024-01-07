@@ -55,4 +55,10 @@
     <url>https://github.com/vlaaad/reveal</url>
     <tag>0b74636b4998fd4f1a917642e29ddb9aba6f95ae</tag>
   </scm>
+  <licenses>
+    <license>
+      <name>MIT</name>
+      <url>https://opensource.org/license/mit</url>
+    </license>
+  </licenses>
 </project>
