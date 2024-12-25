@@ -3,6 +3,7 @@
             [clojure.spec.alpha :as s]
             [clojure.string :as str]
             [vlaaad.reveal.action :as action]
+            vlaaad.reveal.memory
             [vlaaad.reveal.action-popup :as action-popup]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.test :as test]
