@@ -16,6 +16,7 @@ clj -A:build -M -m version $version $(invoke git rev-parse HEAD)
 clj -Spom
 invoke git tag "v$version"
 invoke git push
+invoke git push free-remote free:master
 invoke git push free-remote "v$version"
 clj -M:depstar "$version.jar"
 clj -A:build -M -m deploy "$version.jar" (Read-Host -Prompt "Username") (Read-Host -Prompt "Token" -AsSecureString | ConvertFrom-SecureString -AsPlainText)
