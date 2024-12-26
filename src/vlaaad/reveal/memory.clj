@@ -1,5 +1,5 @@
 (ns vlaaad.reveal.memory
-  (:require [clojure.string :as string]
+  (:require [clojure.string :as str]
             [vlaaad.reveal.action :as action]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.view :as view])
@@ -92,7 +92,7 @@
 (defn bytes-to-human-readable [bytes]
   (let [kb 1024
         mb (* kb 1024)
-        fmt #(string/replace (format "%5.2f" %) "," ".")]
+        fmt #(str/replace (format "%5.2f" %) "," ".")]
     (cond
       (>= bytes mb) (str (fmt (double (/ bytes mb))) "mb")
       (>= bytes kb) (str (fmt (double (/ bytes kb))) "kb")
@@ -117,29 +117,34 @@
 (action/defaction ::action/memory:tree [x]
   (when (some? x)
     (fn []
-      (let [{:keys [^"[Ljava.lang.Object;" objects
-                    ^"[[I" children
-                    ^"[Ljava.lang.Object;" labels
-                    ^"[J" memory]} (tree x)]
-        {:fx/type view/tree-view
-         :root 0
-         :render #(if (:truncated %)
-                    (stream/raw-string (str "..." (- (count (:truncated %)) 100) " more") {:fill :util})
-                    (stream/horizontal
-                      (let [v (aget labels %)]
-                        (if v
-                          (stream/raw-string v {:fill :symbol})
-                          (stream/raw-string "<root>" {:fill :util})))
-                      stream/separator
-                      (stream/raw-string (bytes-to-human-readable (aget memory %)) {:fill :scalar})
-                      stream/separator
-                      (stream/stream (aget objects %))))
-         :valuate #(when-not (:truncated %) (aget ^"[Ljava.lang.Object;" objects %))
-         :branch? #(or (:truncated %) (pos? (count (aget children %))))
-         :children #(if (:truncated %)
-                      (vec (drop 100 (sort-by (comp - (fn [i] (aget memory i))) (:truncated %))))
-                      (let [is (aget children %)
-                            ret (top-n-by 100 (fn [i] (aget memory i)) is)]
-                        (if (pos? (:truncated (meta ret)))
-                          (conj ret {:truncated is})
-                          ret)))}))))
+      (try
+        (let [{:keys [^"[Ljava.lang.Object;" objects
+                      ^"[[I" children
+                      ^"[Ljava.lang.Object;" labels
+                      ^"[J" memory]} (tree x)]
+          {:fx/type view/tree-view
+           :root 0
+           :render #(if (:truncated %)
+                      (stream/raw-string (str "..." (- (count (:truncated %)) 100) " more") {:fill :util})
+                      (stream/horizontal
+                        (let [v (aget labels %)]
+                          (if v
+                            (stream/raw-string v {:fill :symbol})
+                            (stream/raw-string "<root>" {:fill :util})))
+                        stream/separator
+                        (stream/raw-string (bytes-to-human-readable (aget memory %)) {:fill :scalar})
+                        stream/separator
+                        (stream/stream (aget objects %))))
+           :valuate #(when-not (:truncated %) (aget ^"[Ljava.lang.Object;" objects %))
+           :branch? #(or (:truncated %) (pos? (count (aget children %))))
+           :children #(if (:truncated %)
+                        (vec (drop 100 (sort-by (comp - (fn [i] (aget memory i))) (:truncated %))))
+                        (let [is (aget children %)
+                              ret (top-n-by 100 (fn [i] (aget memory i)) is)]
+                          (if (pos? (:truncated (meta ret)))
+                            (conj ret {:truncated is})
+                            ret)))})
+        (catch Exception e
+          (if (str/includes? (ex-message e) "-Djol.magicFieldOffset=true")
+            (stream/as "-Djol.magicFieldOffset=true" (stream/raw-string "Cannot analyze memory, try with the JVM option:\n-Djol.magicFieldOffset=true" {:fill :error}))
+            (throw e)))))))
