@@ -33,7 +33,7 @@
             [cljfx.fx.tree-item :as fx.tree-item]
             [cljfx.fx.tree-view :as fx.tree-view]
             [cljfx.fx.tree-cell :as fx.tree-cell])
-  (:import [clojure.lang IRef IFn]
+  (:import [clojure.lang IRef IFn Reflector]
            [java.util.concurrent ArrayBlockingQueue TimeUnit BlockingQueue]
            [javafx.scene.control TableView TablePosition TableColumn$SortType TreeView TreeCell TreeItem]
            [javafx.scene Node]
@@ -44,7 +44,7 @@
            [javafx.scene.input KeyEvent KeyCode Clipboard ClipboardContent]
            [java.beans Introspector PropertyDescriptor]
            [java.lang.reflect Modifier Field]
-           [java.util UUID]))
+           [java.util List UUID]))
 
 (defn- runduce!
   ([xf x]
@@ -866,7 +866,7 @@
                                                   :sort 1
                                                   :key descriptor}
                                                  (try
-                                                   {:value (.invoke read-meth value (object-array 0))}
+                                                   {:value (Reflector/prepRet (.getReturnType read-meth) (.invoke read-meth value (object-array 0)))}
                                                    (catch Exception e {:error e})))
                                                (catch Throwable _ nil))))))
                             fields (->> value
@@ -884,14 +884,25 @@
                                                  :sort -1
                                                  :key field}
                                                 (try
-                                                  {:value (.get field value)}
+                                                  {:value (Reflector/prepRet (.getType field) (.get field value))}
                                                   (catch Exception e {:error e})))
                                               (catch Throwable _ nil)))))
-                            items (when (.isArray (class value))
+                            items (cond
+                                    (.isArray (class value))
                                     (cons
                                       {:name "length"
                                        :sort 2
                                        :value (count value)}
+                                      (->> value
+                                           (take 1000)
+                                           (map-indexed (fn [i v]
+                                                          {:name i
+                                                           :key i
+                                                           :sort -3
+                                                           :value v}))))
+                                    (instance? List value)
+                                    (cons
+                                      {:name "length" :sort 2 :value (count value)}
                                       (->> value
                                            (take 1000)
                                            (map-indexed (fn [i v]
