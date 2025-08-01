@@ -5,6 +5,7 @@
             [vlaaad.reveal.action :as action]
             vlaaad.reveal.memory
             [vlaaad.reveal.action-popup :as action-popup]
+            [vlaaad.reveal.graphviz :as graphviz]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.test :as test]
             [vlaaad.reveal.view :as view]
@@ -893,6 +894,16 @@
                           :size {:value 100}}}]}})}"
   [props]
   (assoc props :fx/type vega/view))
+
+(def ^{:arglists '([{:keys [graph]}])} graphviz-view
+  "Cljfx component fn that shows a graphviz visualization
+
+  Required keys:
+    :graph    graphviz graph string
+
+  Examples:
+    {:fx/type graphviz-view :graph \"digraph { a -> b; b -> c }\"}"
+  graphviz/view)
 
 ;; endregion
 
