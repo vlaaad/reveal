@@ -131,7 +131,7 @@
                         (focus! node)))))))
 
 (defn- switch-focus! [^Node from to]
-  (when (.isFocused from)
+  (when (and (.isFocused from) to)
     (focus-when-on-scene! to)))
 
 (defn ext-focused-by-default [{:keys [desc]}]

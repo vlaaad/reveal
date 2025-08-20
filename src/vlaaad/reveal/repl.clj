@@ -34,9 +34,7 @@
 
 (defn- wrap-caught [ui caught]
   (fn [ex]
-    (ui (stream/as ex
-          (stream/raw-string (-> ex Throwable->map m/ex-triage m/ex-str)
-                             {:fill :error})))
+    (ui (stream/thrown ex))
     (caught ex)))
 
 (defn- make-tap [ui]

@@ -45,6 +45,7 @@
           :atom (atom :atom)
           :agent (agent "agent")
           :ref (ref 1)}
+   :fns #{assoc inc ((fn a [] (fn b [])))}
    :dates {:date (Date. 0)
            :timestamp (Timestamp. 0)
            :instant (Instant/ofEpochMilli 0)

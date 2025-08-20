@@ -524,6 +524,10 @@
     (as hash
       (raw-string (format "0x%x" hash) {:fill :scalar}))))
 
+(defn- identity-hash-code-comment [x]
+  (let [hash (System/identityHashCode x)]
+    (as hash (raw-string (format "#_0x%x" hash) {:fill :util}))))
+
 (defmacro defstream [dispatch-val bindings sf]
   (let [[x ann] (cond-> bindings (= 1 (count bindings)) (conj (gensym "ann")))]
     `(defmethod stream-dispatch ~dispatch-val [x# ann#]
@@ -674,22 +678,119 @@
 
 ;; exceptions
 
+(defn thrown [^Throwable t]
+  (vertically
+    (eduction
+      (take-while some?)
+      (map-indexed
+        (fn [i ^Throwable t]
+          (let [cause (.getCause t)
+                stack-trace (into []
+                                  (comp
+                                    (keep
+                                      (fn [[^StackTraceElement prev-el ^StackTraceElement el]]
+                                        (when (or (nil? prev-el)
+                                                  (not (and (= (.getClassName prev-el) (.getClassName el))
+                                                            (= (.getFileName prev-el) (.getFileName el))
+                                                            (= "invokeStatic" (.getMethodName prev-el))
+                                                            (case (.getMethodName el) ("invoke" "doInvoke" "invokePrim") true false))))
+                                          el)))
+                                    (remove
+                                      (fn [^StackTraceElement el]
+                                        (case (.getClassName el)
+                                          ("clojure.lang.RestFn" "clojure.lang.AFn") true
+                                          "clojure.lang.Var" (case (.getMethodName el) ("invoke" "applyTo") true false)
+                                          false))))
+                                  (partition 2 1 (cons nil (.getStackTrace t))))
+                n (count stack-trace)]
+            (as t
+              (apply
+                vertical
+                (cond->
+                  [(raw-string
+                     (str (when (pos? i) "Caused by ")
+                          (.getName (.getClass t))
+                          (when-let [message (.getMessage t)]
+                            (when-not (and cause (= message (str cause)))
+                              (str ": " message))))
+                     {:fill :error})]
+
+                  (pos? n)
+                  (conj
+                    (horizontal
+                      (raw-string "  " {:selectable false})
+                      (let [maxn (if cause 1 32)]
+                        (apply
+                          vertical
+                          (cond->
+                            [(vertically
+                               (eduction
+                                 (take maxn)
+                                 (map (fn [^StackTraceElement el]
+                                        (let [file-name (.getFileName el)
+                                              method-name (.getMethodName el)
+                                              class-name (.getClassName el)
+                                              line-number (.getLineNumber el)
+                                              clj (if file-name
+                                                    (or (.endsWith file-name ".clj")
+                                                        (.endsWith file-name ".cljc")
+                                                        (= file-name "NO_SOURCE_FILE"))
+                                                    (case method-name ("invoke" "doInvoke" "invokePrim" "invokeStatic") true false))
+                                              s (if clj
+                                                  (case method-name
+                                                    ("invoke" "doInvoke" "invokeStatic")
+                                                    (-> class-name
+                                                        (Compiler/demunge)
+                                                        (.replaceFirst "/eval\\d{3,}" "/eval")
+                                                        (.replaceAll "--\\d{3,}" ""))
+
+                                                    (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
+                                                  (str class-name "." method-name))]
+                                          (as el
+                                            (if file-name
+                                              (horizontal
+                                                (raw-string s {:fill :error})
+                                                separator
+                                                (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
+                                              (raw-string s {:fill :error}))))))
+                                 stack-trace))]
+                            (< maxn n)
+                            (conj (raw-string (str "... " (- n maxn) " more") {:fill :util})))))))))))))
+      (iterate ex-cause t))))
+
 (defstream Throwable [t]
-  (horizontal
-    (raw-string "#reveal/error" {:fill :object})
-    (stream (Throwable->map t))))
+  (let [^Throwable t t
+        message (.getMessage t)
+        cause (.getCause t)
+        stack-trace (.getStackTrace t)
+        n (count stack-trace)]
+    (horizontal
+      (raw-string "(" {:fill :object})
+      (apply
+        vertical
+        (cond->
+          [(raw-string (str (.getName (class t)) ".") {:fill :object})]
+          message (conj (horizontal separator (stream message)))
+          (pos? n) (conj (horizontal
+                           separator
+                           (raw-string "#_[" {:fill :util})
+                           (vertically stack-trace)
+                           (raw-string "]" {:fill :util})))
+          cause (conj (horizontal separator (stream cause)))))
+      (raw-string ")" {:fill :object}))))
 
 (defstream StackTraceElement [^StackTraceElement el]
-  (horizontal
-    (raw-string "[" {:fill :object})
-    (stream (symbol (.getClassName el)))
-    separator
-    (stream (symbol (.getMethodName el)))
-    separator
-    (stream (.getFileName el))
-    separator
-    (stream (.getLineNumber el))
-    (raw-string "]" {:fill :object})))
+  (let [file-name (.getFileName el)
+        method-name (.getMethodName el)
+        class-name (.getClassName el)
+        line-number (.getLineNumber el)
+        s (symbol (str class-name "." method-name))]
+    (if file-name
+      (horizontal
+        (raw-string s {:fill :symbol})
+        separator
+        (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
+      (raw-string s {:fill :symbol}))))
 
 ;; objects
 
@@ -709,8 +810,11 @@
     (raw-string "]" {:fill :object})))
 
 (defstream Fn [f]
-  (escaped-string (Compiler/demunge (.getName (class f))) {:fill :object}
-                  escape-layout-chars {:fill :scalar}))
+  (horizontal
+    (escaped-string (.replaceAll (Compiler/demunge (.getName (class f))) "--\\d{3,}" "") {:fill :object}
+                    escape-layout-chars {:fill :scalar})
+    separator
+    (identity-hash-code-comment f)))
 
 (defstream Pattern [re]
   (horizontal
@@ -745,50 +849,58 @@
 
 (defstream IRef [*ref]
   (horizontal
-    (raw-string (str "#reveal/" (.toLowerCase (.getSimpleName (class *ref))) "[") {:fill :object})
-    (stream @*ref)
+    (raw-string (str "(" (.toLowerCase (.getSimpleName (class *ref)))) {:fill :object})
     separator
-    (identity-hash-code *ref)
-    (raw-string "]" {:fill :object})))
+    (stream @*ref)
+    (raw-string ")" {:fill :object})
+    separator
+    (identity-hash-code-comment *ref)))
 
 (defstream File [file]
   (horizontal
-    (raw-string "#reveal/file" {:fill :object})
+    (raw-string "(java.io.File." {:fill :object})
     separator
-    (stream (str file))))
+    (stream (str file))
+    (raw-string ")" {:fill :object})))
 
 (defstream Delay [*delay]
   (horizontal
-    (raw-string "#reveal/delay[" {:fill :object})
+    (raw-string "(delay" {:fill :object})
+    separator
     (if (realized? *delay)
       (stream @*delay)
       (raw-string "..." {:fill :util}))
+    (raw-string ")" {:fill :object})
     separator
-    (identity-hash-code *delay)
-    (raw-string "]" {:fill :object})))
+    (identity-hash-code-comment *delay)))
 
 (defstream Reduced [*reduced]
   (horizontal
-    (raw-string "#reveal/reduced" {:fill :object})
+    (raw-string "(reduced" {:fill :object})
     separator
-    (stream @*reduced)))
+    (stream @*reduced)
+    (raw-string ")" {:fill :object})
+    separator
+    (identity-hash-code-comment *reduced)))
 
 (defstream IBlockingDeref [*blocking-deref]
   (let [class-name (.getName (class *blocking-deref))]
     (cond
       (.startsWith class-name "clojure.core$promise$reify")
       (horizontal
-        (raw-string "#reveal/promise[" {:fill :object})
+        (raw-string "(promise" {:fill :object})
+        separator
         (if (realized? *blocking-deref)
           (stream @*blocking-deref)
           (raw-string "..." {:fill :util}))
+        (raw-string ")" {:fill :object})
         separator
-        (identity-hash-code *blocking-deref)
-        (raw-string "]" {:fill :object}))
+        (identity-hash-code-comment *blocking-deref))
 
       (.startsWith class-name "clojure.core$future_call$reify")
       (horizontal
-        (raw-string "#reveal/future[" {:fill :object})
+        (raw-string "(future" {:fill :object})
+        separator
         (cond
           (.isCancelled ^Future *blocking-deref)
           (raw-string "cancelled" {:fill :util})
@@ -802,20 +914,21 @@
 
           :else
           (raw-string "pending" {:fill :util}))
+        (raw-string ")" {:fill :object})
         separator
-        (identity-hash-code *blocking-deref)
-        (raw-string "]" {:fill :object}))
+        (identity-hash-code-comment *blocking-deref))
 
       :else
       (raw-string (pr-str *blocking-deref) {:fill :object}))))
 
 (defstream Volatile [*ref]
   (horizontal
-    (raw-string "#reveal/volatile[" {:fill :object})
-    (stream @*ref)
+    (raw-string "(volatile!" {:fill :object})
     separator
-    (identity-hash-code *ref)
-    (raw-string "]" {:fill :object})))
+    (stream @*ref)
+    (raw-string ")" {:fill :object})
+    separator
+    (identity-hash-code-comment *ref)))
 
 (defstream TaggedLiteral [x]
   (horizontal
@@ -831,15 +944,17 @@
 
 (defstream URL [x]
   (horizontal
-    (raw-string "#reveal/url" {:fill :object})
+    (raw-string "(java.net.URL." {:fill :object})
     separator
-    (stream (str x))))
+    (stream (str x))
+    (raw-string ")" {:fill :object})))
 
 (defstream URI [x]
   (horizontal
-    (raw-string "#reveal/uri" {:fill :object})
+    (raw-string "(java.net.URI." {:fill :object})
     separator
-    (stream (str x))))
+    (stream (str x))
+    (raw-string ")" {:fill :object})))
 
 (defstream UUID [x]
   (horizontal
