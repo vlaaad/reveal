@@ -283,6 +283,19 @@
                                  input))))]
              (sf rf acc)))))
 
+(defn single-line [sf]
+  (let [space-op (string " " {})]
+    (as-is
+      (fn [rf acc]
+        (let [rf (fn
+                   ([acc] (rf acc))
+                   ([acc input]
+                    (case (:op input)
+                      ::newrow acc
+                      (::separator ::newline) (space-op rf acc)
+                      (rf acc input))))]
+          (sf rf acc))))))
+
 (defn- emit-xf [rf]
   (fn
     ([] (rf))
@@ -683,7 +696,7 @@
     (vertically
       (eduction
         (map-indexed
-          (fn [i {:keys [type message at] :as m}]
+          (fn [i {:keys [type message at data] :as m}]
             (let [stack-trace (into []
                                     (comp
                                       (keep
@@ -719,41 +732,41 @@
                         (let [maxn 32]
                           (apply
                             vertical
-                            (cond->
-                              [(vertically
-                                 (eduction
-                                   (take maxn)
-                                   (map (fn [el]
-                                          (let [^String file-name (el 2)
-                                                method-name (el 1)
-                                                class-name (el 0)
-                                                line-number (el 3)
-                                                clj (if file-name
-                                                      (or (.endsWith file-name ".clj")
-                                                          (.endsWith file-name ".cljc")
-                                                          (= file-name "NO_SOURCE_FILE"))
-                                                      (case method-name (invoke doInvoke invokePrim invokeStatic) true false))
-                                                s (if clj
-                                                    (case method-name
-                                                      (invoke doInvoke invokeStatic)
-                                                      (-> class-name
-                                                          str
-                                                          (Compiler/demunge)
-                                                          (.replaceFirst "/eval\\d{3,}" "/eval")
-                                                          (.replaceAll "--\\d{3,}" ""))
+                            (-> []
+                                (cond-> data (conj (override-style (single-line (stream data)) assoc :fill :error)))
+                                (conj (vertically
+                                        (eduction
+                                          (take maxn)
+                                          (map (fn [el]
+                                                 (let [^String file-name (el 2)
+                                                       method-name (el 1)
+                                                       class-name (el 0)
+                                                       line-number (el 3)
+                                                       clj (if file-name
+                                                             (or (.endsWith file-name ".clj")
+                                                                 (.endsWith file-name ".cljc")
+                                                                 (= file-name "NO_SOURCE_FILE"))
+                                                             (case method-name (invoke doInvoke invokePrim invokeStatic) true false))
+                                                       s (if clj
+                                                           (case method-name
+                                                             (invoke doInvoke invokeStatic)
+                                                             (-> class-name
+                                                                 str
+                                                                 (Compiler/demunge)
+                                                                 (.replaceFirst "/eval\\d{3,}" "/eval")
+                                                                 (.replaceAll "--\\d{3,}" ""))
 
-                                                      (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
-                                                    (str class-name "." method-name))]
-                                            (as el
-                                              (if file-name
-                                                (horizontal
-                                                  (raw-string s {:fill :error})
-                                                  separator
-                                                  (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
-                                                (raw-string s {:fill :error}))))))
-                                   stack-trace))]
-                              (< maxn n)
-                              (conj (raw-string (str "... " (- n maxn) " more") {:fill :util})))))))))))))
+                                                             (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
+                                                           (str class-name "." method-name))]
+                                                   (as el
+                                                     (if file-name
+                                                       (horizontal
+                                                         (raw-string s {:fill :error})
+                                                         separator
+                                                         (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
+                                                       (raw-string s {:fill :error}))))))
+                                          stack-trace)))
+                                (cond-> (< maxn n) (conj (raw-string (str "... " (- n maxn) " more") {:fill :util}))))))))))))))
         via))))
 
 (defn thrown [^Throwable t]
@@ -780,7 +793,8 @@
                                           "clojure.lang.Var" (case (.getMethodName el) ("invoke" "applyTo") true false)
                                           false))))
                                   (partition 2 1 (cons nil (.getStackTrace t))))
-                n (count stack-trace)]
+                n (count stack-trace)
+                ex-data (ex-data t)]
             (as t
               (apply
                 vertical
@@ -800,40 +814,40 @@
                       (let [maxn (if cause 1 32)]
                         (apply
                           vertical
-                          (cond->
-                            [(vertically
-                               (eduction
-                                 (take maxn)
-                                 (map (fn [^StackTraceElement el]
-                                        (let [file-name (.getFileName el)
-                                              method-name (.getMethodName el)
-                                              class-name (.getClassName el)
-                                              line-number (.getLineNumber el)
-                                              clj (if file-name
-                                                    (or (.endsWith file-name ".clj")
-                                                        (.endsWith file-name ".cljc")
-                                                        (= file-name "NO_SOURCE_FILE"))
-                                                    (case method-name ("invoke" "doInvoke" "invokePrim" "invokeStatic") true false))
-                                              s (if clj
-                                                  (case method-name
-                                                    ("invoke" "doInvoke" "invokeStatic")
-                                                    (-> class-name
-                                                        (Compiler/demunge)
-                                                        (.replaceFirst "/eval\\d{3,}" "/eval")
-                                                        (.replaceAll "--\\d{3,}" ""))
+                          (-> []
+                              (cond-> ex-data (conj (override-style (single-line (stream ex-data)) assoc :fill :error)))
+                              (conj (vertically
+                                      (eduction
+                                        (take maxn)
+                                        (map (fn [^StackTraceElement el]
+                                               (let [file-name (.getFileName el)
+                                                     method-name (.getMethodName el)
+                                                     class-name (.getClassName el)
+                                                     line-number (.getLineNumber el)
+                                                     clj (if file-name
+                                                           (or (.endsWith file-name ".clj")
+                                                               (.endsWith file-name ".cljc")
+                                                               (= file-name "NO_SOURCE_FILE"))
+                                                           (case method-name ("invoke" "doInvoke" "invokePrim" "invokeStatic") true false))
+                                                     s (if clj
+                                                         (case method-name
+                                                           ("invoke" "doInvoke" "invokeStatic")
+                                                           (-> class-name
+                                                               (Compiler/demunge)
+                                                               (.replaceFirst "/eval\\d{3,}" "/eval")
+                                                               (.replaceAll "--\\d{3,}" ""))
 
-                                                    (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
-                                                  (str class-name "." method-name))]
-                                          (as el
-                                            (if file-name
-                                              (horizontal
-                                                (raw-string s {:fill :error})
-                                                separator
-                                                (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
-                                              (raw-string s {:fill :error}))))))
-                                 stack-trace))]
-                            (< maxn n)
-                            (conj (raw-string (str "... " (- n maxn) " more") {:fill :util})))))))))))))
+                                                           (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
+                                                         (str class-name "." method-name))]
+                                                 (as el
+                                                   (if file-name
+                                                     (horizontal
+                                                       (raw-string s {:fill :error})
+                                                       separator
+                                                       (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
+                                                     (raw-string s {:fill :error}))))))
+                                        stack-trace)))
+                              (cond-> (< maxn n) (conj (raw-string (str "... " (- n maxn) " more") {:fill :util}))))))))))))))
       (iterate ex-cause t))))
 
 (defstream Throwable [t]
@@ -841,7 +855,8 @@
         message (.getMessage t)
         cause (.getCause t)
         stack-trace (.getStackTrace t)
-        n (count stack-trace)]
+        n (count stack-trace)
+        ex-data (ex-data t)]
     (horizontal
       (raw-string "(" {:fill :object})
       (apply
@@ -849,6 +864,7 @@
         (cond->
           [(raw-string (str (.getName (class t)) ".") {:fill :object})]
           message (conj (horizontal separator (stream message)))
+          ex-data (conj (horizontal separator (stream ex-data)))
           (pos? n) (conj (horizontal
                            separator
                            (raw-string "#_[" {:fill :util})
