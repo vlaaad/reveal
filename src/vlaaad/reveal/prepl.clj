@@ -1,14 +1,13 @@
 (ns vlaaad.reveal.prepl
   (:require [clojure.core.server :as server]
-            [clojure.main :as m]
+            [clojure.string :as str]
             [vlaaad.reveal.stream :as stream]
-            [vlaaad.reveal.ui :as ui]
-            [clojure.string :as str]))
+            [vlaaad.reveal.ui :as ui]))
 
 (defn- prepl-output [x]
   (if (:exception x)
     (stream/as x
-      (cond-> (stream/raw-string (-> x :val m/ex-triage m/ex-str) {:fill :error})
+      (cond-> (stream/datafied-thrown (:val x))
         (:form x)
         (as-> $ (stream/vertical
                   (stream/raw-string (:form x) {:fill :util})

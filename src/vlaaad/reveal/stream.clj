@@ -678,6 +678,84 @@
 
 ;; exceptions
 
+(defn datafied-thrown [data]
+  (let [{:keys [via trace]} data]
+    (vertically
+      (eduction
+        (map-indexed
+          (fn [i {:keys [type message at] :as m}]
+            (let [stack-trace (into []
+                                    (comp
+                                      (keep
+                                        (fn [[prev-el el]]
+                                          (when (or (nil? prev-el)
+                                                    (not (and (= (prev-el 0) (el 0))
+                                                              (= (prev-el 2) (el 2))
+                                                              (= 'invokeStatic (prev-el 1))
+                                                              (case (el 1) (invoke doInvoke invokePrim) true false))))
+                                            el)))
+                                      (remove
+                                        (fn [^StackTraceElement el]
+                                          (case (el 0)
+                                            (clojure.lang.RestFn clojure.lang.AFn) true
+                                            clojure.lang.Var (case (el 1) (invoke applyTo) true false)
+                                            false))))
+                                    (partition 2 1 (cons nil (if (= i (dec (count via))) trace [at]))))
+                  n (count stack-trace)]
+              (as m
+                (apply
+                  vertical
+                  (cond->
+                    [(raw-string
+                       (str (when (pos? i) "Caused by ")
+                            type
+                            (when message (str ": " message)))
+                       {:fill :error})]
+
+                    (pos? n)
+                    (conj
+                      (horizontal
+                        (raw-string "  " {:selectable false})
+                        (let [maxn 32]
+                          (apply
+                            vertical
+                            (cond->
+                              [(vertically
+                                 (eduction
+                                   (take maxn)
+                                   (map (fn [el]
+                                          (let [^String file-name (el 2)
+                                                method-name (el 1)
+                                                class-name (el 0)
+                                                line-number (el 3)
+                                                clj (if file-name
+                                                      (or (.endsWith file-name ".clj")
+                                                          (.endsWith file-name ".cljc")
+                                                          (= file-name "NO_SOURCE_FILE"))
+                                                      (case method-name (invoke doInvoke invokePrim invokeStatic) true false))
+                                                s (if clj
+                                                    (case method-name
+                                                      (invoke doInvoke invokeStatic)
+                                                      (-> class-name
+                                                          str
+                                                          (Compiler/demunge)
+                                                          (.replaceFirst "/eval\\d{3,}" "/eval")
+                                                          (.replaceAll "--\\d{3,}" ""))
+
+                                                      (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
+                                                    (str class-name "." method-name))]
+                                            (as el
+                                              (if file-name
+                                                (horizontal
+                                                  (raw-string s {:fill :error})
+                                                  separator
+                                                  (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
+                                                (raw-string s {:fill :error}))))))
+                                   stack-trace))]
+                              (< maxn n)
+                              (conj (raw-string (str "... " (- n maxn) " more") {:fill :util})))))))))))))
+        via))))
+
 (defn thrown [^Throwable t]
   (vertically
     (eduction
