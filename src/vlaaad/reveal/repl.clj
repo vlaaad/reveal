@@ -1,9 +1,11 @@
 (ns vlaaad.reveal.repl
   (:require [clojure.main :as m]
-            [vlaaad.reveal.ui :as ui]
+            [clojure.string :as str]
+            [vlaaad.reveal.ns :as ns]
+            [vlaaad.reveal.prefs :as prefs]
             [vlaaad.reveal.stream :as stream]
-            [clojure.string :as str])
-  (:import [java.io PrintWriter Writer BufferedWriter]))
+            [vlaaad.reveal.ui :as ui])
+  (:import [java.io BufferedWriter PrintWriter Writer]))
 
 (defn- stream-read [form ui]
   (ui (stream/as form
@@ -79,13 +81,26 @@
          (flush)))
     nil))
 
+(defn- eval-in-current-namespace [eval form]
+  (eval form))
+
+(defn- eval-in-eval-file-metadata-namespace [eval form]
+  (if-let [source-ns-symbol (some-> form meta :clojure.core/eval-file ns/file-ns-symbol)]
+    (let [source-ns (create-ns source-ns-symbol)]
+      (binding [*ns* source-ns]
+        (eval form)))
+    (eval form)))
+
 (defn- wrap-eval [ui eval]
   (let [out (make-print ui *out* :string)
-        err (make-print ui *err* :error)]
+        err (make-print ui *err* :error)
+        apply-eval (if (:use-eval-file-metadata-namespace @prefs/prefs false)
+                     eval-in-eval-file-metadata-namespace
+                     eval-in-current-namespace)]
     (fn [form]
       (binding [*out* out
                 *err* err]
-        (let [ret (eval form)]
+        (let [ret (apply-eval eval form)]
           (flush)
           ret)))))
 
