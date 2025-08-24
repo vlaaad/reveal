@@ -85,7 +85,7 @@
   (eval form))
 
 (defn- eval-in-eval-file-metadata-namespace [eval form]
-  (if-let [source-ns-symbol (some-> form meta :clojure.core/eval-file ns/file-ns-symbol)]
+  (if-let [source-ns-symbol (some-> form meta ns/file-ns-symbol)]
     (let [source-ns (create-ns source-ns-symbol)]
       (binding [*ns* source-ns]
         (eval form)))

@@ -1,10 +1,11 @@
 (ns vlaaad.reveal.ns
   (:require [clojure.java.io :as io]
-            [clojure.tools.namespace.file :as namespace.file]
-            [clojure.tools.namespace.parse :as namespace.parse]
             [clojure.tools.reader :as reader])
-  (:import [clojure.lang ExceptionInfo]
-           [java.io FileNotFoundException IOException]))
+  (:import [clojure.lang ExceptionInfo LineNumberingPushbackReader]
+           [java.io FileNotFoundException]
+           [java.net URL]))
+
+(set! *warn-on-reflection* true)
 
 (defmacro when-exists [ns-sym & body]
   `(try
@@ -14,37 +15,66 @@
      ~@body
      (catch FileNotFoundException _#)))
 
-(defn- try-read-file-ns-decl [source-file]
-  ;; disable reader code execution for safety - we're unlikely to need it to parse the ns decl
-  ;; note that the clojure.tools.namespace functions use reader/*read-eval*, not the *read-eval* in core
-  (binding [reader/*read-eval* false]
-    (try
-      (namespace.file/read-file-ns-decl source-file)
-      (catch ExceptionInfo e
-        (case (:ex-kind (ex-data e))
-          (:reader-error) nil ; syntax error or reader/*read-eval* violation
-          (:eof :illegal-argument) nil ; syntax error
-          (throw e)))
-      (catch IOException _
-        nil))))
+(defn- read-namespaces [input-stream]
+  (let [reader (LineNumberingPushbackReader. (io/reader input-stream))
+        opts {:eof ::eof :read-cond :preserve}]
+    ;; disable reader code execution for safety - we're unlikely to need it to parse the ns decl
+    ;; note that the clojure.tools.namespace functions use reader/*read-eval*, not the *read-eval* in core
+    (binding [reader/*read-eval* false]
+      (loop [acc (sorted-map)]
+        (let [form (try
+                     (reader/read opts reader)
+                     (catch ExceptionInfo e
+                       (case (:type (ex-data e))
+                         :reader-exception nil
+                         (throw e))))]
+          (if (identical? ::eof form)
+            acc
+            (recur
+              (if-let [ns-sym (or (and (list? form)
+                                       (= 'ns (first form))
+                                       (= (simple-symbol? (second form)))
+                                       (second form))
+                                  (and (list? form)
+                                       (= 'in-ns (first form))
+                                       (list? (second form))
+                                       (= 'quote (first (second form)))
+                                       (simple-symbol? (second (second form)))
+                                       (second (second form))))]
+                (let [{:keys [line column]} (meta form)]
+                  (assoc acc [line column] ns-sym))
+                acc))))))))
 
 (defonce ^:private source-file-info-cache-atom (atom {}))
 
-(defn- source-file-info [source-file-or-path]
-  (let [source-file (io/file source-file-or-path)]
-    (when (and source-file (.isFile source-file))
-      (let [absolute-path (.getAbsolutePath source-file)
-            last-modified (.lastModified source-file)]
-        (or (when-let [source-file-info (get @source-file-info-cache-atom absolute-path)]
-              (when (= last-modified (:last-modified source-file-info))
-                source-file-info))
-            (let [ns-decl (try-read-file-ns-decl source-file)
-                  ns-symbol (some-> ns-decl namespace.parse/name-from-ns-decl)]
-              (-> (swap! source-file-info-cache-atom
-                         assoc absolute-path
-                         {:last-modified last-modified
-                          :ns-symbol ns-symbol})
-                  (get absolute-path))))))))
+(defn- source-file-info [^String eval-file]
+  (let [^URL url (if (.contains eval-file ".jar!/")
+                   (URL. (str "jar:file:" eval-file))
+                   (URL. (str "file:" eval-file)))
+        conn (doto (.openConnection url)
+               (.setUseCaches false))]
+    (try
+      (let [last-modified (.getLastModified conn)
+            source-file-info (@source-file-info-cache-atom eval-file)]
+        (or (when (and source-file-info (= last-modified (:last-modified source-file-info)))
+              source-file-info)
+            (let [namespaces (read-namespaces (.getInputStream conn))
+                  source-file-info {:last-modified last-modified
+                                    :namespaces namespaces}]
+              (swap! source-file-info-cache-atom assoc eval-file source-file-info)
+              source-file-info)))
+      (finally
+        (.close (.getInputStream conn))))))
 
-(defn file-ns-symbol [source-file-or-path]
-  (some-> source-file-or-path source-file-info :ns-symbol))
+(defn file-ns-symbol [{:keys [^String clojure.core/eval-file line column]}]
+  (when (and (string? eval-file)
+             (pos-int? line)
+             (pos-int? column))
+    (try
+      (-> eval-file
+          source-file-info
+          :namespaces
+          (rsubseq < [line column])
+          first
+          (some-> val))
+      (catch Exception _))))
