@@ -2,7 +2,6 @@
   (:require [clojure.main :as m]
             [clojure.string :as str]
             [vlaaad.reveal.ns :as ns]
-            [vlaaad.reveal.prefs :as prefs]
             [vlaaad.reveal.stream :as stream]
             [vlaaad.reveal.ui :as ui])
   (:import [java.io BufferedWriter PrintWriter Writer]))
@@ -91,10 +90,10 @@
         (eval form)))
     (eval form)))
 
-(defn- wrap-eval [ui eval]
+(defn- wrap-eval [ui infer-ns eval]
   (let [out (make-print ui *out* :string)
         err (make-print ui *err* :error)
-        apply-eval (if (:use-eval-file-metadata-namespace @prefs/prefs false)
+        apply-eval (if infer-ns
                      eval-in-eval-file-metadata-namespace
                      eval-in-current-namespace)]
     (fn [form]
@@ -119,7 +118,7 @@
                       (select-keys [:init :need-prompt :prompt :flush :read :eval :print :caught])
                       (update :init #(or % init))
                       (update :read #(wrap-read ui (or % m/repl-read)))
-                      (update :eval #(wrap-eval ui (or % eval)))
+                      (update :eval #(wrap-eval ui (:infer-ns args false) (or % eval)))
                       (update :print #(wrap-print ui (or % prn)))
                       (update :caught #(wrap-caught ui (or % m/repl-caught))))]
     (ui (stream/as *clojure-version*

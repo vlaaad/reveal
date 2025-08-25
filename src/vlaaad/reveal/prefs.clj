@@ -26,11 +26,8 @@
 (s/def ::theme
   #{:dark :light})
 
-(s/def ::use-eval-file-metadata-namespace
-  boolean?)
-
 (s/def ::prefs
-  (s/keys :opt-un [::font-family ::font-size ::theme ::use-eval-file-metadata-namespace]))
+  (s/keys :opt-un [::font-family ::font-size ::theme]))
 
 (def prefs
   (delay

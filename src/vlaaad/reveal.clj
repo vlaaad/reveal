@@ -36,6 +36,10 @@
 
   Available opts (all optional):
 
+    ;; reveal-specific repl opts
+    :infer-ns    attempt to infer expected ns for evaluation from the supplied
+                 form metadata, default false
+
     ;; repl opts as per clojure.main/repl doc (can be fully-qualified symbols)
     :init           0-arg fn, initialization hook
     :need-prompt    0-arg fn, will prompt user for input if returns true
@@ -45,6 +49,7 @@
     :eval           1-arg fn that evaluates its argument
     :print          1-arg fn that prints its argument
     :caught         1-arg fn that handles thrown exceptions
+
     ;; window opts:
     :title              window title, defaults to \"repl\"
     :close-difficulty   how easy it is to close the window; either:
