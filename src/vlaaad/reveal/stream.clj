@@ -858,7 +858,7 @@
         n (count stack-trace)
         ex-data (ex-data t)]
     (horizontal
-      (raw-string "(" {:fill :object})
+      (raw-string "(" {:fill :util})
       (apply
         vertical
         (cond->
@@ -871,7 +871,7 @@
                            (vertically stack-trace)
                            (raw-string "]" {:fill :util})))
           cause (conj (horizontal separator (stream cause)))))
-      (raw-string ")" {:fill :object}))))
+      (raw-string ")" {:fill :util}))))
 
 (defstream StackTraceElement [^StackTraceElement el]
   (let [file-name (.getFileName el)
@@ -943,37 +943,41 @@
 
 (defstream IRef [*ref]
   (horizontal
-    (raw-string (str "(" (.toLowerCase (.getSimpleName (class *ref)))) {:fill :object})
+    (raw-string "(" {:fill :util})
+    (raw-string (.toLowerCase (.getSimpleName (class *ref))) {:fill :object})
     separator
     (stream @*ref)
-    (raw-string ")" {:fill :object})
+    (raw-string ")" {:fill :util})
     separator
     (identity-hash-code-comment *ref)))
 
 (defstream File [file]
   (horizontal
-    (raw-string "(java.io.File." {:fill :object})
+    (raw-string "(" {:fill :util})
+    (raw-string "java.io.File." {:fill :object})
     separator
     (stream (str file))
-    (raw-string ")" {:fill :object})))
+    (raw-string ")" {:fill :util})))
 
 (defstream Delay [*delay]
   (horizontal
-    (raw-string "(delay" {:fill :object})
+    (raw-string "(" {:fill :util})
+    (raw-string "delay" {:fill :object})
     separator
     (if (realized? *delay)
       (stream @*delay)
       (raw-string "..." {:fill :util}))
-    (raw-string ")" {:fill :object})
+    (raw-string ")" {:fill :util})
     separator
     (identity-hash-code-comment *delay)))
 
 (defstream Reduced [*reduced]
   (horizontal
-    (raw-string "(reduced" {:fill :object})
+    (raw-string "(" {:fill :util})
+    (raw-string "reduced" {:fill :object})
     separator
     (stream @*reduced)
-    (raw-string ")" {:fill :object})
+    (raw-string ")" {:fill :util})
     separator
     (identity-hash-code-comment *reduced)))
 
@@ -982,18 +986,20 @@
     (cond
       (.startsWith class-name "clojure.core$promise$reify")
       (horizontal
-        (raw-string "(promise" {:fill :object})
+        (raw-string "(" {:fill :util})
+        (raw-string "promise" {:fill :object})
         separator
         (if (realized? *blocking-deref)
           (stream @*blocking-deref)
           (raw-string "..." {:fill :util}))
-        (raw-string ")" {:fill :object})
+        (raw-string ")" {:fill :util})
         separator
         (identity-hash-code-comment *blocking-deref))
 
       (.startsWith class-name "clojure.core$future_call$reify")
       (horizontal
-        (raw-string "(future" {:fill :object})
+        (raw-string "(" {:fill :util})
+        (raw-string "future" {:fill :object})
         separator
         (cond
           (.isCancelled ^Future *blocking-deref)
@@ -1008,7 +1014,7 @@
 
           :else
           (raw-string "pending" {:fill :util}))
-        (raw-string ")" {:fill :object})
+        (raw-string ")" {:fill :util})
         separator
         (identity-hash-code-comment *blocking-deref))
 
@@ -1017,10 +1023,11 @@
 
 (defstream Volatile [*ref]
   (horizontal
-    (raw-string "(volatile!" {:fill :object})
+    (raw-string "(" {:fill :util})
+    (raw-string "volatile!" {:fill :object})
     separator
     (stream @*ref)
-    (raw-string ")" {:fill :object})
+    (raw-string ")" {:fill :util})
     separator
     (identity-hash-code-comment *ref)))
 
@@ -1038,17 +1045,19 @@
 
 (defstream URL [x]
   (horizontal
-    (raw-string "(java.net.URL." {:fill :object})
+    (raw-string "(" {:fill :util})
+    (raw-string "java.net.URL." {:fill :object})
     separator
     (stream (str x))
-    (raw-string ")" {:fill :object})))
+    (raw-string ")" {:fill :util})))
 
 (defstream URI [x]
   (horizontal
-    (raw-string "(java.net.URI." {:fill :object})
+    (raw-string "(" {:fill :util})
+    (raw-string "java.net.URI." {:fill :object})
     separator
     (stream (str x))
-    (raw-string ")" {:fill :object})))
+    (raw-string ")" {:fill :util})))
 
 (defstream UUID [x]
   (horizontal
