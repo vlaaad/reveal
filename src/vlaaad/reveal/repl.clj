@@ -118,7 +118,7 @@
                       (select-keys [:init :need-prompt :prompt :flush :read :eval :print :caught])
                       (update :init #(or % init))
                       (update :read #(wrap-read ui (or % m/repl-read)))
-                      (update :eval #(wrap-eval ui (:infer-ns args false) (or % eval)))
+                      (update :eval #(wrap-eval ui (:infer-ns args true) (or % eval)))
                       (update :print #(wrap-print ui (or % prn)))
                       (update :caught #(wrap-caught ui (or % m/repl-caught))))]
     (ui (stream/as *clojure-version*

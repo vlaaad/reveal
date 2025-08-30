@@ -38,7 +38,7 @@
 
     ;; reveal-specific repl opts
     :infer-ns    attempt to infer expected ns for evaluation from the supplied
-                 form metadata, default false
+                 form metadata, default true
 
     ;; repl opts as per clojure.main/repl doc (can be fully-qualified symbols)
     :init           0-arg fn, initialization hook
