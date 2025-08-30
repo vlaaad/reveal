@@ -913,7 +913,9 @@
 (defstream Pattern [re]
   (horizontal
     (raw-string "#" {:fill :object})
-    (raw-string (str \" re \") {:fill :string})))
+    (raw-string (str \" re \") {:fill :string})
+    separator
+    (identity-hash-code-comment re)))
 
 (defstream Var [var]
   (raw-string (pr-str var) {:fill :object}))
