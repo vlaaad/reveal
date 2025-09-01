@@ -23,11 +23,14 @@
   (s/or :url-string (s/and string? valid-url?)
         :system-font system-font?))
 
+(s/def ::formatting
+  #{:default :slim})
+
 (s/def ::theme
   #{:dark :light})
 
 (s/def ::prefs
-  (s/keys :opt-un [::font-family ::font-size ::theme]))
+  (s/keys :opt-un [::font-family ::font-size ::formatting ::theme]))
 
 (def prefs
   (delay

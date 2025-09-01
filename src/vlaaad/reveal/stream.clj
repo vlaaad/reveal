@@ -1,29 +1,34 @@
 (ns vlaaad.reveal.stream
   (:refer-clojure :exclude [newline])
-  (:require [vlaaad.reveal.style :as style]
-            [vlaaad.reveal.ns :as ns]
-            [clojure.main :as m]
+  (:require [cljfx.fx.text :as fx.text]
             [cljfx.fx.text-flow :as fx.text-flow]
-            [cljfx.fx.text :as fx.text]
-            lambdaisland.deep-diff2.diff-impl)
-  (:import [clojure.lang Keyword Symbol IPersistentMap IPersistentVector IPersistentSet Fn
-                         ISeq MultiFn IRef Var Volatile Namespace IRecord Delay
-                         IBlockingDeref TaggedLiteral Reduced ReaderConditional
-                         IPersistentCollection BigInt PersistentQueue]
-           [java.util.regex Pattern]
+            [clojure.main :as m]
+            [lambdaisland.deep-diff2.diff-impl]
+            [vlaaad.reveal.ns :as ns]
+            [vlaaad.reveal.prefs :as prefs]
+            [vlaaad.reveal.style :as style])
+  (:import [clojure.core Eduction]
+           [clojure.lang BigInt Delay Fn IBlockingDeref IPersistentCollection IPersistentMap
+                         IPersistentSet IPersistentVector IRecord IRef ISeq Keyword MultiFn Namespace
+                         PersistentQueue ReaderConditional Reduced Symbol
+                         TaggedLiteral Var Volatile]
            [java.io File]
-           [lambdaisland.deep_diff2.diff_impl Insertion Deletion Mismatch]
-           [java.net URL URI]
-           [java.util UUID List Collection RandomAccess Map Set TimeZone Date Calendar]
-           [clojure.core Eduction]
-           [java.text SimpleDateFormat DateFormat]
+           [java.lang.reflect Constructor Field Method Proxy]
+           [java.net URI URL]
+           [java.text DateFormat SimpleDateFormat]
            [java.time Instant]
+           [java.util Calendar Collection Date List Map RandomAccess Set TimeZone UUID]
            [java.util.concurrent Future]
-           [java.lang.reflect Method Constructor Field Proxy]))
+           [java.util.regex Pattern]
+           [lambdaisland.deep_diff2.diff_impl Deletion Insertion Mismatch]))
 
 (set! *warn-on-reflection* true)
 
 (defrecord AnnotatedValue [value annotation])
+
+(def ^{:private true :tag 'long} slim-key-character-limit 6) ; Fits quotes + four chars.
+
+(def ^:private *slim-format (delay (= :slim (:formatting @prefs/prefs :default))))
 
 (defn as-is [sf]
   (with-meta sf {::type ::as-is}))
@@ -224,6 +229,29 @@
         acc
         coll))))
 
+(defn- sf-wider-than? [sf ^long max-width]
+  (->> 0
+       (sf (fn [^long width input]
+             (let [width (case (:op input)
+                           ::separator (inc width)
+                           ::string (+ width (count (:text input)))
+                           ::newline 0
+                           width)]
+               (if (< max-width width)
+                 (reduced width)
+                 width))))
+       (unreduced)
+       (long)
+       (< max-width)))
+
+(defn- sf-multi-line? [sf]
+  (unreduced
+    (sf
+      #(case (:op %2)
+         ::newline (reduced true)
+         false)
+      nil)))
+
 (defn entries
   ([m]
    (entries m nil))
@@ -233,12 +261,21 @@
        (comp
          (map (fn [e]
                 (let [k (key e)
-                      v (val e)]
-                  (horizontal (stream k (assoc ann :vlaaad.reveal.nav/val v
-                                                   :vlaaad.reveal.nav/coll m))
-                              separator
-                              (stream v (assoc ann :vlaaad.reveal.nav/key k
-                                                   :vlaaad.reveal.nav/coll m))))))
+                      v (val e)
+                      ksf (stream k (assoc ann :vlaaad.reveal.nav/val v
+                                               :vlaaad.reveal.nav/coll m))
+                      vsf (stream v (assoc ann :vlaaad.reveal.nav/key k
+                                               :vlaaad.reveal.nav/coll m))]
+                  (if (and @*slim-format
+                           (sf-wider-than? ksf slim-key-character-limit)
+                           (sf-multi-line? vsf))
+                    (vertical ksf
+                              (horizontal separator
+                                          separator
+                                          vsf))
+                    (horizontal ksf
+                                separator
+                                vsf)))))
          (interpose (=> newline newrow)))
        m))))
 
@@ -628,10 +665,18 @@
     (raw-string "}" {:fill :object})))
 
 (defstream IRecord [m]
-  (horizontal
-    (raw-string (str "#" (.getName (class m)) "{") {:fill :object})
-    (entries m)
-    (raw-string "}" {:fill :object})))
+  (if (and @*slim-format
+           (< 1 (count m)))
+    (vertical
+      (raw-string (str "#" (.getName (class m))) {:fill :object})
+      (horizontal
+        (raw-string "{" {:fill :object})
+        (entries m)
+        (raw-string "}" {:fill :object})))
+    (horizontal
+      (raw-string (str "#" (.getName (class m)) "{") {:fill :object})
+      (entries m)
+      (raw-string "}" {:fill :object}))))
 
 (defstream Map [m]
   (horizontal
