@@ -174,10 +174,12 @@
     (let [visible-ratio (min 1.0 (/ canvas-size document-size))]
       (max min-scroll-tab-size (* canvas-size visible-ratio)))))
 
-(defn- segment-width [segment]
+(defn- segment-width
+  ^double [segment]
   (* (font/char-width) (.length ^String (:text segment))))
 
-(defn region-width [region]
+(defn region-width
+  ^double [region]
   (transduce (map segment-width) + (:segments region)))
 
 (defn make
@@ -455,6 +457,49 @@
         (when (and (< index (count line)) (:selectable (line index)))
           [row index])))))
 
+(defn canvas->adjusted-cursor [layout ^double x ^double y]
+  (let [{:keys [anchor lines ^double scroll-x ^double scroll-y]} layout
+        doc-x (- x scroll-x)
+        doc-y (- y scroll-y)
+        last-row (dec (count lines))
+        adjust-row #(clamp % 0 last-row)
+        adjusted-row (long (adjust-row (/ doc-y (font/line-height))))
+        step-row (if (< adjusted-row (cursor/row anchor))
+                   dec
+                   inc)]
+    (loop [adjusted-row adjusted-row]
+      (let [regions (lines adjusted-row)
+            region-index (long
+                           (first
+                             (reduce-kv
+                               (fn [[_ ^double acc-x] region-index region]
+                                 (let [acc-x (+ acc-x (region-width region))]
+                                   (if (< doc-x acc-x)
+                                     (reduced [region-index])
+                                     [region-index acc-x])))
+                               [-1 0.0]
+                               regions)))]
+        (if (neg? region-index)
+          (let [next-adjusted-row (long (adjust-row (step-row adjusted-row)))]
+            (when (not= adjusted-row next-adjusted-row)
+              (recur next-adjusted-row)))
+          (let [step-region-index (if (< region-index (cursor/col anchor))
+                                    inc
+                                    dec)
+                adjusted-index (->> region-index
+                                    (iterate step-region-index)
+                                    (some (fn [region-index]
+                                            (if-let [region (get regions region-index)]
+                                              (when (:selectable region)
+                                                region-index)
+                                              -1)))
+                                    (long))]
+            (if (neg? adjusted-index)
+              (let [next-adjusted-row (long (adjust-row (step-row adjusted-row)))]
+                (when (not= adjusted-row next-adjusted-row)
+                  (recur next-adjusted-row)))
+              [adjusted-row adjusted-index])))))))
+
 (defn perform-drag [layout ^MouseEvent event]
   (if-let [gesture (:gesture layout)]
     (case (:type gesture)
@@ -469,7 +514,7 @@
                                  (-> layout :scroll-tab-y :scroll-per-pixel))))
           make)
       :selection
-      (set-cursor layout (canvas->cursor layout (.getX event) (.getY event))
+      (set-cursor layout (canvas->adjusted-cursor layout (.getX event) (.getY event))
                   :anchor false
                   :scroll false)
 

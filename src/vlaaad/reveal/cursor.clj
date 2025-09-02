@@ -4,10 +4,12 @@
 (defn before? [a b]
   (neg? (compare a b)))
 
-(defn row [cursor]
+(defn row
+  ^long [cursor]
   (nth cursor 0))
 
-(defn col [cursor]
+(defn col
+  ^long [cursor]
   (nth cursor 1))
 
 (defn min [a b]
