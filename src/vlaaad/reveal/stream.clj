@@ -28,6 +28,7 @@
 
 (def ^{:private true :tag 'long} slim-key-character-limit 6) ; Fits quotes + four chars.
 (def ^{:private true :tag 'long} slim-value-character-limit 20) ; Fits long integer.
+(def ^{:private true :tag 'long} slim-type-tag-character-limit slim-value-character-limit)
 
 (def ^:private *slim-format (delay (= :slim (:formatting @prefs/prefs :default))))
 
@@ -613,6 +614,28 @@
   (let [hash (System/identityHashCode x)]
     (as hash (raw-string (format "#_0x%x" hash) {:fill :util}))))
 
+(defn type-tagged
+  ([class-or-symbol value]
+   (type-tagged class-or-symbol {:fill :object} value))
+  ([class-or-symbol type-tag-style value]
+   (let [type-name (cond
+                     (class? class-or-symbol)
+                     (.getName ^Class class-or-symbol)
+
+                     (symbol? class-or-symbol)
+                     (str class-or-symbol)
+
+                     :else
+                     (throw (IllegalArgumentException. "class-or-symbol must be a class or a symbol.")))
+         type-tag-sf (raw-string (str "#" type-name) type-tag-style)
+         value-sf (stream value)
+         break (and @*slim-format
+                    (or (sf-wider-than? type-tag-sf slim-type-tag-character-limit)
+                        (sf-multi-line? value-sf)))]
+     (if break
+       (vertical type-tag-sf value-sf)
+       (horizontal type-tag-sf separator value-sf)))))
+
 (defmacro defstream [dispatch-val bindings sf]
   (let [[x ann] (cond-> bindings (= 1 (count bindings)) (conj (gensym "ann")))]
     `(defmethod stream-dispatch ~dispatch-val [x# ann#]
@@ -700,16 +723,10 @@
     (raw-string "}" {:fill :object})))
 
 (defstream IRecord [m]
-  (if (and @*slim-format
-           (< 1 (count m)))
-    (vertical
-      (raw-string (str "#" (.getName (class m))) {:fill :object})
-      (horizontal
-        (raw-string "{" {:fill :object})
-        (entries m)
-        (raw-string "}" {:fill :object})))
+  (type-tagged
+    (class m) {:fill :object}
     (horizontal
-      (raw-string (str "#" (.getName (class m)) "{") {:fill :object})
+      (raw-string "{" {:fill :object})
       (entries m)
       (raw-string "}" {:fill :object}))))
 
