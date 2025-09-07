@@ -27,6 +27,7 @@
 (defrecord AnnotatedValue [value annotation])
 
 (def ^{:private true :tag 'long} slim-key-character-limit 6) ; Fits quotes + four chars.
+(def ^{:private true :tag 'long} slim-value-character-limit 20) ; Fits long integer.
 
 (def ^:private *slim-format (delay (= :slim (:formatting @prefs/prefs :default))))
 
@@ -229,6 +230,23 @@
         acc
         coll))))
 
+(declare escape-layout-chars)
+
+(defn- value-wider-than? [value ^long max-width]
+  (->> value
+       (pr-str)
+       (reduce
+         (fn [^long width char]
+           (let [width (if-let [^String escape-string (escape-layout-chars char)]
+                         (+ width (.length escape-string))
+                         (inc width))]
+             (if (< max-width width)
+               (reduced width)
+               width)))
+         0)
+       (long)
+       (< max-width)))
+
 (defn- sf-wider-than? [sf ^long max-width]
   (->> 0
        (sf (fn [^long width input]
@@ -302,13 +320,30 @@
   ([xs] (horizontally xs nil))
   ([xs ann] (block :horizontal (delimited-items xs separator ann))))
 
+(defn horizontal-item? [x]
+  (cond
+    (coll? x) false
+    (nil? x) true
+    (boolean? x) true
+    (number? x) true
+    (char? x) true
+    (or (string? x)
+        (keyword? x)
+        (symbol? x)) (not (value-wider-than? x slim-value-character-limit))
+    :else false))
+
+(defn horizontal-coll? [coll]
+  (if @*slim-format
+    (every? horizontal-item? coll)
+    (not-any? coll? coll)))
+
 (defn items
   ([coll]
    (items coll nil))
   ([coll ann]
-   (if (some coll? coll)
-     (vertically coll ann)
-     (horizontally coll ann))))
+   (if (horizontal-coll? coll)
+     (horizontally coll ann)
+     (vertically coll ann))))
 
 (defn override-style [sf f & args]
   (as-is (fn [rf acc]
