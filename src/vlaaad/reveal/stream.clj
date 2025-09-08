@@ -231,23 +231,6 @@
         acc
         coll))))
 
-(declare escape-layout-chars)
-
-(defn- value-wider-than? [value ^long max-width]
-  (->> value
-       (pr-str)
-       (reduce
-         (fn [^long width char]
-           (let [width (if-let [^String escape-string (escape-layout-chars char)]
-                         (+ width (.length escape-string))
-                         (inc width))]
-             (if (< max-width width)
-               (reduced width)
-               width)))
-         0)
-       (long)
-       (< max-width)))
-
 (defn- sf-wider-than? [sf ^long max-width]
   (->> 0
        (sf (fn [^long width input]
@@ -286,8 +269,8 @@
                       vsf (stream v (assoc ann :vlaaad.reveal.nav/key k
                                                :vlaaad.reveal.nav/coll m))]
                   (if (and @*slim-format
-                           (sf-wider-than? ksf slim-key-character-limit)
-                           (sf-multi-line? vsf))
+                           (sf-multi-line? vsf)
+                           (sf-wider-than? ksf slim-key-character-limit))
                     (vertical ksf
                               (horizontal separator
                                           separator
@@ -330,7 +313,7 @@
     (char? x) true
     (or (string? x)
         (keyword? x)
-        (symbol? x)) (not (value-wider-than? x slim-value-character-limit))
+        (symbol? x)) (not (sf-wider-than? (stream x) slim-value-character-limit))
     :else false))
 
 (defn horizontal-coll? [coll]
@@ -630,8 +613,8 @@
          type-tag-sf (raw-string (str "#" type-name) type-tag-style)
          value-sf (stream value)
          break (and @*slim-format
-                    (or (sf-wider-than? type-tag-sf slim-type-tag-character-limit)
-                        (sf-multi-line? value-sf)))]
+                    (or (sf-multi-line? value-sf)
+                        (sf-wider-than? type-tag-sf slim-type-tag-character-limit)))]
      (if break
        (vertical type-tag-sf value-sf)
        (horizontal type-tag-sf separator value-sf)))))
