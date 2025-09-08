@@ -346,6 +346,19 @@
   [& sfs]
   (apply stream/vertical sfs))
 
+(defn type-tagged
+  "Returns streaming function that prefixes something with a type-tag
+
+  Args:
+
+    class-or-symbol   class or symbol to derive the type name from
+    type-tag-style    optional styling map for the type-tag
+    value             value or streaming function to follow the type-tag"
+  ([class-or-symbol value]
+   (stream/type-tagged class-or-symbol value))
+  ([class-or-symbol type-tag-style value]
+   (stream/type-tagged class-or-symbol type-tag-style value)))
+
 (def separator
   "Streaming function that separates values in vertical and horizontal blocks
 
