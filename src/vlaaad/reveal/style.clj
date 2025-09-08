@@ -7,8 +7,8 @@
 
 (def scroll-bar-color (delay (case @theme :dark "#fff6" :light "#0006")))
 (def inactive-scroll-bar-color (delay (case @theme :dark "#eee3" :light "#3333")))
-(def selection-color (delay (case @theme :dark "#005dd1" :light "#64e3fc")))
-(def unfocused-selection-color (delay (case @theme :dark "#555555" :light "#e3e3e3")))
+(def selection-color (delay (case @theme :dark "#004091" :light "#64e3fc")))
+(def unfocused-selection-color (delay (case @theme :dark "#444444" :light "#e3e3e3")))
 (def popup-color (delay (case @theme :dark "#3b3b44" :light "#eeeeee")))
 (def search-color (delay (case @theme :dark "#aec1d0" :light "#32383d")))
 (def background-color (delay (case @theme :dark "#232325" :light "#fafafa")))
