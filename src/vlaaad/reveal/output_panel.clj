@@ -17,7 +17,7 @@
            [javafx.event Event]
            [javafx.scene Node]
            [javafx.beans.value ChangeListener]
-           [org.apache.commons.lang3 StringUtils]
+           [org.apache.commons.lang3 Strings]
            [java.util.concurrent Semaphore]))
 
 (defn- update-if-exists [state id f & args]
@@ -317,7 +317,7 @@
   ([^StringBuilder acc in] (.append acc in)))
 
 (defn- index-of-ignore-case [a b start]
-  (let [result (StringUtils/indexOfIgnoreCase a b start)]
+  (let [result (.indexOf Strings/CI a b start)]
     (if (= result -1) nil result)))
 
 (defn- draw-search [^GraphicsContext ctx
