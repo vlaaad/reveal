@@ -321,6 +321,9 @@
     (every? horizontal-item? coll)
     (not-any? coll? coll)))
 
+(defn horizontal-args? [& args]
+  (horizontal-coll? args))
+
 (defn items
   ([coll]
    (items coll nil))
@@ -338,6 +341,9 @@
                                  ::string (apply update input :style f args)
                                  input))))]
              (sf rf acc)))))
+
+(defn replace-non-util-fill [style fill]
+  (update style :fill #(if (= :util %1) :util %2) fill))
 
 (defn single-line [sf]
   (let [space-op (string " " {})]
@@ -775,6 +781,36 @@
 
 ;; exceptions
 
+(defn- stack-trace-line [^String class-name ^String method-name ^String file-name line-number style]
+  (let [clj (if file-name
+              (or (.endsWith file-name ".clj")
+                  (.endsWith file-name ".cljc")
+                  (= file-name "NO_SOURCE_FILE"))
+              (case method-name ("invoke" "doInvoke" "invokePrim" "invokeStatic") true false))
+        s (if clj
+            (case method-name
+              ("invoke" "doInvoke" "invokeStatic")
+              (-> class-name
+                  (Compiler/demunge)
+                  (.replaceFirst "/eval\\d{3,}" "/eval")
+                  (.replaceAll "--\\d{3,}" ""))
+
+              (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
+            (str class-name "." method-name))]
+    (if file-name
+      (horizontal
+        (raw-string s style)
+        separator
+        (raw-string (str "(" file-name (when (nat-int? line-number) (str ":" line-number)) ")") {:fill :util}))
+      (raw-string s style))))
+
+(defn- stack-trace-element [^StackTraceElement el style]
+  (let [class-name (.getClassName el)
+        method-name (.getMethodName el)
+        file-name (.getFileName el)
+        line-number (.getLineNumber el)]
+    (as el (stack-trace-line class-name method-name file-name line-number style))))
+
 (defn datafied-thrown [data]
   (let [{:keys [via trace]} data]
     (vertically
@@ -803,11 +839,20 @@
                 (apply
                   vertical
                   (cond->
-                    [(raw-string
-                       (str (when (pos? i) "Caused by ")
-                            type
-                            (when message (str ": " message)))
-                       {:fill :error})]
+                    [(apply
+                       horizontal
+                       (cond->
+                         [(raw-string
+                            (str (when (pos? i) "Caused by ")
+                                 type
+                                 (when message ": "))
+                            {:fill :object})]
+
+                         message
+                         (conj
+                           (raw-string
+                             message
+                             {:fill :string}))))]
 
                     (pos? n)
                     (conj
@@ -817,38 +862,13 @@
                           (apply
                             vertical
                             (-> []
-                                (cond-> data (conj (override-style (single-line (stream data)) assoc :fill :error)))
+                                (cond-> data (conj (single-line (stream data))))
                                 (conj (vertically
                                         (eduction
                                           (take maxn)
                                           (map (fn [el]
-                                                 (let [^String file-name (el 2)
-                                                       method-name (el 1)
-                                                       class-name (el 0)
-                                                       line-number (el 3)
-                                                       clj (if file-name
-                                                             (or (.endsWith file-name ".clj")
-                                                                 (.endsWith file-name ".cljc")
-                                                                 (= file-name "NO_SOURCE_FILE"))
-                                                             (case method-name (invoke doInvoke invokePrim invokeStatic) true false))
-                                                       s (if clj
-                                                           (case method-name
-                                                             (invoke doInvoke invokeStatic)
-                                                             (-> class-name
-                                                                 str
-                                                                 (Compiler/demunge)
-                                                                 (.replaceFirst "/eval\\d{3,}" "/eval")
-                                                                 (.replaceAll "--\\d{3,}" ""))
-
-                                                             (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
-                                                           (str class-name "." method-name))]
-                                                   (as el
-                                                     (if file-name
-                                                       (horizontal
-                                                         (raw-string s {:fill :error})
-                                                         separator
-                                                         (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
-                                                       (raw-string s {:fill :error}))))))
+                                                 (let [[class-name method-name file-name line-number] el]
+                                                   (as el (stack-trace-line (str class-name) (str method-name) file-name line-number {:fill :symbol})))))
                                           stack-trace)))
                                 (cond-> (< maxn n) (conj (raw-string (str "... " (- n maxn) " more") {:fill :util}))))))))))))))
         via))))
@@ -860,6 +880,9 @@
       (map-indexed
         (fn [i ^Throwable t]
           (let [cause (.getCause t)
+                message (when-let [message (.getMessage t)]
+                          (when-not (and cause (= message (str cause)))
+                            message))
                 stack-trace (into []
                                   (comp
                                     (keep
@@ -883,13 +906,20 @@
               (apply
                 vertical
                 (cond->
-                  [(raw-string
-                     (str (when (pos? i) "Caused by ")
-                          (.getName (.getClass t))
-                          (when-let [message (.getMessage t)]
-                            (when-not (and cause (= message (str cause)))
-                              (str ": " message))))
-                     {:fill :error})]
+                  [(apply
+                     horizontal
+                     (cond->
+                       [(raw-string
+                          (str (when (pos? i) "Caused by ")
+                               (.getName (.getClass t))
+                               (when message ": "))
+                          {:fill :object})]
+
+                       message
+                       (conj
+                         (raw-string
+                           message
+                           {:fill :string}))))]
 
                   (pos? n)
                   (conj
@@ -899,42 +929,17 @@
                         (apply
                           vertical
                           (-> []
-                              (cond-> ex-data (conj (override-style (single-line (stream ex-data)) assoc :fill :error)))
+                              (cond-> ex-data (conj (single-line (stream ex-data))))
                               (conj (vertically
                                       (eduction
                                         (take maxn)
-                                        (map (fn [^StackTraceElement el]
-                                               (let [file-name (.getFileName el)
-                                                     method-name (.getMethodName el)
-                                                     class-name (.getClassName el)
-                                                     line-number (.getLineNumber el)
-                                                     clj (if file-name
-                                                           (or (.endsWith file-name ".clj")
-                                                               (.endsWith file-name ".cljc")
-                                                               (= file-name "NO_SOURCE_FILE"))
-                                                           (case method-name ("invoke" "doInvoke" "invokePrim" "invokeStatic") true false))
-                                                     s (if clj
-                                                         (case method-name
-                                                           ("invoke" "doInvoke" "invokeStatic")
-                                                           (-> class-name
-                                                               (Compiler/demunge)
-                                                               (.replaceFirst "/eval\\d{3,}" "/eval")
-                                                               (.replaceAll "--\\d{3,}" ""))
-
-                                                           (str (Compiler/demunge class-name) "/" (Compiler/demunge method-name)))
-                                                         (str class-name "." method-name))]
-                                                 (as el
-                                                   (if file-name
-                                                     (horizontal
-                                                       (raw-string s {:fill :error})
-                                                       separator
-                                                       (raw-string (str "(" file-name (when-not (neg? line-number) (str ":" line-number)) ")") {:fill :util}))
-                                                     (raw-string s {:fill :error}))))))
+                                        (map #(stack-trace-element % {:fill :symbol}))
                                         stack-trace)))
                               (cond-> (< maxn n) (conj (raw-string (str "... " (- n maxn) " more") {:fill :util}))))))))))))))
       (iterate ex-cause t))))
 
 (defstream Throwable [t]
+  ;; Contrary to caught exceptions, these are intentionally not prettified.
   (let [^Throwable t t
         message (.getMessage t)
         cause (.getCause t)
@@ -958,6 +963,7 @@
       (raw-string ")" {:fill :util}))))
 
 (defstream StackTraceElement [^StackTraceElement el]
+  ;; Contrary to caught exceptions, these are intentionally not prettified.
   (let [file-name (.getFileName el)
         method-name (.getMethodName el)
         class-name (.getClassName el)
@@ -1202,30 +1208,36 @@
 (ns/when-exists lambdaisland.deep-diff.diff
   (load "stream/deep_diff"))
 
+(defn- style-diff-value [x fill]
+  (override-style x replace-non-util-fill fill))
+
 (defstream Mismatch [{:keys [- +]}]
-  (horizontal
-    (override-style
-      (horizontal
-        (raw-string "-")
-        (stream -))
-      assoc :fill :error)
-    separator
-    (override-style
-      (horizontal
-        (raw-string "+")
-        (stream +))
-      assoc :fill :success)))
+  (let [-sf (style-diff-value
+              (horizontal
+                (raw-string "-")
+                (stream -))
+              :error)
+
+        +sf (style-diff-value
+              (horizontal
+                (raw-string "+")
+                (stream +))
+              :success)]
+
+    (if (horizontal-args? - +)
+      (horizontal -sf separator +sf)
+      (vertical -sf +sf))))
 
 (defstream Insertion [{:keys [+]}]
-  (override-style
+  (style-diff-value
     (horizontal
       (raw-string "+")
       (stream +))
-    assoc :fill :success))
+    :success))
 
 (defstream Deletion [{:keys [-]}]
-  (override-style
+  (style-diff-value
     (horizontal
       (raw-string "-")
       (stream -))
-    assoc :fill :error))
+    :error))

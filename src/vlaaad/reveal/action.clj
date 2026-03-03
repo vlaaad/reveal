@@ -123,6 +123,17 @@
          (apply diff/diff (drop 1 (second actual)))
          (diff/diff expected actual)))))
 
+(defaction ::prettify [x]
+  (cond
+    (instance? Throwable x)
+    #(stream/thrown x)
+
+    (and (map? x)
+         (vector? (:via x))
+         (vector? (:trace x))
+         (string? (:cause x)))
+    #(stream/datafied-thrown x)))
+
 (defaction ::why-is-this-boolean-red? [x]
   (when (and (boolean? x)
              (not (or (identical? Boolean/TRUE x)

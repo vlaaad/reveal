@@ -7,7 +7,9 @@
 (defn- prepl-output [x]
   (if (:exception x)
     (stream/as x
-      (cond-> (stream/datafied-thrown (:val x))
+      (cond-> (stream/override-style
+                (stream/datafied-thrown (:val x))
+                stream/replace-non-util-fill :error)
         (:form x)
         (as-> $ (stream/vertical
                   (stream/raw-string (:form x) {:fill :util})

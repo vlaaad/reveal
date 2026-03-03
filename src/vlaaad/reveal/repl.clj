@@ -75,7 +75,9 @@
 
 (defn- wrap-caught [ui caught]
   (fn [ex]
-    (ui (stream/thrown ex))
+    (ui (stream/override-style
+          (stream/thrown ex)
+          stream/replace-non-util-fill :error))
     (caught ex)))
 
 (defn- make-tap [ui]

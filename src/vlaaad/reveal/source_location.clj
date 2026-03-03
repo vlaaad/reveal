@@ -98,6 +98,19 @@
           (symbol-source-file)
           (make-source-location (.getLineNumber el))))
 
+(defn of-datafied-stack-trace-element
+  [el]
+  (when (and (vector? el)
+             (= 4 (count el)))
+    (let [[class-name-sym _ _ line] el]
+      (when (and (symbol? class-name-sym)
+                 (integer? line))
+        (some-> (str class-name-sym)
+                (demunged-name)
+                (symbol)
+                (symbol-source-file)
+                (make-source-location line))))))
+
 (defn of-compiler-exception
   [^Compiler$CompilerException e]
   (make-source-location (.-source e) (.-line e)))
@@ -135,6 +148,9 @@
 
     (instance? StackTraceElement value)
     (of-stack-trace-element value)
+
+    (vector? value)
+    (of-datafied-stack-trace-element value)
 
     (instance? Compiler$CompilerException value)
     (of-compiler-exception value)
